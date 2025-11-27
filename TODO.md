@@ -49,11 +49,119 @@ Multi-monitor wallpaper generator using ComfyUI with deterministic prompts and r
 
 ### 🟡 MEDIUM PRIORITY - New Features
 
-#### NSFW Mode
-- [ ] **NSFW Atoms Directory**: Separate `atoms_nsfw/` with adult content prompts
-- [ ] **NSFW Config Toggle**: `nsfw = true/false` in config.toml
-- [ ] **NSFW CLI Flag**: `--nsfw` to enable adult content generation
-- [ ] **Content Filtering**: Ensure NSFW content only generated when explicitly enabled
+#### 🔄 PROMPT BUILDER REDESIGN (Replaces NSFW Mode)
+
+**STATUS**: Phase 1-2 Complete - Template system implemented
+
+##### Problem Statement
+The current 4-atom system (subject, environment, lighting, style) is too rigid:
+- NSFW mode was a band-aid solution
+- Users can't customize prompt structure
+- No per-monitor customization
+- Negative prompts not supported
+
+##### 🏆 DESIGN: Hybrid Wildcards + Templates
+
+**Directory Structure** (`~/.config/darkwall-comfyui/`):
+```
+atoms/
+├── subjects/           # Each file = wildcard
+│   ├── nature.txt      # One prompt fragment per line
+│   ├── abstract.txt
+│   ├── characters.txt
+│   └── nsfw/           # Optional NSFW subfolder
+│       └── adult.txt
+├── styles/
+│   ├── artistic.txt
+│   ├── photorealistic.txt
+│   └── anime.txt
+├── environments/
+│   └── ...
+├── modifiers/
+│   └── ...
+└── negative/           # Negative prompt atoms
+    ├── quality.txt     # "blurry, low quality, watermark"
+    └── artifacts.txt
+
+prompts/
+├── monitor_0.prompt    # Per-monitor prompt templates
+├── monitor_1.prompt
+└── default.prompt      # Fallback
+```
+
+**Prompt Template Syntax** (`.prompt` files):
+```
+# Positive prompt template
+__subjects/nature__, __environments/outdoor__, __styles/artistic__
+
+# Supports inline variants
+{cinematic|dramatic|moody} lighting
+
+# Supports weights
+{0.8::masterpiece|0.2::experimental}, high quality
+
+---negative---
+__negative/quality__, __negative/artifacts__
+```
+
+**Config Integration** (`config.toml`):
+```toml
+[prompts]
+default_template = "default.prompt"
+
+[monitors.0]
+name = "ultrawide"
+template = "monitor_0.prompt"  # Custom template
+
+[monitors.1]
+name = "portrait"
+template = "default.prompt"    # Uses default
+```
+
+##### Implementation Plan
+
+- [x] **Phase 1: Simplify prompt_generator.py** (COMPLETE)
+  - Removed `PromptPillars` dataclass (unnecessary intermediate)
+  - Removed `generate_pillars()` (replaced by template parsing)
+  - Removed `build_prompt()` (template IS the prompt)
+  - Kept `get_time_slot_seed()` and `select_atom()` (core logic)
+  - Added template parsing with `__wildcard__` and `{variant}` syntax
+  
+- [x] **Phase 2: Template Parser** (COMPLETE)
+  - Parse `.prompt` files with positive/negative sections
+  - Resolve `__path__` → random line from `atoms/path.txt`
+  - Resolve `{a|b|c}` → random choice
+  - Resolve `{0.5::a|2::b}` → weighted random
+  
+- [x] **Phase 3: Config Updates** (COMPLETE)
+  - Added `default_template` to PromptConfig
+  - Created `prompts/default.prompt` template
+  - Updated config initialization to copy prompts/ directory
+  
+- [x] **Phase 4: Negative Prompt Support** (COMPLETE)
+  - Parse `---negative---` section in templates
+  - `generate_prompt_pair()` returns PromptResult with positive & negative
+  - TODO: Inject negative prompt into workflow JSON (when workflow has negative node)
+  
+- [x] **Phase 5: BREAK EVERYTHING** (COMPLETE)
+  - Removed `atoms` property (use `_load_atom_file()` directly)
+  - Removed `select_atom()` method (use `_select_from_list()`)
+  - Removed `_generate_legacy_template()` fallback
+  - Renamed atom files: `subject.txt`, `environment.txt`, `lighting.txt`, `style.txt`
+  - Template file is REQUIRED - no fallback
+
+##### Simplification Benefits
+
+| Before | After |
+|--------|-------|
+| `PromptPillars` dataclass | Removed - template is the structure |
+| `generate_pillars()` | Removed - inline resolution |
+| `build_prompt()` hard-coded | Template file defines structure |
+| 4 fixed atom files | Any `.txt` file in atoms/ |
+| No negative prompts | `---negative---` section |
+| No per-monitor themes | Per-monitor `.prompt` files |
+
+---
 
 #### Wallpaper History & Gallery
 - [ ] **Save All Wallpapers**: Keep history of all generated wallpapers (not just current)
@@ -62,11 +170,11 @@ Multi-monitor wallpaper generator using ComfyUI with deterministic prompts and r
 - [ ] **Favorites System**: Mark wallpapers as favorites to prevent deletion
 - [ ] **Cleanup Policy**: Configurable retention (keep last N, keep X days, etc.)
 
-#### Enhanced Prompt Generation
-- [ ] **Theme Packs**: Multiple atom sets for different moods (cyberpunk, nature, abstract)
-- [ ] **Prompt Templates**: Customizable prompt structure beyond 4-pillar system
-- [ ] **Negative Prompts**: Support for negative prompt injection
-- [ ] **Prompt Preview**: Show generated prompt before sending to ComfyUI
+#### Enhanced Prompt Generation (Superseded by Prompt Builder Redesign above)
+- [x] **Theme Packs**: ~~Multiple atom sets~~ → Solved by atoms/ subdirectories
+- [x] **Prompt Templates**: ~~Customizable structure~~ → Solved by .prompt files
+- [x] **Negative Prompts**: ~~Support for negative prompts~~ → Solved by ---negative--- section
+- [x] **Prompt Preview**: Kept as `darkwall prompt preview` command
 
 ### � LOW PRIORITY - Polish & Documentation
 
@@ -185,7 +293,7 @@ Multi-monitor wallpaper generator using ComfyUI with deterministic prompts and r
 - ~~No validation of ComfyUI URL connectivity~~ ✅ FIXED
 - ~~Swaybg timeout due to persistent daemon conflict~~ ✅ FIXED
 - ~~Workflow path not resolving relative to config directory~~ ✅ FIXED
-- 7 pre-existing unit tests failing (unrelated to recent changes, need investigation)
+- ~~7 pre-existing unit tests failing~~ ✅ FIXED (87 tests now passing)
 
 ## Dependencies 🔧
 
@@ -195,7 +303,7 @@ Multi-monitor wallpaper generator using ComfyUI with deterministic prompts and r
 - `pytest` ✅ (in devShell)
 
 ---
-*Last Updated: 2025-11-27 23:57*
+*Last Updated: 2025-11-28 01:05*
 
 ## Recent Fixes (This Session)
 - **Workflow Path Resolution**: Fixed relative workflow paths to resolve against config directory

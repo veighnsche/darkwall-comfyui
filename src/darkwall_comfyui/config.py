@@ -70,6 +70,7 @@ def validate_toml_structure(config_dict: Dict[str, Any], config_file: Path) -> N
             'theme': str,
             'atoms_dir': str,
             'use_monitor_seed': bool,
+            'default_template': str,  # Optional
         },
         'logging': {
             'level': str,
@@ -162,6 +163,7 @@ class PromptConfig:
     theme: str = "default"
     atoms_dir: str = "atoms"
     use_monitor_seed: bool = True
+    default_template: str = "default.prompt"  # Default prompt template
 
 
 @dataclass
@@ -333,7 +335,7 @@ class Config:
         
         # Files that should always be present
         required_files = ["config.toml"]
-        required_dirs = ["atoms", "workflows"]
+        required_dirs = ["atoms", "workflows", "prompts"]
         
         # Copy missing files
         for required_file in required_files:
@@ -541,6 +543,7 @@ class Config:
                 'theme': self.prompt.theme,
                 'atoms_dir': self.prompt.atoms_dir,
                 'use_monitor_seed': self.prompt.use_monitor_seed,
+                'default_template': self.prompt.default_template,
             },
             'logging': {
                 'level': self.logging.level,

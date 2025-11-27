@@ -19,11 +19,21 @@ def temp_config_dir() -> Generator[Path, None, None]:
         atoms_dir = config_dir / "atoms"
         atoms_dir.mkdir()
         
-        # Create test atom files
-        (atoms_dir / "1_subject.txt").write_text("mountain\nocean\nforest\n")
-        (atoms_dir / "2_environment.txt").write_text("misty\nsunset\nnight\n")
-        (atoms_dir / "3_lighting.txt").write_text("soft light\ndramatic\nambient\n")
-        (atoms_dir / "4_style.txt").write_text("photorealistic\nartistic\nminimalist\n")
+        # Create test atom files (no numbered prefixes!)
+        (atoms_dir / "subject.txt").write_text("mountain\nocean\nforest\n")
+        (atoms_dir / "environment.txt").write_text("misty\nsunset\nnight\n")
+        (atoms_dir / "lighting.txt").write_text("soft light\ndramatic\nambient\n")
+        (atoms_dir / "style.txt").write_text("photorealistic\nartistic\nminimalist\n")
+        
+        # Create prompts directory with default template
+        prompts_dir = config_dir / "prompts"
+        prompts_dir.mkdir()
+        (prompts_dir / "default.prompt").write_text(
+            "__subject__, __environment__, __lighting__, __style__, "
+            "dark mode friendly, high quality\n\n"
+            "---negative---\n"
+            "blurry, low quality\n"
+        )
         
         # Create test config file
         config_file = config_dir / "config.toml"

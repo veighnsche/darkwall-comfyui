@@ -71,19 +71,27 @@ level = "INVALID"
             assert state == {'last_monitor_index': -1, 'rotation_count': 0}
     
     def test_prompt_generator_specific_exceptions(self, temp_config_dir):
-        """Test PromptGenerator raises specific PromptError exceptions."""
+        """Test PromptGenerator handles missing files gracefully."""
         import tempfile
         
         prompt_config = type('PromptConfig', (), {
             'time_slot_minutes': 30,
             'theme': 'default',
             'atoms_dir': 'atoms',
-            'use_monitor_seed': True
+            'use_monitor_seed': True,
+            'default_template': 'default.prompt'
         })()
         
-        # Test with missing atoms directory - should raise FileNotFoundError
-        with pytest.raises(FileNotFoundError):
-            prompt_gen = PromptGenerator(prompt_config, temp_config_dir / "nonexistent")
+        # New behavior: missing atoms directory doesn't raise - uses fallback template
+        prompt_gen = PromptGenerator(prompt_config, temp_config_dir / "nonexistent")
+        
+        # Missing wildcard returns empty list
+        atoms = prompt_gen._load_atom_file("nonexistent")
+        assert atoms == []
+        
+        # Template resolution marks missing wildcards
+        result = prompt_gen._resolve_template("test __missing__ end", seed=42)
+        assert "[missing:missing]" in result
     
     def test_custom_setter_specific_exceptions(self):
         """Test CustomSetter handles specific exceptions properly."""

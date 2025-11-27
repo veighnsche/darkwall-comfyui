@@ -11,7 +11,7 @@ def test_state_manager_initialization(monitor_config):
     """Test that StateManager initializes correctly."""
     mgr = StateManager(monitor_config)
     
-    assert mgr.config == monitor_config
+    assert mgr.monitor_config == monitor_config
     assert hasattr(mgr, 'state_file')
     assert hasattr(mgr, 'logger')
 
@@ -108,11 +108,11 @@ def test_next_monitor_index_rotation(monitor_config):
         mgr.reset_rotation()
         
         # First call should return 0 (from -1 initial state)
-        next_idx = mgr.next_monitor_index()
+        next_idx = mgr.get_next_monitor_index()
         assert next_idx == 0
         
         # Second call should return 1
-        next_idx = mgr.next_monitor_index()
+        next_idx = mgr.get_next_monitor_index()
         assert next_idx == 1
 
 
@@ -132,9 +132,9 @@ def test_rotation_count_increment(monitor_config):
         assert state['rotation_count'] == 0
         
         # Get next index multiple times
-        mgr.next_monitor_index()
-        mgr.next_monitor_index()
-        mgr.next_monitor_index()
+        mgr.get_next_monitor_index()
+        mgr.get_next_monitor_index()
+        mgr.get_next_monitor_index()
         
         # Check rotation count
         state = mgr.get_state()
@@ -207,10 +207,10 @@ def test_single_monitor_rotation(monitor_config):
         mgr.reset_rotation()
         
         # Should always return 0 for single monitor
-        next_idx = mgr.next_monitor_index()
+        next_idx = mgr.get_next_monitor_index()
         assert next_idx == 0
         
-        next_idx = mgr.next_monitor_index()
+        next_idx = mgr.get_next_monitor_index()
         assert next_idx == 0
 
 
@@ -232,30 +232,9 @@ def test_multi_monitor_rotation(monitor_config):
         mgr.reset_rotation()
         
         # Should rotate through 0, 1, 2, 0, 1, 2...
-        assert mgr.next_monitor_index() == 0
-        assert mgr.next_monitor_index() == 1
-        assert mgr.next_monitor_index() == 2
-        assert mgr.next_monitor_index() == 0
-        assert mgr.next_monitor_index() == 1
-        next_idx = mgr.get_next_monitor_index()
-        assert next_idx == 0
-
-
-def test_multi_monitor_rotation(test_config):
-    """Test rotation with multiple monitors."""
-    mgr = StateManager(test_config)
-    
-    # Reset state
-    mgr.reset_rotation()
-    
-    # Test with 3 monitors
-    test_config.monitors.count = 3
-    
-    expected_sequence = [0, 1, 2, 0, 1, 2]
-    actual_sequence = []
-    
-    for _ in range(6):
-        next_idx = mgr.get_next_monitor_index()
-        actual_sequence.append(next_idx)
-    
-    assert actual_sequence == expected_sequence
+        assert mgr.get_next_monitor_index() == 0
+        assert mgr.get_next_monitor_index() == 1
+        assert mgr.get_next_monitor_index() == 2
+        assert mgr.get_next_monitor_index() == 0
+        assert mgr.get_next_monitor_index() == 1
+        assert mgr.get_next_monitor_index() == 2

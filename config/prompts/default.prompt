@@ -1,0 +1,11 @@
+# DarkWall Prompt Template
+#
+# Syntax:
+#   __path__      - Random line from atoms/path.txt
+#   {a|b|c}       - Random choice from options
+#   {0.5::a|2::b} - Weighted random choice
+
+__subject__, __environment__, __lighting__, __style__, 16:9 wallpaper, dark mode friendly, no text, no watermark, no signature, high quality, detailed
+
+---negative---
+blurry, low quality, watermark, signature, text, logo, banner, cropped, out of frame, worst quality, low resolution, jpeg artifacts, ugly, duplicate, morbid, mutilated, poorly drawn, bad anatomy, wrong anatomy
