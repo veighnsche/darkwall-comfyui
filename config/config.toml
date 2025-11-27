@@ -1,0 +1,62 @@
+# DarkWall ComfyUI Configuration
+
+[comfyui]
+# Base URL of your ComfyUI instance
+base_url = "https://comfyui.home.arpa"
+
+# Path to your ComfyUI workflow exported in API format
+workflow_path = "workflow.json"
+
+# Generation timeout in seconds
+timeout = 300
+
+# Polling interval in seconds for checking generation status
+poll_interval = 5
+
+# Optional custom headers (e.g., for authentication)
+# headers = { "Authorization" = "Bearer your-token" }
+
+[monitors]
+# Number of monitors to manage wallpapers for
+count = 3
+
+# Output paths for each monitor (0-indexed)
+# Use {index} placeholder for monitor number, or specify explicit paths
+# Examples:
+# pattern = "~/Pictures/wallpapers/monitor_{index}.png"
+# or explicit:
+# paths = ["~/Pictures/wallpapers/monitor_0.png", "~/Pictures/wallpapers/monitor_1.png", "~/Pictures/wallpapers/monitor_2.png"]
+pattern = "~/Pictures/wallpapers/monitor_{index}.png"
+
+# Wallpaper setting command for your desktop environment
+# Supported: swaybg, swww, feh, nitrogen, or custom
+# For custom: command = "custom:/path/to/script --monitor {index} --image {path}"
+command = "swaybg"
+
+# Backup directory pattern
+backup_pattern = "~/Pictures/wallpapers/backups/monitor_{index}_{timestamp}.png"
+
+[output]
+# Create backup of previous wallpaper before overwriting
+create_backup = true
+
+[prompt]
+# Time slot duration in minutes for deterministic prompt generation
+# 30 = 48 unique prompts per day, 60 = 24 prompts per day
+time_slot_minutes = 30
+
+# Theme name (corresponds to directory in config/themes/)
+theme = "default"
+
+# Directory containing prompt atom files
+atoms_dir = "atoms"
+
+# Use monitor index in seed generation for variety per monitor
+use_monitor_seed = true
+
+[logging]
+# Log level: DEBUG, INFO, WARNING, ERROR, CRITICAL
+level = "INFO"
+
+# Enable verbose output
+verbose = false

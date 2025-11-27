@@ -1,0 +1,62 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "darkwall-comfyui"
+version = "0.1.0"
+description = "Deterministic dark-mode wallpaper generator using ComfyUI"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "Vince"}
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Multimedia :: Graphics",
+    "Topic :: System :: Shells",
+]
+requires-python = ">=3.9"
+dependencies = [
+    "requests>=2.25.0",
+    "tomli>=2.0.0",
+    "tomli-w>=1.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=6.0",
+    "pytest-cov",
+    "black",
+    "isort",
+    "mypy",
+]
+
+[project.scripts]
+generate-wallpaper-once = "darkwall_comfyui.main:main"
+
+[project.urls]
+Homepage = "https://github.com/vince/darkwall-comfyui"
+Repository = "https://github.com/vince/darkwall-comfyui"
+Issues = "https://github.com/vince/darkwall-comfyui/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+darkwall_comfyui = ["config/**/*"]
+
+[tool.black]
+line-length = 88
+target-version = ['py39']
+
+[tool.isort]
+profile = "black"
+line_length = 88
