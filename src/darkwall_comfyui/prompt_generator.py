@@ -13,7 +13,8 @@ from pathlib import Path
 from typing import List, Dict, Any
 from dataclasses import dataclass
 
-from .config import Config
+from .config import Config, PromptConfig
+from .exceptions import PromptError
 
 
 @dataclass
@@ -34,9 +35,10 @@ class PromptGenerator:
     Supports multi-monitor setups with monitor-specific variation.
     """
     
-    def __init__(self, config: Config) -> None:
+    def __init__(self, prompt_config: PromptConfig, config_dir: Path) -> None:
         """Initialize prompt generator with configuration."""
-        self.config = config
+        self.config = prompt_config
+        self.config_dir = config_dir
         self.logger = logging.getLogger(__name__)
         
         # Load prompt atoms from config directory
@@ -52,7 +54,7 @@ class PromptGenerator:
         Raises:
             FileNotFoundError: If atoms directory doesn't exist
         """
-        atoms_dir = self.config.get_config_dir() / self.config.prompt.atoms_dir
+        atoms_dir = self.config_dir / self.config.atoms_dir
         
         self.logger.debug(f"Loading atoms from: {atoms_dir}")
         
@@ -158,7 +160,7 @@ class PromptGenerator:
             Integer seed for deterministic selection
         """
         if slot_minutes is None:
-            slot_minutes = self.config.prompt.time_slot_minutes
+            slot_minutes = self.config.time_slot_minutes
         
         now = datetime.now()
         # Create slot identifier: YYYY-MM-DD-HH-slot
@@ -166,7 +168,7 @@ class PromptGenerator:
         slot_string = f"{now.year}-{now.month}-{now.day}-{now.hour}-{slot_number}"
         
         # Add monitor index to seed if enabled and provided
-        if self.config.prompt.use_monitor_seed and monitor_index is not None:
+        if self.config.use_monitor_seed and monitor_index is not None:
             slot_string = f"{slot_string}-monitor{monitor_index}"
         
         # Convert to deterministic integer seed
@@ -250,7 +252,7 @@ class PromptGenerator:
             Complete prompt string ready for ComfyUI
             
         Raises:
-            ValueError: If prompt generation fails
+            PromptError: If prompt generation fails
         """
         try:
             # Generate time slot seed
@@ -275,14 +277,19 @@ class PromptGenerator:
             
             # Validate prompt
             if not prompt or len(prompt.strip()) == 0:
-                raise ValueError("Generated prompt is empty")
+                raise PromptError("Generated prompt is empty")
             
             if len(prompt) < 10:
-                self.logger.warning(f"Generated prompt seems too short: {prompt}")
+                raise PromptError(f"Generated prompt too short: {len(prompt)} chars")
             
-            self.logger.debug(f"Generated prompt for monitor {monitor_index or 'default'}: {prompt[:100]}...")
             return prompt
             
+        except PromptError:
+            # Re-raise our own exceptions
+            raise
+        except (ValueError, KeyError) as e:
+            self.logger.error(f"Prompt generation error: {e}")
+            raise PromptError(f"Prompt generation failed: {e}")
         except Exception as e:
             self.logger.error(f"Failed to generate prompt for monitor {monitor_index}: {e}")
-            raise ValueError(f"Prompt generation failed: {e}")
+            raise PromptError(f"Prompt generation failed: {e}")

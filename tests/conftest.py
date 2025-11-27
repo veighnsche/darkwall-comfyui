@@ -6,7 +6,7 @@ from typing import Generator
 
 import pytest
 
-from darkwall_comfyui.config import Config
+from darkwall_comfyui.config import Config, ComfyUIConfig, MonitorConfig, OutputConfig, PromptConfig
 
 
 @pytest.fixture
@@ -75,6 +75,36 @@ def test_config(temp_config_dir: Path) -> Config:
     finally:
         # Restore original method
         Config.get_config_dir = original_get_config_dir
+
+
+@pytest.fixture
+def comfyui_config(test_config: Config) -> ComfyUIConfig:
+    """Extract ComfyUIConfig from test config."""
+    return test_config.comfyui
+
+
+@pytest.fixture
+def monitor_config(test_config: Config) -> MonitorConfig:
+    """Extract MonitorConfig from test config."""
+    return test_config.monitors
+
+
+@pytest.fixture
+def output_config(test_config: Config) -> OutputConfig:
+    """Extract OutputConfig from test config."""
+    return test_config.output
+
+
+@pytest.fixture
+def prompt_config(test_config: Config) -> PromptConfig:
+    """Extract PromptConfig from test config."""
+    return test_config.prompt
+
+
+@pytest.fixture
+def config_dir(temp_config_dir: Path) -> Path:
+    """Get the config directory path for tests."""
+    return temp_config_dir
 
 
 @pytest.fixture

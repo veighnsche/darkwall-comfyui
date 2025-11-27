@@ -33,14 +33,35 @@ class WallpaperSetter(ABC):
         """
         pass
     
-    def _run_command(self, cmd: list[str], timeout: int = 30) -> bool:
+    def _run_command(self, cmd: list[str], timeout: int = 30, background: bool = False) -> bool:
         """Run a command and return success status."""
         try:
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
-            if result.returncode != 0:
-                self.logger.error(f"Command failed: {' '.join(cmd)}\n{result.stderr}")
-                return False
-            return True
+            if background:
+                # Use subprocess.Popen to run in background without waiting
+                process = subprocess.Popen(
+                    cmd, 
+                    stdout=subprocess.DEVNULL, 
+                    stderr=subprocess.DEVNULL,
+                    start_new_session=True
+                )
+                
+                # Give it a moment to start and check if it's still running
+                import time
+                time.sleep(0.5)
+                
+                if process.poll() is None:
+                    # Process is still running (expected for background daemons)
+                    return True
+                else:
+                    # Process exited immediately (error)
+                    self.logger.error(f"Background command failed: {' '.join(cmd)}")
+                    return False
+            else:
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+                if result.returncode != 0:
+                    self.logger.error(f"Command failed: {' '.join(cmd)}\n{result.stderr}")
+                    return False
+                return True
         except subprocess.TimeoutExpired:
             self.logger.error(f"Command timed out: {' '.join(cmd)}")
             return False
@@ -50,6 +71,11 @@ class WallpaperSetter(ABC):
         except Exception as e:
             self.logger.error(f"Command error: {e}")
             return False
+    
+    def _default_monitor_name(self, index: int) -> str:
+        """Get default monitor name for index."""
+        names = ["eDP-1", "DP-1", "DP-2", "HDMI-A-1", "HDMI-A-2"]
+        return names[index] if index < len(names) else f"DP-{index}"
 
 
 class SwwwSetter(WallpaperSetter):
@@ -63,10 +89,6 @@ class SwwwSetter(WallpaperSetter):
             self.logger.info(f"Set wallpaper on {name} via swww")
             return True
         return False
-    
-    def _default_monitor_name(self, index: int) -> str:
-        names = ["eDP-1", "DP-1", "DP-2", "HDMI-A-1", "HDMI-A-2"]
-        return names[index] if index < len(names) else f"DP-{index}"
 
 
 class SwaybgSetter(WallpaperSetter):
@@ -81,40 +103,10 @@ class SwaybgSetter(WallpaperSetter):
         # Run swaybg in background since it's a persistent daemon
         cmd = ["swaybg", "--output", name, "--mode", "fill", "--image", str(image_path)]
         
-        if self._run_background_command(cmd):
+        if self._run_command(cmd, background=True):
             self.logger.info(f"Set wallpaper on {name} via swaybg (background)")
             return True
         return False
-    
-    def _run_background_command(self, cmd: list[str]) -> bool:
-        """Run a command in background and return success status."""
-        try:
-            # Use subprocess.Popen to run in background without waiting
-            process = subprocess.Popen(
-                cmd, 
-                stdout=subprocess.DEVNULL, 
-                stderr=subprocess.DEVNULL,
-                start_new_session=True
-            )
-            
-            # Give it a moment to start and check if it's still running
-            import time
-            time.sleep(0.5)
-            
-            if process.poll() is None:
-                # Process is still running (expected for swaybg daemon)
-                return True
-            else:
-                # Process exited immediately (error)
-                self.logger.error(f"Background command failed: {' '.join(cmd)}")
-                return False
-                
-        except FileNotFoundError:
-            self.logger.error(f"Command not found: {cmd[0]}")
-            return False
-        except Exception as e:
-            self.logger.error(f"Background command error: {e}")
-            return False
     
     def _kill_existing_swaybg(self, monitor_name: str) -> None:
         """Kill existing swaybg processes for the specific monitor."""
@@ -132,10 +124,6 @@ class SwaybgSetter(WallpaperSetter):
                         
         except Exception as e:
             self.logger.debug(f"Failed to kill swaybg processes for {monitor_name}: {e}")
-    
-    def _default_monitor_name(self, index: int) -> str:
-        names = ["eDP-1", "DP-1", "DP-2", "HDMI-A-1", "HDMI-A-2"]
-        return names[index] if index < len(names) else f"DP-{index}"
 
 
 class FehSetter(WallpaperSetter):
@@ -171,17 +159,18 @@ class CustomSetter(WallpaperSetter):
         self.template = command_template
     
     def set(self, image_path: Path, monitor_index: int, monitor_name: Optional[str] = None) -> bool:
-        name = monitor_name or f"monitor_{monitor_index}"
-        
         try:
             cmd_str = self.template.format(
                 path=str(image_path),
                 index=monitor_index,
-                monitor=name
+                name=monitor_name or f"DP-{monitor_index}"
             )
             cmd = cmd_str.split()
         except KeyError as e:
             self.logger.error(f"Invalid placeholder in custom command: {e}")
+            return False
+        except (ValueError, AttributeError) as e:
+            self.logger.error(f"Error formatting custom command: {e}")
             return False
         
         if self._run_command(cmd):

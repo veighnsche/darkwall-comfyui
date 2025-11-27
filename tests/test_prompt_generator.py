@@ -4,11 +4,12 @@ import pytest
 from darkwall_comfyui.prompt_generator import PromptGenerator
 
 
-def test_prompt_generator_initialization(test_config):
+def test_prompt_generator_initialization(prompt_config, config_dir):
     """Test that PromptGenerator initializes correctly."""
-    gen = PromptGenerator(test_config)
+    gen = PromptGenerator(prompt_config, config_dir)
     
-    assert gen.config == test_config
+    assert gen.config == prompt_config
+    assert gen.config_dir == config_dir
     assert hasattr(gen, 'atoms')
     assert isinstance(gen.atoms, dict)
     
@@ -25,9 +26,9 @@ def test_prompt_generator_initialization(test_config):
     assert "photorealistic" in gen.atoms["style"]
 
 
-def test_time_slot_seed_generation(test_config):
+def test_time_slot_seed_generation(prompt_config, config_dir):
     """Test deterministic seed generation."""
-    gen = PromptGenerator(test_config)
+    gen = PromptGenerator(prompt_config, config_dir)
     
     # Test seed generation is deterministic
     seed1 = gen.get_time_slot_seed()
@@ -40,9 +41,9 @@ def test_time_slot_seed_generation(test_config):
     assert seed_monitor_0 != seed_monitor_1
 
 
-def test_atom_selection(test_config):
-    """Test atom selection with deterministic seeds."""
-    gen = PromptGenerator(test_config)
+def test_atom_selection(prompt_config, config_dir):
+    """Test atom selection based on seed."""
+    gen = PromptGenerator(prompt_config, config_dir)
     
     atoms = ["mountain", "ocean", "forest"]
     
@@ -62,9 +63,9 @@ def test_atom_selection(test_config):
     assert empty_selected == "minimal dark wallpaper"
 
 
-def test_pillar_generation(test_config):
-    """Test prompt pillar generation."""
-    gen = PromptGenerator(test_config)
+def test_pillar_generation(prompt_config, config_dir):
+    """Test pillar generation from atoms."""
+    gen = PromptGenerator(prompt_config, config_dir)
     
     pillars = gen.generate_pillars(42)
     
@@ -84,9 +85,9 @@ def test_pillar_generation(test_config):
     assert len(pillars.style) > 0
 
 
-def test_prompt_building(test_config):
-    """Test final prompt building."""
-    gen = PromptGenerator(test_config)
+def test_prompt_building(prompt_config, config_dir):
+    """Test prompt building from pillars."""
+    gen = PromptGenerator(prompt_config, config_dir)
     
     from darkwall_comfyui.prompt_generator import PromptPillars
     
@@ -108,9 +109,9 @@ def test_prompt_building(test_config):
     assert "dark mode friendly" in prompt
 
 
-def test_full_prompt_generation(test_config):
-    """Test complete prompt generation."""
-    gen = PromptGenerator(test_config)
+def test_full_prompt_generation(prompt_config, config_dir):
+    """Test complete prompt generation workflow."""
+    gen = PromptGenerator(prompt_config, config_dir)
     
     prompt = gen.generate_prompt(monitor_index=0)
     
@@ -127,42 +128,9 @@ def test_full_prompt_generation(test_config):
     assert prompt != prompt_monitor_1
 
 
-def test_missing_atoms_directory():
-    """Test behavior when atoms directory is missing."""
-    from darkwall_comfyui.config import Config
-    import tempfile
+def test_missing_atoms_directory(prompt_config, temp_config_dir):
+    """Test error handling when atoms directory doesn't exist."""
+    from pathlib import Path
     
-    with tempfile.TemporaryDirectory() as temp_dir:
-        config_dir = Path(temp_dir)
-        
-        # Create config without atoms directory
-        config_file = config_dir / "config.toml"
-        config_file.write_text("""
-[comfyui]
-base_url = "http://localhost:8188"
-workflow_path = "test_workflow.json"
-timeout = 300
-poll_interval = 2
-
-[monitors]
-count = 1
-command = "swww"
-pattern = "monitor_{index}.png"
-backup_pattern = "monitor_{index}_{timestamp}.png"
-
-[output]
-directory = "~/wallpapers"
-create_backup = true
-
-[prompt]
-atoms_dir = "atoms"
-time_slot_minutes = 60
-
-[logging]
-level = "INFO"
-""")
-        
-        config = Config.load(config_file=config_file, initialize=False)
-        
-        with pytest.raises(FileNotFoundError):
-            PromptGenerator(config)
+    with pytest.raises(FileNotFoundError):
+        PromptGenerator(prompt_config, temp_config_dir / "nonexistent")

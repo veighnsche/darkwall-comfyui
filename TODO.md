@@ -34,11 +34,11 @@ Multi-monitor wallpaper generator using ComfyUI with deterministic prompts and r
 ### � HIGH PRIORITY - Refactoring & Architecture
 
 #### Code Quality Refactoring
-- [ ] **Consolidate Duplicate Logic**: Review and merge similar code patterns
-- [ ] **Consistent Error Handling**: Standardize exception handling across modules
-- [ ] **Configuration Validation**: Add schema validation for config files
-- [ ] **Dependency Injection**: Reduce coupling between modules for testability
-- [ ] **Clean Up Patchy Code**: Address ad-hoc fixes made during development
+- [x] **Consolidate Duplicate Logic**: Review and merge similar code patterns
+- [x] **Consistent Error Handling**: Standardize exception handling across modules
+- [x] **Configuration Validation**: Add schema validation for config files
+- [x] **Dependency Injection**: Reduce coupling between modules for testability
+- [x] **Clean Up Patchy Code**: Address ad-hoc fixes made during development
 
 #### Multi-Workflow Support
 - [ ] **Per-Monitor Workflows**: Different workflow JSON per monitor (different sizes/styles)

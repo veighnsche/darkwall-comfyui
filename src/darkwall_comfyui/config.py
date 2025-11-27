@@ -8,6 +8,7 @@ providing defaults and validation, plus config initialization and state manageme
 import os
 import json
 import logging
+import re
 from pathlib import Path
 from typing import Dict, Any, Optional, List
 from dataclasses import dataclass, field
@@ -17,6 +18,95 @@ try:
     import tomli_w
 except ImportError:
     raise ImportError("Required packages 'tomli' and 'tomli-w' not found. Install with: pip install tomli tomli-w")
+
+from .exceptions import ConfigError, StateError
+
+
+# URL validation regex
+URL_PATTERN = re.compile(
+    r'^https?://'  # http:// or https://
+    r'(?:(?:[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?\.)+[A-Z]{2,6}\.?|'  # domain
+    r'localhost|'  # localhost
+    r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})'  # IP
+    r'(?::\d+)?'  # optional port
+    r'(?:/?|[/?]\S+)$', re.IGNORECASE)
+
+
+def validate_toml_structure(config_dict: Dict[str, Any], config_file: Path) -> None:
+    """
+    Validate TOML structure before creating dataclasses.
+    
+    Checks for unknown sections and keys, providing helpful error messages.
+    
+    Args:
+        config_dict: Loaded TOML configuration dictionary
+        config_file: Path to config file for error messages
+        
+    Raises:
+        ConfigError: If structure validation fails
+    """
+    # Define valid sections and their keys
+    valid_structure = {
+        'comfyui': {
+            'base_url': str,
+            'workflow_path': str,
+            'timeout': int,
+            'poll_interval': int,
+            'headers': dict,  # Optional
+        },
+        'monitors': {
+            'count': int,
+            'pattern': str,
+            'paths': list,  # Optional
+            'command': str,
+            'backup_pattern': str,
+        },
+        'output': {
+            'create_backup': bool,
+        },
+        'prompt': {
+            'time_slot_minutes': int,
+            'theme': str,
+            'atoms_dir': str,
+            'use_monitor_seed': bool,
+        },
+        'logging': {
+            'level': str,
+            'verbose': bool,
+        },
+    }
+    
+    # Check for unknown sections
+    for section in config_dict:
+        if section not in valid_structure:
+            raise ConfigError(
+                f"Unknown config section '{section}' in {config_file}. "
+                f"Valid sections: {list(valid_structure.keys())}"
+            )
+    
+    # Check each section for unknown keys and type validation
+    for section_name, section_config in config_dict.items():
+        if not isinstance(section_config, dict):
+            raise ConfigError(
+                f"Section '{section_name}' must be a dictionary in {config_file}"
+            )
+        
+        valid_keys = valid_structure[section_name]
+        
+        for key, value in section_config.items():
+            if key not in valid_keys:
+                raise ConfigError(
+                    f"Unknown key '{key}' in section '{section_name}' in {config_file}. "
+                    f"Valid keys: {list(valid_keys.keys())}"
+                )
+            
+            # Basic type checking
+            expected_type = valid_keys[key]
+            if expected_type != dict and not isinstance(value, expected_type):
+                raise ConfigError(
+                    f"Key '{section_name}.{key}' must be of type {expected_type.__name__} "
+                    f"in {config_file}, got {type(value).__name__}"
+                )
 
 
 @dataclass
@@ -89,27 +179,62 @@ class Config:
     def __post_init__(self) -> None:
         """Validate and post-process configuration."""
         # Validate ComfyUI settings
-        if not self.comfyui.base_url.startswith(('http://', 'https://')):
-            raise ValueError(f"Invalid base URL: {self.comfyui.base_url}")
+        if not URL_PATTERN.match(self.comfyui.base_url):
+            raise ConfigError(f"Invalid base URL format: {self.comfyui.base_url}")
         
-        if self.comfyui.timeout <= 0:
-            raise ValueError("Generation timeout must be positive")
+        if self.comfyui.timeout <= 0 or self.comfyui.timeout > 3600:  # Max 1 hour
+            raise ConfigError("Generation timeout must be between 1 and 3600 seconds")
         
-        if self.comfyui.poll_interval <= 0:
-            raise ValueError("Poll interval must be positive")
+        if self.comfyui.poll_interval <= 0 or self.comfyui.poll_interval > 60:  # Max 1 minute
+            raise ConfigError("Poll interval must be between 1 and 60 seconds")
+        
+        # Validate workflow path format
+        workflow_path = Path(self.comfyui.workflow_path)
+        if workflow_path.suffix.lower() != '.json':
+            raise ConfigError(f"Workflow path must be a JSON file: {workflow_path}")
         
         # Validate monitor settings
-        if self.monitors.count <= 0:
-            raise ValueError("Monitor count must be positive")
+        if self.monitors.count <= 0 or self.monitors.count > 10:
+            raise ConfigError("Monitor count must be between 1 and 10")
+        
+        # Validate wallpaper command
+        valid_commands = ['swaybg', 'swww', 'feh', 'nitrogen']
+        if not self.monitors.command.startswith('custom:'):
+            if self.monitors.command not in valid_commands:
+                raise ConfigError(
+                    f"Invalid wallpaper command: {self.monitors.command}. "
+                    f"Valid commands: {valid_commands} or 'custom:<template>'"
+                )
+        
+        # Validate path patterns contain required placeholders
+        if '{index}' not in self.monitors.pattern:
+            raise ConfigError("Monitor pattern must contain {index} placeholder")
+        
+        if '{index}' not in self.monitors.backup_pattern:
+            raise ConfigError("Backup pattern must contain {index} placeholder")
+        
+        if '{timestamp}' not in self.monitors.backup_pattern:
+            raise ConfigError("Backup pattern must contain {timestamp} placeholder")
+        
+        # Validate paths array if provided
+        if self.monitors.paths is not None:
+            if len(self.monitors.paths) != self.monitors.count:
+                raise ConfigError(
+                    f"Paths array length ({len(self.monitors.paths)}) must match monitor count ({self.monitors.count})"
+                )
         
         # Validate prompt settings
         if self.prompt.time_slot_minutes <= 0 or self.prompt.time_slot_minutes > 1440:
-            raise ValueError("Time slot minutes must be between 1 and 1440")
+            raise ConfigError("Time slot minutes must be between 1 and 1440")
+        
+        # Validate atoms directory name
+        if not self.prompt.atoms_dir.isidentifier() and self.prompt.atoms_dir != 'atoms':
+            raise ConfigError(f"Invalid atoms directory name: {self.prompt.atoms_dir}")
         
         # Validate logging settings
         valid_levels = ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']
         if self.logging.level.upper() not in valid_levels:
-            raise ValueError(f"Log level must be one of: {valid_levels}")
+            raise ConfigError(f"Log level must be one of: {valid_levels}")
     
     @classmethod
     def get_config_dir(cls) -> Path:
@@ -276,9 +401,17 @@ class Config:
             try:
                 with open(config_file, 'rb') as f:
                     config_dict = tomli.load(f)
+                
+                # Validate TOML structure before proceeding
+                validate_toml_structure(config_dict, config_file)
+                
                 logging.getLogger(__name__).info(f"Loaded config from {config_file}")
-            except Exception as e:
+            except (tomli.TOMLDecodeError, OSError, ConfigError) as e:
                 logging.getLogger(__name__).warning(f"Failed to load config file {config_file}: {e}")
+                # If validation fails, re-raise as ConfigError
+                if isinstance(e, ConfigError):
+                    raise
+                # For other errors (like TOML parsing), continue with defaults
         else:
             logging.getLogger(__name__).warning(f"Config file not found: {config_file}, using defaults")
         
@@ -418,9 +551,9 @@ class Config:
 class StateManager:
     """Manages persistent state for multi-monitor rotation."""
     
-    def __init__(self, config: Config) -> None:
-        self.config = config
-        self.state_file = config.get_state_file()
+    def __init__(self, monitor_config: MonitorConfig) -> None:
+        self.monitor_config = monitor_config
+        self.state_file = Config.get_state_file()  # Still need Config for static method
         self.logger = logging.getLogger(__name__)
     
     def get_state(self) -> Dict[str, Any]:
@@ -431,7 +564,7 @@ class StateManager:
         try:
             with open(self.state_file, 'r') as f:
                 return json.load(f)
-        except Exception as e:
+        except (FileNotFoundError, json.JSONDecodeError, OSError) as e:
             self.logger.warning(f"Failed to load state file: {e}")
             return {'last_monitor_index': -1, 'rotation_count': 0}
     
@@ -442,7 +575,7 @@ class StateManager:
         try:
             with open(self.state_file, 'w') as f:
                 json.dump(state, f, indent=2)
-        except Exception as e:
+        except (OSError, PermissionError) as e:
             self.logger.error(f"Failed to save state file: {e}")
     
     def get_next_monitor_index(self) -> int:
@@ -451,7 +584,7 @@ class StateManager:
         last_index = state.get('last_monitor_index', -1)
         
         # Cycle to next monitor
-        next_index = (last_index + 1) % self.config.monitors.count
+        next_index = (last_index + 1) % self.monitor_config.count
         
         # Update state
         state['last_monitor_index'] = next_index

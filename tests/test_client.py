@@ -8,21 +8,21 @@ from darkwall_comfyui.comfy.client import ComfyClient, ComfyClientError, ComfyCo
 from darkwall_comfyui.comfy.client import ComfyTimeoutError, ComfyGenerationError
 
 
-def test_client_initialization(test_config):
+def test_client_initialization(comfyui_config):
     """Test that ComfyClient initializes correctly."""
-    client = ComfyClient(test_config)
+    client = ComfyClient(comfyui_config)
     
-    assert client.config == test_config
-    assert client.base_url == test_config.comfyui.base_url.rstrip('/')
-    assert client.timeout == test_config.comfyui.timeout
-    assert client.poll_interval == test_config.comfyui.poll_interval
+    assert client.config == comfyui_config
+    assert client.base_url == comfyui_config.base_url.rstrip('/')
+    assert client.timeout == comfyui_config.timeout
+    assert client.poll_interval == comfyui_config.poll_interval
     assert hasattr(client, 'session')
     assert hasattr(client, 'logger')
 
 
-def test_health_check_success(test_config):
+def test_health_check_success(comfyui_config):
     """Test successful health check."""
-    client = ComfyClient(test_config)
+    client = ComfyClient(comfyui_config)
     
     with patch.object(client.session, 'get') as mock_get:
         mock_response = Mock()
@@ -38,9 +38,9 @@ def test_health_check_success(test_config):
         )
 
 
-def test_health_check_failure_status(test_config):
+def test_health_check_failure_status(comfyui_config):
     """Test health check with non-200 status."""
-    client = ComfyClient(test_config)
+    client = ComfyClient(comfyui_config)
     
     with patch.object(client.session, 'get') as mock_get:
         mock_response = Mock()
@@ -52,9 +52,9 @@ def test_health_check_failure_status(test_config):
         assert result is False
 
 
-def test_health_check_connection_error(test_config):
+def test_health_check_connection_error(comfyui_config):
     """Test health check with connection error."""
-    client = ComfyClient(test_config)
+    client = ComfyClient(comfyui_config)
     
     with patch.object(client.session, 'get') as mock_get:
         mock_get.side_effect = ConnectionError("Connection failed")
@@ -64,9 +64,9 @@ def test_health_check_connection_error(test_config):
         assert result is False
 
 
-def test_prompt_injection(test_config):
+def test_prompt_injection(comfyui_config):
     """Test prompt injection into workflow."""
-    client = ComfyClient(test_config)
+    client = ComfyClient(comfyui_config)
     
     workflow = {
         "1": {
@@ -95,9 +95,9 @@ def test_prompt_injection(test_config):
     assert workflow["1"]["inputs"]["text"] == "original prompt"  # Original unchanged
 
 
-def test_prompt_injection_multiple_fields(test_config):
-    """Test prompt injection finds multiple possible field names."""
-    client = ComfyClient(test_config)
+def test_prompt_injection_multiple_fields(comfyui_config):
+    """Test prompt injection into multiple text fields."""
+    client = ComfyClient(comfyui_config)
     
     workflow = {
         "1": {
@@ -114,9 +114,9 @@ def test_prompt_injection_multiple_fields(test_config):
     assert new_workflow["1"]["inputs"]["positive"] == "new prompt"
 
 
-def test_prompt_injection_no_prompt_field(test_config):
-    """Test prompt injection when no prompt field is found."""
-    client = ComfyClient(test_config)
+def test_prompt_injection_no_prompt_field(comfyui_config):
+    """Test workflow with no prompt field."""
+    client = ComfyClient(comfyui_config)
     
     workflow = {
         "1": {
@@ -133,9 +133,9 @@ def test_prompt_injection_no_prompt_field(test_config):
     assert new_workflow == workflow
 
 
-def test_submit_workflow_success(test_config):
+def test_submit_workflow_success(comfyui_config):
     """Test successful workflow submission."""
-    client = ComfyClient(test_config)
+    client = ComfyClient(comfyui_config)
     
     workflow = {"1": {"class_type": "TestNode", "inputs": {}}}
     
@@ -155,38 +155,45 @@ def test_submit_workflow_success(test_config):
         )
 
 
-def test_submit_workflow_no_prompt_id(test_config):
-    """Test workflow submission when no prompt_id is returned."""
-    client = ComfyClient(test_config)
+def test_submit_workflow_no_prompt_id(comfyui_config):
+    """Test workflow submission with no prompt ID in response."""
+    client = ComfyClient(comfyui_config)
     
     workflow = {"1": {"class_type": "TestNode", "inputs": {}}}
     
     with patch.object(client.session, 'post') as mock_post:
+        import requests
         mock_response = Mock()
         mock_response.json.return_value = {}
-        mock_response.raise_for_status.return_value = None
-        mock_post.return_value = mock_response
+        mock_response.status_code = 400
+        mock_response.text = "No prompt_id in response"
         
-        with pytest.raises(ComfyGenerationError, match="No prompt_id"):
+        # Create a proper HTTPError with response
+        http_error = requests.HTTPError("No prompt_id")
+        http_error.response = mock_response
+        mock_post.side_effect = http_error
+        
+        with pytest.raises(ComfyGenerationError, match="Invalid workflow"):
             client._submit(workflow)
 
 
-def test_submit_workflow_connection_error(test_config):
+def test_submit_workflow_connection_error(comfyui_config):
     """Test workflow submission with connection error."""
-    client = ComfyClient(test_config)
+    client = ComfyClient(comfyui_config)
     
     workflow = {"1": {"class_type": "TestNode", "inputs": {}}}
     
     with patch.object(client.session, 'post') as mock_post:
-        mock_post.side_effect = ConnectionError("Connection failed")
+        import requests
+        mock_post.side_effect = requests.ConnectionError("Connection failed")
         
         with pytest.raises(ComfyConnectionError):
             client._submit(workflow)
 
 
-def test_get_history_success(test_config):
+def test_get_history_success(comfyui_config):
     """Test successful history retrieval."""
-    client = ComfyClient(test_config)
+    client = ComfyClient(comfyui_config)
     
     with patch.object(client.session, 'get') as mock_get:
         mock_response = Mock()
@@ -210,9 +217,9 @@ def test_get_history_success(test_config):
         )
 
 
-def test_get_history_not_found(test_config):
-    """Test history retrieval when prompt is not found."""
-    client = ComfyClient(test_config)
+def test_get_history_not_found(comfyui_config):
+    """Test history retrieval with non-existent prompt."""
+    client = ComfyClient(comfyui_config)
     
     with patch.object(client.session, 'get') as mock_get:
         mock_response = Mock()
@@ -225,11 +232,11 @@ def test_get_history_not_found(test_config):
         assert history is None
 
 
-def test_download_image_success(test_config):
+def test_download_image_success(comfyui_config):
     """Test successful image download."""
-    client = ComfyClient(test_config)
+    client = ComfyClient(comfyui_config)
     
-    test_image_data = b"fake image data"
+    test_image_data = b"x" * 150  # Make sure it's over 100 bytes
     
     with patch.object(client.session, 'get') as mock_get:
         mock_response = Mock()
@@ -247,9 +254,9 @@ def test_download_image_success(test_config):
         )
 
 
-def test_download_image_empty_data(test_config):
+def test_download_image_empty_data(comfyui_config):
     """Test image download with empty data."""
-    client = ComfyClient(test_config)
+    client = ComfyClient(comfyui_config)
     
     with patch.object(client.session, 'get') as mock_get:
         mock_response = Mock()
@@ -261,9 +268,9 @@ def test_download_image_empty_data(test_config):
             client._download_image("test.png")
 
 
-def test_download_image_too_small(test_config):
+def test_download_image_too_small(comfyui_config):
     """Test image download with data that's too small."""
-    client = ComfyClient(test_config)
+    client = ComfyClient(comfyui_config)
     
     with patch.object(client.session, 'get') as mock_get:
         mock_response = Mock()
@@ -275,15 +282,19 @@ def test_download_image_too_small(test_config):
             client._download_image("test.png")
 
 
-def test_download_image_not_found(test_config):
-    """Test image download when image is not found."""
-    client = ComfyClient(test_config)
+def test_download_image_not_found(comfyui_config):
+    """Test image download with 404 error."""
+    client = ComfyClient(comfyui_config)
     
     with patch.object(client.session, 'get') as mock_get:
+        import requests
         mock_response = Mock()
         mock_response.status_code = 404
-        mock_response.raise_for_status.side_effect = Exception("HTTP 404")
-        mock_get.return_value = mock_response
+        
+        # Create a proper HTTPError with response
+        http_error = requests.HTTPError("HTTP 404")
+        http_error.response = mock_response
+        mock_get.side_effect = http_error
         
         with pytest.raises(ComfyClientError, match="Image not found"):
             client._download_image("test.png")

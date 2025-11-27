@@ -3,7 +3,7 @@
 import logging
 import sys
 
-from ..config import Config, StateManager
+from ..config import Config, StateManager, MonitorConfig, OutputConfig, ComfyUIConfig, PromptConfig
 from ..comfy import ComfyClient, WorkflowManager
 from ..prompt_generator import PromptGenerator
 from ..wallpaper import WallpaperTarget
@@ -27,7 +27,7 @@ def generate_once(config: Config, dry_run: bool = False) -> None:
     logger = logging.getLogger(__name__)
     
     # Get next monitor (but don't update state in dry run)
-    state = StateManager(config)
+    state = StateManager(config.monitors)
     if dry_run:
         # Just peek at next monitor without updating state
         current_state = state.get_state()
@@ -46,7 +46,7 @@ def generate_once(config: Config, dry_run: bool = False) -> None:
         
         # Show prompt that would be generated
         try:
-            prompt_gen = PromptGenerator(config)
+            prompt_gen = PromptGenerator(config.prompt, Config.get_config_dir())
             prompt = prompt_gen.generate_prompt(monitor_index=monitor_index)
             print(f"  Prompt: {prompt[:100]}...")
         except Exception as e:
@@ -61,12 +61,12 @@ def generate_once(config: Config, dry_run: bool = False) -> None:
     
     try:
         # Generate prompt
-        prompt_gen = PromptGenerator(config)
+        prompt_gen = PromptGenerator(config.prompt, Config.get_config_dir())
         prompt = prompt_gen.generate_prompt(monitor_index=monitor_index)
         logger.info(f"Prompt: {prompt[:100]}...")
         
         # Load workflow
-        workflow_mgr = WorkflowManager(config)
+        workflow_mgr = WorkflowManager(config.comfyui)
         workflow = workflow_mgr.load()
         
         # Validate workflow
@@ -75,7 +75,7 @@ def generate_once(config: Config, dry_run: bool = False) -> None:
             logger.warning(f"Workflow: {warning}")
         
         # Generate image
-        client = ComfyClient(config)
+        client = ComfyClient(config.comfyui)
         
         if not client.health_check():
             logger.error(f"ComfyUI not reachable at {config.comfyui.base_url}")
@@ -85,7 +85,7 @@ def generate_once(config: Config, dry_run: bool = False) -> None:
         logger.info(f"Generated: {result.filename}")
         
         # Save wallpaper
-        target = WallpaperTarget(config)
+        target = WallpaperTarget(config.monitors, config.output)
         saved_path = target.save_wallpaper(result.image_data, output_path)
         
         # Set wallpaper
@@ -119,7 +119,7 @@ def generate_all(config: Config, dry_run: bool = False) -> None:
             
             # Show prompt that would be generated
             try:
-                prompt_gen = PromptGenerator(config)
+                prompt_gen = PromptGenerator(config.prompt, Config.get_config_dir())
                 prompt = prompt_gen.generate_prompt(monitor_index=i)
                 print(f"    Prompt: {prompt[:100]}...")
             except Exception as e:
@@ -131,11 +131,11 @@ def generate_all(config: Config, dry_run: bool = False) -> None:
     logger.info(f"Generating for all {config.monitors.count} monitors")
     
     # Load shared resources once
-    prompt_gen = PromptGenerator(config)
-    workflow_mgr = WorkflowManager(config)
+    prompt_gen = PromptGenerator(config.prompt, Config.get_config_dir())
+    workflow_mgr = WorkflowManager(config.comfyui)
     workflow = workflow_mgr.load()
-    client = ComfyClient(config)
-    target = WallpaperTarget(config)
+    client = ComfyClient(config.comfyui)
+    target = WallpaperTarget(config.monitors, config.output)
     
     if not client.health_check():
         logger.error(f"ComfyUI not reachable at {config.comfyui.base_url}")

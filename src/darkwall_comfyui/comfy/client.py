@@ -14,7 +14,8 @@ from urllib.parse import urljoin
 
 import requests
 
-from ..config import Config
+from ..config import Config, ComfyUIConfig
+from ..exceptions import GenerationError
 
 
 @dataclass
@@ -25,7 +26,7 @@ class GenerationResult:
     image_data: bytes
 
 
-class ComfyClientError(Exception):
+class ComfyClientError(GenerationError):
     """Base exception for ComfyUI client errors."""
     pass
 
@@ -55,19 +56,19 @@ class ComfyClient:
         # result.image_data contains the generated image bytes
     """
     
-    def __init__(self, config: Config) -> None:
-        self.config = config
-        self.base_url = config.comfyui.base_url.rstrip('/')
-        self.timeout = config.comfyui.timeout
-        self.poll_interval = config.comfyui.poll_interval
+    def __init__(self, comfyui_config: ComfyUIConfig) -> None:
+        self.config = comfyui_config
+        self.base_url = comfyui_config.base_url.rstrip('/')
+        self.timeout = comfyui_config.timeout
+        self.poll_interval = comfyui_config.poll_interval
         
         self.session = requests.Session()
         self.session.headers.update({
             'Content-Type': 'application/json',
             'User-Agent': 'darkwall-comfyui/0.1.0'
         })
-        if config.comfyui.headers:
-            self.session.headers.update(config.comfyui.headers)
+        if comfyui_config.headers:
+            self.session.headers.update(comfyui_config.headers)
         
         self.logger = logging.getLogger(__name__)
     

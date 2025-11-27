@@ -11,7 +11,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
-from ..config import Config
+from ..config import Config, MonitorConfig, OutputConfig
+from ..exceptions import CommandError
 from .setters import get_setter, WallpaperSetter
 
 
@@ -26,8 +27,9 @@ class WallpaperTarget:
     - Coordinating with wallpaper setters
     """
     
-    def __init__(self, config: Config) -> None:
-        self.config = config
+    def __init__(self, monitor_config: MonitorConfig, output_config: OutputConfig) -> None:
+        self.monitor_config = monitor_config
+        self.output_config = output_config
         self.logger = logging.getLogger(__name__)
         self._setter: Optional[WallpaperSetter] = None
     
@@ -35,7 +37,7 @@ class WallpaperTarget:
     def setter(self) -> WallpaperSetter:
         """Lazy-load wallpaper setter."""
         if self._setter is None:
-            self._setter = get_setter(self.config.monitors.command)
+            self._setter = get_setter(self.monitor_config.command)
         return self._setter
     
     def save_wallpaper(self, image_data: bytes, output_path: Path) -> Path:
@@ -50,10 +52,10 @@ class WallpaperTarget:
             Path where wallpaper was saved
             
         Raises:
-            RuntimeError: If saving fails
+            CommandError: If saving fails
         """
         if not image_data:
-            raise RuntimeError(f"No image data provided for {output_path}")
+            raise CommandError(f"No image data provided for {output_path}")
         
         self.logger.info(f"Saving wallpaper to: {output_path}")
         
@@ -63,10 +65,10 @@ class WallpaperTarget:
             
             # Check if directory is writable
             if not os.access(output_path.parent, os.W_OK):
-                raise RuntimeError(f"Output directory is not writable: {output_path.parent}")
+                raise CommandError(f"Output directory is not writable: {output_path.parent}")
             
             # Create backup if enabled and file exists
-            if self.config.output.create_backup and output_path.exists():
+            if self.output_config.create_backup and output_path.exists():
                 self._create_backup(output_path)
             
             # Write image data
@@ -74,22 +76,22 @@ class WallpaperTarget:
             
             # Verify the file was written correctly
             if not output_path.exists():
-                raise RuntimeError(f"Failed to create wallpaper file: {output_path}")
+                raise CommandError(f"Failed to create wallpaper file: {output_path}")
             
             file_size = output_path.stat().st_size
             if file_size == 0:
-                raise RuntimeError(f"Wallpaper file is empty: {output_path}")
+                raise CommandError(f"Wallpaper file is empty: {output_path}")
             
             if file_size != len(image_data):
-                raise RuntimeError(f"Size mismatch: expected {len(image_data)} bytes, got {file_size}")
+                raise CommandError(f"Size mismatch: expected {len(image_data)} bytes, got {file_size}")
             
             self.logger.info(f"Saved {file_size} bytes to {output_path}")
             return output_path
             
         except OSError as e:
-            raise RuntimeError(f"Filesystem error saving wallpaper to {output_path}: {e}")
+            raise CommandError(f"Filesystem error saving wallpaper to {output_path}: {e}")
         except Exception as e:
-            raise RuntimeError(f"Unexpected error saving wallpaper to {output_path}: {e}")
+            raise CommandError(f"Unexpected error saving wallpaper to {output_path}: {e}")
     
     def set_wallpaper(self, wallpaper_path: Path, monitor_index: int) -> bool:
         """
@@ -109,7 +111,7 @@ class WallpaperTarget:
         try:
             monitor_index = self._extract_monitor_index(current_path)
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            backup_path = self.config.monitors.get_backup_path(monitor_index, timestamp)
+            backup_path = self.monitor_config.get_backup_path(monitor_index, timestamp)
             
             # Ensure backup directory exists
             backup_path.parent.mkdir(parents=True, exist_ok=True)
@@ -152,7 +154,7 @@ class WallpaperTarget:
     
     def get_info(self, monitor_index: int) -> dict[str, Any]:
         """Get info about wallpaper for a specific monitor."""
-        path = self.config.monitors.get_output_path(monitor_index)
+        path = self.monitor_config.get_output_path(monitor_index)
         
         if not path.exists():
             return {"exists": False, "path": str(path), "monitor_index": monitor_index}
@@ -169,4 +171,4 @@ class WallpaperTarget:
     
     def list_all(self) -> list[dict[str, Any]]:
         """List wallpaper info for all monitors."""
-        return [self.get_info(i) for i in range(self.config.monitors.count)]
+        return [self.get_info(i) for i in range(self.monitor_config.count)]

@@ -9,19 +9,15 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from ..config import Config
-
-
-class WorkflowError(Exception):
-    """Workflow loading or validation error."""
-    pass
+from ..config import Config, ComfyUIConfig
+from ..exceptions import WorkflowError
 
 
 class WorkflowManager:
     """Manages ComfyUI workflow files."""
     
-    def __init__(self, config: Config) -> None:
-        self.config = config
+    def __init__(self, comfyui_config: ComfyUIConfig) -> None:
+        self.config = comfyui_config
         self.logger = logging.getLogger(__name__)
         self._cached_workflow: Optional[dict[str, Any]] = None
         self._cached_path: Optional[Path] = None
