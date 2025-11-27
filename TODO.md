@@ -45,7 +45,15 @@ Multi-monitor wallpaper generator using ComfyUI with deterministic prompts and r
 - [x] **CLI Interface**: Argument parsing with subcommands (init, status, generate, etc.)
 - [x] **Logging**: Configurable logging system with multiple levels
 
-### Multi-Monitor Support
+### ComfyUI Integration ✅
+- [x] **Workflow Loading**: Complete workflow JSON loading with validation and caching
+- [x] **API Client**: Full HTTP client for ComfyUI endpoints with error handling
+- [x] **Prompt Injection**: Inject generated prompts into workflow JSON
+- [x] **Result Polling**: Wait for generation completion and handle timeouts
+- [x] **Image Download**: Download generated wallpapers from ComfyUI
+- [x] **Health Checks**: Verify ComfyUI connectivity before generation
+
+### Multi-Monitor Support ✅
 - [x] **MonitorConfig**: Dataclass for monitor configuration with patterns and commands
 - [x] **Rotation State**: StateManager for tracking which monitor to update next
 - [x] **Monitor-Specific Seeds**: Prompt generator supports monitor index in seed generation
@@ -66,13 +74,6 @@ Multi-monitor wallpaper generator using ComfyUI with deterministic prompts and r
 
 ## In Progress Tasks 🟡
 
-### Config Loading Fix
-- [x] **Fix backup_pattern**: Already correctly in `[monitors]` section and `MonitorConfig` dataclass
-- [x] **Fix atoms_dir**: Default is "atoms" which correctly resolves to `~/.config/darkwall-comfyui/atoms/`
-- [x] **Test Dataclass Loading**: All config sections load properly as dataclasses
-- [x] **Fix File Permissions**: Uses read/write copy to ensure mutable files
-- [x] **Fix ComfyClient**: Updated to use nested config structure (`config.comfyui.base_url` etc.)
-
 ### Integration Testing
 - [ ] **End-to-End Test**: Complete wallpaper generation workflow test
 - [ ] **Multi-Monitor Test**: Verify rotation works across multiple monitors
@@ -80,24 +81,33 @@ Multi-monitor wallpaper generator using ComfyUI with deterministic prompts and r
 
 ## Pending Tasks 📋
 
-### ComfyUI Integration
-- [ ] **Workflow Loading**: Implement actual ComfyUI workflow file loading
-- [ ] **API Client**: Complete HTTP client for ComfyUI endpoints
-- [ ] **Prompt Injection**: Inject generated prompts into workflow JSON
-- [ ] **Result Polling**: Wait for generation completion and handle timeouts
-- [ ] **Image Download**: Download generated wallpapers from ComfyUI
+### Testing & Quality Assurance
+- [ ] **Integration Tests**: End-to-end workflow testing with mocked ComfyUI
+- [ ] **Multi-Monitor Integration**: Test rotation across 3+ monitors
+- [ ] **Error Scenario Testing**: Network failures, missing files, invalid configs
+- [ ] **Performance Testing**: Large workflow files and slow generation
 
-### Wallpaper Management
-- [ ] **File Operations**: Save wallpapers with proper naming and directory structure
-- [ ] **Backup System**: Create backups before overwriting existing wallpapers
-- [ ] **Command Execution**: Actually run wallpaper setting commands (currently mocked)
-- [ ] **Error Handling**: Graceful handling of command failures and missing tools
+### Documentation & Polish
+- [ ] **Man Page**: Complete CLI documentation with examples
+- [ ] **Troubleshooting Guide**: Common issues and solutions
+- [ ] **API Documentation**: Document internal APIs for extensibility
 
-### State Management
-- [ ] **State Persistence**: Save rotation state to JSON file
-- [ ] **State Recovery**: Handle corrupted or missing state files
-- [ ] **Rotation Logic**: Proper cycling through monitors with configurable order
-- [ ] **Reset Functionality**: Implement state reset for testing/recovery
+### Optional Enhancements
+- [ ] **Docker Support**: Containerized deployment option
+- [ ] **Desktop Integration**: Auto-start and desktop notifications
+- [ ] **Plugin System**: Support for custom prompt generators and wallpaper setters
+
+### Wallpaper Management ✅
+- [x] **File Operations**: Save wallpapers with proper naming and directory structure
+- [x] **Backup System**: Create backups before overwriting existing wallpapers
+- [x] **Command Execution**: Actually run wallpaper setting commands (swww, swaybg, feh, nitrogen, custom)
+- [x] **Error Handling**: Graceful handling of command failures and missing tools
+
+### State Management ✅
+- [x] **State Persistence**: Save rotation state to JSON file
+- [x] **State Recovery**: Handle corrupted or missing state files
+- [x] **Rotation Logic**: Proper cycling through monitors with configurable order
+- [x] **Reset Functionality**: Implement state reset for testing/recovery
 
 ### CLI Features
 - [x] **Generate All**: Implement wallpaper generation for all monitors at once
@@ -119,7 +129,7 @@ Multi-monitor wallpaper generator using ComfyUI with deterministic prompts and r
 
 ### Deployment
 - [x] **Systemd Service**: Timer service for automatic wallpaper rotation
-- [ ] **Package Installation**: Install to system with proper paths
+- [x] **Package Installation**: Install to system with proper paths
 - [ ] **Desktop Integration**: Auto-start and desktop notifications
 - [ ] **Docker Support**: Containerized deployment option
 
@@ -145,33 +155,29 @@ Multi-monitor wallpaper generator using ComfyUI with deterministic prompts and r
 
 ## Next Steps 🎯
 
-1. **Fix Critical Config Issues** (Immediate)
-   - Move `backup_pattern` to correct section
-   - Fix `atoms_dir` path mismatch
-   - Test complete config loading
+1. **Create Integration Tests** (Immediate)
+   - End-to-end workflow test with mocked ComfyUI responses
+   - Multi-monitor rotation test
+   - Error scenario testing
 
-2. **Complete ComfyUI Integration** (This Week)
-   - Implement workflow loading and prompt injection
-   - Add API client with proper error handling
-   - Test end-to-end generation
+2. **Documentation Polish** (This Week)
+   - Complete man page with all commands and examples
+   - Add troubleshooting guide for common issues
+   - Document internal APIs for extensibility
 
-3. **Multi-Monitor Testing** (Next Week)
-   - Test rotation across 3 monitors
-   - Verify different wallpaper commands work
-   - Test state persistence and recovery
-
-4. **Documentation and Polish** (Following Week)
-   - Update README with multi-monitor examples
-   - Add systemd timer setup instructions
-   - Complete CLI help and man page
+3. **Optional Enhancements** (Future)
+   - Docker containerization
+   - Desktop notifications
+   - Plugin system for custom components
 
 ## Known Bugs 🐛
 
 - ~~Config initialization creates read-only files from Nix store~~ ✅ FIXED
-- State file handling not implemented yet
-- Wallpaper commands are mocked (not actually executed)
-- No validation of ComfyUI URL connectivity
-- Missing error handling for network failures
+- ~~State file handling not implemented yet~~ ✅ FIXED
+- ~~Wallpaper commands are mocked (not actually executed)~~ ✅ FIXED
+- ~~No validation of ComfyUI URL connectivity~~ ✅ FIXED
+- Missing integration tests for end-to-end workflows
+- No error handling for network timeouts beyond basic retries
 
 ## Dependencies Needed 🔧
 
@@ -182,7 +188,7 @@ Multi-monitor wallpaper generator using ComfyUI with deterministic prompts and r
 - Mock ComfyUI server - for development testing
 
 ---
-*Last Updated: 2025-11-27 17:59*
+*Last Updated: 2025-11-27 23:21*
 
 ## Recent Fixes
 - **File Permissions Fix**: Changed `_copy_config_files` to use `read_bytes()`/`write_bytes()` instead of `shutil.copy2` to avoid inheriting read-only permissions from Nix store
@@ -191,4 +197,6 @@ Multi-monitor wallpaper generator using ComfyUI with deterministic prompts and r
 - **Config Duplication Removed**: Deleted `src/darkwall_comfyui/config/` duplicate, rely solely on top-level `config/`
 - **ComfyClient Fixed**: Updated to use nested dataclass config structure
 - **Prompt Generator Fixed**: Removed dead fallback path, clear error message for missing atoms
-*Status: Core infrastructure complete, ComfyUI integration in progress*
+- **TODO Accuracy Update**: Corrected TODO to reflect actual implementation status - ComfyUI integration, wallpaper setters, and state management are all complete
+
+*Status: Core implementation complete, ready for integration testing and documentation polish*
