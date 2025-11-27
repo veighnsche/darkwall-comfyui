@@ -40,18 +40,25 @@ dev = [
 ]
 
 [project.scripts]
-generate-wallpaper-once = "darkwall_comfyui.main:main"
+generate-wallpaper-once = "darkwall_comfyui.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/vince/darkwall-comfyui"
 Repository = "https://github.com/vince/darkwall-comfyui"
 Issues = "https://github.com/vince/darkwall-comfyui/issues"
 
-[tool.setuptools.packages.find]
-where = ["src"]
+[tool.setuptools]
+package-dir = {"" = "src"}
+packages = [
+    "darkwall_comfyui",
+    "darkwall_comfyui.comfy",
+    "darkwall_comfyui.commands",
+    "darkwall_comfyui.wallpaper",
+]
 
 [tool.setuptools.package-data]
-darkwall_comfyui = ["config/**/*"]
+# Config files are bundled via Nix, not package data
+# darkwall_comfyui = ["config/**/*"]
 
 [tool.black]
 line-length = 88

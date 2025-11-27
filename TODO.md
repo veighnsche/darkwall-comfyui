@@ -6,9 +6,9 @@ Multi-monitor wallpaper generator using ComfyUI with deterministic prompts and r
 ## Current Issues
 
 ### 🔴 Critical Issues
-- **Config Structure Mismatch**: TOML has `backup_pattern` in `[output]` section but `OutputConfig` dataclass doesn't include this field
+- ~~**Config Structure Mismatch**: TOML has `backup_pattern` in `[output]` section~~ ✅ FIXED - `backup_pattern` is correctly in `[monitors]` section and `MonitorConfig` dataclass
 - ~~**File Permissions**: Atom files copied from Nix store have read-only permissions, preventing cleanup~~ ✅ FIXED - Uses read/write copy instead of shutil.copy2 to avoid inheriting Nix store permissions
-- **Path Resolution**: Atoms directory path mismatch - config expects `config/atoms` but initialization copies to `atoms/`
+- ~~**Path Resolution**: Atoms directory path mismatch~~ ✅ FIXED - atoms_dir defaults to "atoms" which matches `~/.config/darkwall-comfyui/atoms/`
 
 ### 🟡 Configuration Issues
 - **Dataclass Conversion**: TOML dictionaries not properly converted to dataclass instances (partially fixed)
@@ -45,10 +45,11 @@ Multi-monitor wallpaper generator using ComfyUI with deterministic prompts and r
 ## In Progress Tasks 🟡
 
 ### Config Loading Fix
-- [ ] **Fix backup_pattern**: Move from `[output]` to `[monitors]` section or add to OutputConfig
-- [ ] **Fix atoms_dir**: Update default from `"config/atoms"` to `"atoms"` to match initialization
-- [ ] **Test Dataclass Loading**: Verify all config sections load properly as dataclasses
-- [ ] **Fix File Permissions**: Ensure copied config files have write permissions
+- [x] **Fix backup_pattern**: Already correctly in `[monitors]` section and `MonitorConfig` dataclass
+- [x] **Fix atoms_dir**: Default is "atoms" which correctly resolves to `~/.config/darkwall-comfyui/atoms/`
+- [x] **Test Dataclass Loading**: All config sections load properly as dataclasses
+- [x] **Fix File Permissions**: Uses read/write copy to ensure mutable files
+- [x] **Fix ComfyClient**: Updated to use nested config structure (`config.comfyui.base_url` etc.)
 
 ### Integration Testing
 - [ ] **End-to-End Test**: Complete wallpaper generation workflow test
@@ -165,4 +166,7 @@ Multi-monitor wallpaper generator using ComfyUI with deterministic prompts and r
 - **File Permissions Fix**: Changed `_copy_config_files` to use `read_bytes()`/`write_bytes()` instead of `shutil.copy2` to avoid inheriting read-only permissions from Nix store
 - **New CLI Command**: Added `fix-permissions` subcommand for troubleshooting
 - **Status Enhancement**: Added file permissions display to `status` command showing ✓/✗ for each config file
+- **Config Duplication Removed**: Deleted `src/darkwall_comfyui/config/` duplicate, rely solely on top-level `config/`
+- **ComfyClient Fixed**: Updated to use nested dataclass config structure
+- **Prompt Generator Fixed**: Removed dead fallback path, clear error message for missing atoms
 *Status: Core infrastructure complete, ComfyUI integration in progress*

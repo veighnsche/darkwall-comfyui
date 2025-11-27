@@ -52,13 +52,10 @@ class PromptGenerator:
         atoms_dir = self.config.get_config_dir() / self.config.prompt.atoms_dir
         
         if not atoms_dir.exists():
-            # Fallback to package config directory
-            package_atoms_dir = Path(__file__).parent.parent.parent / "config" / "atoms"
-            if package_atoms_dir.exists():
-                atoms_dir = package_atoms_dir
-                self.logger.debug(f"Using package atoms directory: {atoms_dir}")
-            else:
-                raise FileNotFoundError(f"Atoms directory not found: {atoms_dir}")
+            raise FileNotFoundError(
+                f"Atoms directory not found: {atoms_dir}\n"
+                f"Run 'generate-wallpaper-once init' to initialize config."
+            )
         
         atoms = {}
         
