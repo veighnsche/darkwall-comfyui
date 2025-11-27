@@ -41,7 +41,6 @@ pattern = "monitor_{index}.png"
 backup_pattern = "monitor_{index}_{timestamp}.png"
 
 [output]
-directory = "~/wallpapers"
 create_backup = true
 
 [prompt]
@@ -57,9 +56,25 @@ level = "INFO"
 
 @pytest.fixture
 def test_config(temp_config_dir: Path) -> Config:
-    """Create a test Config instance."""
+    """Create a test Config instance with isolated state."""
     config_file = temp_config_dir / "config.toml"
-    return Config.load(config_file=config_file, initialize=False)
+    
+    # Create a config that uses the temp directory for everything
+    # This ensures state isolation between tests
+    original_get_config_dir = Config.get_config_dir
+    
+    def mock_get_config_dir():
+        return temp_config_dir
+    
+    # Temporarily patch the config directory method
+    Config.get_config_dir = classmethod(lambda cls: temp_config_dir)
+    
+    try:
+        config = Config.load(config_file=config_file, initialize=False)
+        yield config
+    finally:
+        # Restore original method
+        Config.get_config_dir = original_get_config_dir
 
 
 @pytest.fixture

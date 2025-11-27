@@ -74,6 +74,8 @@
           buildInputs = with pkgs; [
             python3
             python3Packages.requests
+            python3Packages.tomli
+            python3Packages.tomli-w
             python3Packages.pytest
             python3Packages.black
             python3Packages.isort
@@ -81,6 +83,7 @@
           ];
           
           shellHook = ''
+            export PYTHONPATH="$(pwd)/src:$PYTHONPATH"
             echo "🎨 DarkWall ComfyUI Development Environment"
             echo "Available commands:"
             echo "  - python -m darkwall_comfyui.main --help"
