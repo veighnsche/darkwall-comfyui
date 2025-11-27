@@ -192,7 +192,7 @@ class Config:
         
         # Files that should always be present
         required_files = ["config.toml"]
-        required_dirs = ["atoms"]
+        required_dirs = ["atoms", "workflows"]
         
         # Copy missing files
         for required_file in required_files:

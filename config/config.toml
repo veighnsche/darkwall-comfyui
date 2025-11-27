@@ -2,10 +2,10 @@
 
 [comfyui]
 # Base URL of your ComfyUI instance
-base_url = "https://comfyui.home.arpa"
+base_url = "http://192.168.178.29:8188"
 
 # Path to your ComfyUI workflow exported in API format
-workflow_path = "workflow.json"
+workflow_path = "workflows/qwen_t2i.json"
 
 # Generation timeout in seconds
 timeout = 300
