@@ -42,6 +42,10 @@ class WorkflowManager:
         if workflow_path is None:
             workflow_path = Path(self.config.comfyui.workflow_path).expanduser()
         
+        # Resolve relative paths against config directory
+        if not workflow_path.is_absolute():
+            workflow_path = self.config.get_config_dir() / workflow_path
+        
         # Check cache
         if self._cached_path == workflow_path and self._cached_workflow:
             self.logger.debug(f"Using cached workflow: {workflow_path}")
