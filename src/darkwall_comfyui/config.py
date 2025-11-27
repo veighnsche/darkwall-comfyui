@@ -60,6 +60,7 @@ def validate_toml_structure(config_dict: Dict[str, Any], config_file: Path) -> N
             'paths': list,  # Optional
             'command': str,
             'backup_pattern': str,
+            'workflows': list,  # Optional
         },
         'output': {
             'create_backup': bool,
@@ -117,6 +118,7 @@ class MonitorConfig:
     paths: Optional[List[str]] = None
     command: str = "swaybg"
     backup_pattern: str = "~/Pictures/wallpapers/backups/monitor_{index}_{timestamp}.png"
+    workflows: Optional[List[str]] = None  # Per-monitor workflow paths
     
     def get_output_path(self, index: int) -> Path:
         """Get output path for specific monitor index."""
@@ -128,6 +130,13 @@ class MonitorConfig:
     def get_backup_path(self, index: int, timestamp: str) -> Path:
         """Get backup path for specific monitor index."""
         return Path(self.backup_pattern.format(index=index, timestamp=timestamp)).expanduser()
+    
+    def get_workflow_path(self, index: int, global_workflow_path: str) -> str:
+        """Get workflow path for specific monitor index."""
+        if self.workflows and len(self.workflows) > index and self.workflows[index]:
+            return self.workflows[index]
+        
+        return global_workflow_path
 
 
 @dataclass
@@ -221,6 +230,13 @@ class Config:
             if len(self.monitors.paths) != self.monitors.count:
                 raise ConfigError(
                     f"Paths array length ({len(self.monitors.paths)}) must match monitor count ({self.monitors.count})"
+                )
+        
+        # Validate workflows array if provided
+        if self.monitors.workflows is not None:
+            if len(self.monitors.workflows) != self.monitors.count:
+                raise ConfigError(
+                    f"Workflows array length ({len(self.monitors.workflows)}) must match monitor count ({self.monitors.count})"
                 )
         
         # Validate prompt settings

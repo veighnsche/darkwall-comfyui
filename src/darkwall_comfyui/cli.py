@@ -72,6 +72,11 @@ def main() -> int:
         action="store_true",
         help="Validate configuration and exit"
     )
+    parser.add_argument(
+        "--workflow",
+        type=str,
+        help="Override workflow path for generate command (per-monitor workflows still apply to generate-all)"
+    )
     
     subparsers = parser.add_subparsers(dest="command", help="Commands")
     
@@ -105,7 +110,7 @@ def main() -> int:
         command = args.command or "generate"
         
         if command == "generate":
-            generate_once(config, dry_run=args.dry_run)
+            generate_once(config, dry_run=args.dry_run, workflow_path=args.workflow)
         elif command == "generate-all":
             generate_all(config, dry_run=args.dry_run)
         elif command == "status":

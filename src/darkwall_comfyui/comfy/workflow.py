@@ -22,12 +22,13 @@ class WorkflowManager:
         self._cached_workflow: Optional[dict[str, Any]] = None
         self._cached_path: Optional[Path] = None
     
-    def load(self, workflow_path: Path = None) -> dict[str, Any]:
+    def load(self, workflow_path: Path = None, config_dir: Path = None) -> dict[str, Any]:
         """
         Load workflow from JSON file.
         
         Args:
             workflow_path: Path to workflow file (defaults to config)
+            config_dir: Config directory for resolving relative paths
             
         Returns:
             Parsed workflow dict
@@ -36,11 +37,15 @@ class WorkflowManager:
             WorkflowError: If loading fails
         """
         if workflow_path is None:
-            workflow_path = Path(self.config.comfyui.workflow_path).expanduser()
+            workflow_path = Path(self.config.workflow_path).expanduser()
         
         # Resolve relative paths against config directory
         if not workflow_path.is_absolute():
-            workflow_path = self.config.get_config_dir() / workflow_path
+            if config_dir is None:
+                # Fallback to getting config directory from global config
+                from ..config import Config
+                config_dir = Config.get_config_dir()
+            workflow_path = config_dir / workflow_path
         
         # Check cache
         if self._cached_path == workflow_path and self._cached_workflow:

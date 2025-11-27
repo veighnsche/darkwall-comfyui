@@ -2,6 +2,7 @@
 
 import logging
 import sys
+from pathlib import Path
 
 from ..config import Config, StateManager, MonitorConfig, OutputConfig, ComfyUIConfig, PromptConfig
 from ..comfy import ComfyClient, WorkflowManager
@@ -9,7 +10,7 @@ from ..prompt_generator import PromptGenerator
 from ..wallpaper import WallpaperTarget
 
 
-def generate_once(config: Config, dry_run: bool = False) -> None:
+def generate_once(config: Config, dry_run: bool = False, workflow_path: str = None) -> None:
     """
     Generate wallpaper for the next monitor in rotation.
     
@@ -23,6 +24,7 @@ def generate_once(config: Config, dry_run: bool = False) -> None:
     Args:
         config: Configuration object
         dry_run: If True, show what would be done without executing
+        workflow_path: Optional workflow path override for this run
     """
     logger = logging.getLogger(__name__)
     
@@ -38,11 +40,17 @@ def generate_once(config: Config, dry_run: bool = False) -> None:
     
     output_path = config.monitors.get_output_path(monitor_index)
     
+    # Get workflow path for this monitor (or use override)
+    if workflow_path:
+        actual_workflow_path = workflow_path
+    else:
+        actual_workflow_path = config.monitors.get_workflow_path(monitor_index, str(config.comfyui.workflow_path))
+    
     if dry_run:
         print(f"DRY RUN: Would generate wallpaper for monitor {monitor_index}")
         print(f"  Output path: {output_path}")
         print(f"  ComfyUI URL: {config.comfyui.base_url}")
-        print(f"  Workflow: {config.comfyui.workflow_path}")
+        print(f"  Workflow: {actual_workflow_path}")
         
         # Show prompt that would be generated
         try:
@@ -58,6 +66,7 @@ def generate_once(config: Config, dry_run: bool = False) -> None:
     
     logger.info(f"Generating wallpaper for monitor {monitor_index}")
     logger.info(f"Output: {output_path}")
+    logger.info(f"Workflow: {actual_workflow_path}")
     
     try:
         # Generate prompt
@@ -67,7 +76,7 @@ def generate_once(config: Config, dry_run: bool = False) -> None:
         
         # Load workflow
         workflow_mgr = WorkflowManager(config.comfyui)
-        workflow = workflow_mgr.load()
+        workflow = workflow_mgr.load(Path(actual_workflow_path), Config.get_config_dir())
         
         # Validate workflow
         warnings = workflow_mgr.validate(workflow)
@@ -115,13 +124,26 @@ def generate_all(config: Config, dry_run: bool = False) -> None:
         print(f"DRY RUN: Would generate wallpapers for all {config.monitors.count} monitors")
         for i in range(config.monitors.count):
             output_path = config.monitors.get_output_path(i)
+            workflow_path = config.monitors.get_workflow_path(i, str(config.comfyui.workflow_path))
             print(f"  Monitor {i}: {output_path}")
+            print(f"    Workflow: {workflow_path}")
             
             # Show prompt that would be generated
             try:
                 prompt_gen = PromptGenerator(config.prompt, Config.get_config_dir())
                 prompt = prompt_gen.generate_prompt(monitor_index=i)
                 print(f"    Prompt: {prompt[:100]}...")
+                
+                # Show workflow validation warnings
+                workflow_mgr = WorkflowManager(config.comfyui)
+                try:
+                    workflow = workflow_mgr.load(Path(workflow_path), Config.get_config_dir())
+                    warnings = workflow_mgr.validate(workflow)
+                    for warning in warnings:
+                        print(f"    Warning: {warning}")
+                except Exception as e:
+                    print(f"    Workflow error: {e}")
+                    
             except Exception as e:
                 print(f"    Prompt error: {e}")
         
@@ -133,7 +155,6 @@ def generate_all(config: Config, dry_run: bool = False) -> None:
     # Load shared resources once
     prompt_gen = PromptGenerator(config.prompt, Config.get_config_dir())
     workflow_mgr = WorkflowManager(config.comfyui)
-    workflow = workflow_mgr.load()
     client = ComfyClient(config.comfyui)
     target = WallpaperTarget(config.monitors, config.output)
     
@@ -146,7 +167,19 @@ def generate_all(config: Config, dry_run: bool = False) -> None:
     for monitor_index in range(config.monitors.count):
         logger.info(f"--- Monitor {monitor_index} ---")
         
+        # Get workflow path for this monitor
+        workflow_path = config.monitors.get_workflow_path(monitor_index, str(config.comfyui.workflow_path))
+        logger.info(f"Using workflow: {workflow_path}")
+        
         try:
+            # Load workflow for this monitor
+            workflow = workflow_mgr.load(Path(workflow_path), Config.get_config_dir())
+            
+            # Validate workflow
+            warnings = workflow_mgr.validate(workflow)
+            for warning in warnings:
+                logger.warning(f"Workflow: {warning}")
+            
             prompt = prompt_gen.generate_prompt(monitor_index=monitor_index)
             result = client.generate(workflow, prompt)
             

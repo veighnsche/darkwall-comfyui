@@ -31,19 +31,20 @@ Multi-monitor wallpaper generator using ComfyUI with deterministic prompts and r
 
 ## Pending Tasks 📋
 
-### � HIGH PRIORITY - Refactoring & Architecture
+### 🎯 HIGH PRIORITY - Refactoring & Architecture
 
-#### Code Quality Refactoring
-- [x] **Consolidate Duplicate Logic**: Review and merge similar code patterns
-- [x] **Consistent Error Handling**: Standardize exception handling across modules
-- [x] **Configuration Validation**: Add schema validation for config files
-- [x] **Dependency Injection**: Reduce coupling between modules for testability
-- [x] **Clean Up Patchy Code**: Address ad-hoc fixes made during development
+#### Code Quality Refactoring (COMPLETED)
+- [x] **Consolidate Duplicate Logic**: Review and merge similar code patterns - Fixed duplicate _run_command and _default_monitor_name methods
+- [x] **Consistent Error Handling**: Standardize exception handling across modules - Implemented specific exceptions, removed silent failures
+- [x] **Configuration Validation**: Add schema validation for config files - Added comprehensive validation in Config.__post_init__
+- [x] **Dependency Injection**: Reduce coupling between modules for testability - All classes now accept specific config objects
+- [x] **Clean Up Patchy Code**: Address ad-hoc fixes made during development - Replaced broad exception handling with specific types
+- [x] **Comprehensive Testing**: Created 52 tests to freeze refactoring behavior and prevent regressions
 
-#### Multi-Workflow Support
-- [ ] **Per-Monitor Workflows**: Different workflow JSON per monitor (different sizes/styles)
-- [ ] **Workflow Selection CLI**: `--workflow` flag to select specific workflow
-- [ ] **Workflow Validation**: Validate workflow JSON structure on load
+#### Multi-Workflow Support (COMPLETED)
+- [x] **Per-Monitor Workflows**: Different workflow JSON per monitor (different sizes/styles) - Added workflows field to MonitorConfig with validation
+- [x] **Workflow Selection CLI**: `--workflow` flag to select specific workflow - Added CLI flag for generate-once override
+- [x] **Workflow Validation**: Validate workflow JSON structure on load - Enhanced dry-run to show validation warnings
 - [ ] **Workflow Templates**: Pre-configured workflows for common resolutions (1080p, 1440p, 4K)
 
 ### 🟡 MEDIUM PRIORITY - New Features
