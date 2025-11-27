@@ -2,7 +2,7 @@
 
 from .generate import generate_once, generate_all
 from .status import show_status
-from .init import init_config, fix_permissions, reset_rotation
+from .init import init_config, fix_permissions, reset_rotation, validate_config
 
 __all__ = [
     "generate_once",
@@ -11,4 +11,5 @@ __all__ = [
     "init_config",
     "fix_permissions",
     "reset_rotation",
+    "validate_config",
 ]

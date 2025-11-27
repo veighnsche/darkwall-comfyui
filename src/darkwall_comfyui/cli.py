@@ -26,6 +26,7 @@ from .commands import (
     init_config,
     fix_permissions,
     reset_rotation,
+    validate_config,
 )
 
 
@@ -61,6 +62,16 @@ def main() -> int:
         action="store_true",
         help="Skip auto-initialization of config"
     )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show what would be generated without actually doing it"
+    )
+    parser.add_argument(
+        "--validate-config",
+        action="store_true",
+        help="Validate configuration and exit"
+    )
     
     subparsers = parser.add_subparsers(dest="command", help="Commands")
     
@@ -70,6 +81,7 @@ def main() -> int:
     subparsers.add_parser("init", help="Initialize config")
     subparsers.add_parser("reset", help="Reset rotation")
     subparsers.add_parser("fix-permissions", help="Fix config permissions")
+    subparsers.add_parser("validate", help="Validate configuration")
     
     args = parser.parse_args()
     
@@ -84,13 +96,18 @@ def main() -> int:
         level = "DEBUG" if args.verbose else config.logging.level
         setup_logging(level)
         
+        # Handle config validation flag
+        if args.validate_config:
+            validate_config(config)
+            return 0
+        
         # Dispatch command
         command = args.command or "generate"
         
         if command == "generate":
-            generate_once(config)
+            generate_once(config, dry_run=args.dry_run)
         elif command == "generate-all":
-            generate_all(config)
+            generate_all(config, dry_run=args.dry_run)
         elif command == "status":
             show_status(config)
         elif command == "init":
@@ -99,6 +116,8 @@ def main() -> int:
             reset_rotation(config)
         elif command == "fix-permissions":
             fix_permissions(config)
+        elif command == "validate":
+            validate_config(config)
         else:
             parser.print_help()
             return 1

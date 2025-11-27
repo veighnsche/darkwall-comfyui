@@ -1,0 +1,21 @@
+[Unit]
+Description=Timer for DarkWall ComfyUI automatic wallpaper rotation
+Documentation=man:generate-wallpaper-once(1)
+Requires=darkwall-comfyui.service
+
+[Timer]
+# Run every hour by default
+OnCalendar=hourly
+# Alternative schedules (uncomment and modify as needed):
+# OnCalendar=*-*-* 06:00:00  # Daily at 6 AM
+# OnCalendar=*-*-* */6:00:00  # Every 6 hours
+# OnCalendar=*-*-* 09:00,17:00:00  # Daily at 9 AM and 5 PM
+
+# Random delay to prevent system load spikes
+RandomizedDelaySec=5m
+
+# Run immediately if missed while system was suspended
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -1,13 +1,16 @@
 # DarkWall ComfyUI
 
-A deterministic dark-mode wallpaper generator that calls ComfyUI to create time-based wallpapers.
+A deterministic dark-mode wallpaper generator that calls ComfyUI to create time-based wallpapers with multi-monitor support.
 
 ## What this tool does
 
 - Generates deterministic dark-mode wallpaper prompts from composable "pillars"
-- Calls ComfyUI at https://comfyui.home.arpa using saved workflow API format
-- Polls until results are ready and saves wallpaper images to ~/Pictures/wallpapers/current.png
+- Calls ComfyUI using configurable URLs and saved workflow API format
+- Supports multi-monitor setups with automatic rotation through monitors
+- Polls until results are ready and saves wallpaper images with configurable naming
+- Creates backups before overwriting existing wallpapers
 - Designed to be called periodically by systemd user timers on NixOS
+- Includes comprehensive CLI with dry-run mode and configuration validation
 
 ## Project Phases
 
@@ -434,6 +437,66 @@ export TIME_SLOT_MINUTES="30"
 export DARKWALL_LOG_LEVEL="INFO"
 ```
 
+### Multi-Monitor Setup
+
+DarkWall ComfyUI supports multi-monitor configurations with automatic rotation:
+
+```bash
+# Initialize configuration with multi-monitor support
+./result/bin/generate-wallpaper-once init
+
+# Edit the generated config file
+nano ~/.config/darkwall-comfyui/config.toml
+```
+
+#### Example Multi-Monitor Configuration
+
+```toml
+[comfyui]
+base_url = "http://localhost:8188"
+workflow_path = "workflow.json"
+timeout = 300
+poll_interval = 2
+
+[monitors]
+count = 3
+command = "swww"
+pattern = "monitor_{index}.png"
+backup_pattern = "monitor_{index}_{timestamp}.png"
+
+[output]
+directory = "~/Pictures/wallpapers"
+create_backup = true
+
+[prompt]
+atoms_dir = "atoms"
+time_slot_minutes = 60
+
+[logging]
+level = "INFO"
+```
+
+#### Wallpaper Commands
+
+Choose the appropriate command for your desktop environment:
+
+- **Wayland (swww)**: `command = "swww"`
+- **Wayland (swaybg)**: `command = "swaybg"`
+- **X11 (feh)**: `command = "feh"`
+- **X11 (nitrogen)**: `command = "nitrogen"`
+- **Custom**: `command = "custom:swww img {path} --outputs {monitor}"`
+
+#### Monitor Naming Patterns
+
+The `pattern` and `backup_pattern` support these placeholders:
+- `{index}`: Monitor index (0-based)
+- `{timestamp}`: Current timestamp (for backups)
+- `{monitor}`: Monitor name (for custom commands)
+
+Examples:
+- `pattern = "monitor_{index}.png"` → `monitor_0.png`, `monitor_1.png`
+- `pattern = "wallpaper_{index}.jpg"` → `wallpaper_0.jpg`, `wallpaper_1.jpg`
+
 ### Systemd Integration
 
 Add to your NixOS/home-manager configuration:
@@ -469,10 +532,67 @@ systemd.user.timers.wallpaper-generator = {
 
 ### Usage
 
-Run manually:
+#### Basic Commands
+
 ```bash
-generate-wallpaper-once --verbose
+# Generate wallpaper for next monitor in rotation
+generate-wallpaper-once generate
+
+# Generate wallpapers for all monitors
+generate-wallpaper-once generate-all
+
+# Show current status and configuration
+generate-wallpaper-once status
+
+# Initialize configuration files
+generate-wallpaper-once init
+
+# Validate configuration
+generate-wallpaper-once validate
+
+# Reset monitor rotation state
+generate-wallpaper-once reset
+
+# Fix file permissions
+generate-wallpaper-once fix-permissions
 ```
+
+#### Advanced Features
+
+```bash
+# Dry run mode - show what would be done without executing
+generate-wallpaper-once --dry-run generate
+generate-wallpaper-once --dry-run generate-all
+
+# Verbose output with detailed logging
+generate-wallpaper-once --verbose generate
+
+# Validate configuration and exit
+generate-wallpaper-once --validate-config
+
+# Skip auto-initialization
+generate-wallpaper-once --no-init generate
+```
+
+#### Systemd Integration
+
+For automatic wallpaper rotation, use the provided systemd files:
+
+```bash
+# Install systemd service and timer
+./scripts/install-systemd.sh
+
+# Check timer status
+systemctl --user status darkwall-comfyui.timer
+
+# View service logs
+journalctl --user -u darkwall-comfyui.service
+
+# Disable automatic rotation
+systemctl --user disable darkwall-comfyui.timer
+```
+
+The timer runs hourly by default. Modify `/home/user/.config/systemd/user/darkwall-comfyui.timer` to change the schedule.
 
 Enable automatic generation:
 ```bash

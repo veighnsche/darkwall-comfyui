@@ -15,7 +15,7 @@ from typing import Optional
 class WallpaperSetter(ABC):
     """Abstract base class for wallpaper setters."""
     
-    def __init__(self):
+    def __init__(self) -> None:
         self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
     
     @abstractmethod
@@ -114,7 +114,7 @@ class NitrogenSetter(WallpaperSetter):
 class CustomSetter(WallpaperSetter):
     """Wallpaper setter using a custom command template."""
     
-    def __init__(self, command_template: str):
+    def __init__(self, command_template: str) -> None:
         super().__init__()
         self.template = command_template
     

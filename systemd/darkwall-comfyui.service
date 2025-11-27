@@ -1,0 +1,36 @@
+[Unit]
+Description=DarkWall ComfyUI Wallpaper Generator
+Documentation=man:generate-wallpaper-once(1)
+
+# Only run when network is available (for ComfyUI communication)
+After=network-online.target
+Wants=network-online.target
+
+# Don't run if ComfyUI is not available
+ConditionPathExists=/usr/bin/generate-wallpaper-once
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/generate-wallpaper-once generate
+
+# Environment variables (optional)
+#Environment=DARKWALL_CONFIG_DIR=/etc/darkwall-comfyui
+#Environment=DARKWALL_LOG_LEVEL=INFO
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/tmp /var/tmp
+
+# Resource limits
+TimeoutStartSec=300
+TimeoutStopSec=30
+
+# User (change as needed)
+User=%i
+Group=%i
+
+[Install]
+WantedBy=multi-user.target

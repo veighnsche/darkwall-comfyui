@@ -34,7 +34,7 @@ class PromptGenerator:
     Supports multi-monitor setups with monitor-specific variation.
     """
     
-    def __init__(self, config: Config):
+    def __init__(self, config: Config) -> None:
         """Initialize prompt generator with configuration."""
         self.config = config
         self.logger = logging.getLogger(__name__)
@@ -48,13 +48,33 @@ class PromptGenerator:
         
         Returns:
             Dictionary mapping pillar names to atom lists
+            
+        Raises:
+            FileNotFoundError: If atoms directory doesn't exist
         """
         atoms_dir = self.config.get_config_dir() / self.config.prompt.atoms_dir
         
+        self.logger.debug(f"Loading atoms from: {atoms_dir}")
+        
+        # Check atoms directory exists
         if not atoms_dir.exists():
             raise FileNotFoundError(
                 f"Atoms directory not found: {atoms_dir}\n"
                 f"Run 'generate-wallpaper-once init' to initialize config."
+            )
+        
+        if not atoms_dir.is_dir():
+            raise FileNotFoundError(
+                f"Atoms path is not a directory: {atoms_dir}\n"
+                f"Please check your configuration."
+            )
+        
+        # Check if directory is readable
+        import os
+        if not os.access(atoms_dir, os.R_OK):
+            raise FileNotFoundError(
+                f"Atoms directory is not readable: {atoms_dir}\n"
+                f"Check directory permissions."
             )
         
         atoms = {}
@@ -73,21 +93,56 @@ class PromptGenerator:
                 atoms[pillar_name] = []
                 continue
             
+            if not pillar_file.is_file():
+                self.logger.warning(f"Atoms path is not a file: {pillar_file}")
+                atoms[pillar_name] = []
+                continue
+            
+            # Check file is readable
+            if not os.access(pillar_file, os.R_OK):
+                self.logger.warning(f"Atoms file is not readable: {pillar_file}")
+                atoms[pillar_name] = []
+                continue
+            
             try:
                 with open(pillar_file, 'r', encoding='utf-8') as f:
                     # Read lines, strip whitespace, ignore empty lines and comments
-                    lines = [
-                        line.strip() 
-                        for line in f 
-                        if line.strip() and not line.strip().startswith('#')
-                    ]
+                    lines = []
+                    for line_num, line in enumerate(f, 1):
+                        line = line.strip()
+                        if line and not line.startswith('#'):
+                            lines.append(line)
+                        elif not line:
+                            # Skip empty lines silently
+                            continue
+                        elif line.startswith('#'):
+                            # Skip comments silently
+                            continue
+                        else:
+                            self.logger.debug(f"Skipping line {line_num} in {pillar_file}: empty or comment")
+                    
                     atoms[pillar_name] = lines
                     
-                self.logger.debug(f"Loaded {len(lines)} atoms for {pillar_name}")
+                self.logger.info(f"Loaded {len(lines)} atoms for {pillar_name} from {pillar_file}")
                 
-            except Exception as e:
-                self.logger.error(f"Failed to load atoms from {pillar_file}: {e}")
+                # Validate that we have some atoms
+                if not lines:
+                    self.logger.warning(f"No atoms found in {pillar_file}")
+                
+            except UnicodeDecodeError as e:
+                self.logger.error(f"Encoding error reading {pillar_file}: {e}")
                 atoms[pillar_name] = []
+            except OSError as e:
+                self.logger.error(f"Filesystem error reading {pillar_file}: {e}")
+                atoms[pillar_name] = []
+            except Exception as e:
+                self.logger.error(f"Unexpected error reading {pillar_file}: {e}")
+                atoms[pillar_name] = []
+        
+        # Validate we have at least some atoms
+        total_atoms = sum(len(atom_list) for atom_list in atoms.values())
+        if total_atoms == 0:
+            self.logger.warning("No atoms loaded from any files - prompt generation will fail")
         
         return atoms
     
@@ -193,10 +248,41 @@ class PromptGenerator:
             
         Returns:
             Complete prompt string ready for ComfyUI
+            
+        Raises:
+            ValueError: If prompt generation fails
         """
-        seed = self.get_time_slot_seed(monitor_index=monitor_index)
-        pillars = self.generate_pillars(seed)
-        prompt = self.build_prompt(pillars)
-        
-        self.logger.debug(f"Generated prompt for monitor {monitor_index or 'default'}: {prompt}")
-        return prompt
+        try:
+            # Generate time slot seed
+            seed = self.get_time_slot_seed(monitor_index=monitor_index)
+            self.logger.debug(f"Generated seed {seed} for monitor {monitor_index or 'default'}")
+            
+            # Generate pillars from seed
+            pillars = self.generate_pillars(seed)
+            
+            # Validate pillars
+            if not all([pillars.subject, pillars.environment, pillars.lighting, pillars.style]):
+                missing = [name for name, value in [
+                    ("subject", pillars.subject),
+                    ("environment", pillars.environment), 
+                    ("lighting", pillars.lighting),
+                    ("style", pillars.style)
+                ] if not value]
+                self.logger.warning(f"Missing pillars: {missing}")
+            
+            # Build final prompt
+            prompt = self.build_prompt(pillars)
+            
+            # Validate prompt
+            if not prompt or len(prompt.strip()) == 0:
+                raise ValueError("Generated prompt is empty")
+            
+            if len(prompt) < 10:
+                self.logger.warning(f"Generated prompt seems too short: {prompt}")
+            
+            self.logger.debug(f"Generated prompt for monitor {monitor_index or 'default'}: {prompt[:100]}...")
+            return prompt
+            
+        except Exception as e:
+            self.logger.error(f"Failed to generate prompt for monitor {monitor_index}: {e}")
+            raise ValueError(f"Prompt generation failed: {e}")

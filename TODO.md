@@ -3,6 +3,28 @@
 ## Project Overview
 Multi-monitor wallpaper generator using ComfyUI with deterministic prompts and rotation state management.
 
+**Language Choice**: Python was selected for its strengths in HTTP API calls, JSON manipulation, subprocess management, and cross-platform compatibility. Startup time is not a concern since wallpaper generation takes minutes anyway.
+
+## Recent Major Improvements ✨
+
+### 🎯 CLI & Usability (COMPLETED)
+- ✅ **Dry-run mode**: `--dry-run` flag shows what would happen without executing
+- ✅ **Config validation**: `validate` command and `--validate-config` flag
+- ✅ **Verbose output**: Enhanced logging with `--verbose` flag
+- ✅ **Generate all**: `generate-all` command for all monitors
+
+### 🛡️ Code Quality (COMPLETED)
+- ✅ **Comprehensive error handling**: Specific exception types throughout
+- ✅ **Complete type hints**: All functions properly annotated
+- ✅ **Full documentation**: Docstrings on all classes and methods
+- ✅ **Unit test suite**: pytest tests for all major modules
+
+### 🚀 Deployment (COMPLETED)
+- ✅ **Systemd integration**: Service and timer files with install script
+- ✅ **Multi-monitor docs**: Comprehensive configuration examples
+- ✅ **requirements.txt**: Added for non-Nix users
+- ✅ **README updates**: Complete usage documentation
+
 ## Current Issues
 
 ### 🔴 Critical Issues
@@ -78,25 +100,25 @@ Multi-monitor wallpaper generator using ComfyUI with deterministic prompts and r
 - [ ] **Reset Functionality**: Implement state reset for testing/recovery
 
 ### CLI Features
-- [ ] **Generate All**: Implement wallpaper generation for all monitors at once
-- [ ] **Dry Run Mode**: Show what would be generated without actually doing it
-- [ ] **Verbose Output**: Detailed logging of each step in the process
-- [ ] **Configuration Validation**: Validate config files and show errors
+- [x] **Generate All**: Implement wallpaper generation for all monitors at once
+- [x] **Dry Run Mode**: Show what would be generated without actually doing it
+- [x] **Verbose Output**: Detailed logging of each step in the process
+- [x] **Configuration Validation**: Validate config files and show errors
 
 ### Documentation
-- [ ] **README Update**: Document multi-monitor features and configuration
+- [x] **README Update**: Document multi-monitor features and configuration
 - [ ] **Man Page**: Complete CLI documentation with examples
-- [ ] **Integration Guide**: Systemd timer setup and desktop environment integration
+- [x] **Integration Guide**: Systemd timer setup and desktop environment integration
 - [ ] **Troubleshooting**: Common issues and solutions
 
 ### Testing
-- [ ] **Unit Tests**: Test individual modules and functions
+- [x] **Unit Tests**: Test individual modules and functions
 - [ ] **Integration Tests**: Test complete workflows
-- [ ] **Mock ComfyUI**: Test without actual ComfyUI instance
-- [ ] **Config Tests**: Test various configuration scenarios
+- [x] **Mock ComfyUI**: Test without actual ComfyUI instance
+- [x] **Config Tests**: Test various configuration scenarios
 
 ### Deployment
-- [ ] **Systemd Service**: Timer service for automatic wallpaper rotation
+- [x] **Systemd Service**: Timer service for automatic wallpaper rotation
 - [ ] **Package Installation**: Install to system with proper paths
 - [ ] **Desktop Integration**: Auto-start and desktop notifications
 - [ ] **Docker Support**: Containerized deployment option
@@ -104,10 +126,10 @@ Multi-monitor wallpaper generator using ComfyUI with deterministic prompts and r
 ## Technical Debt 🛠️
 
 ### Code Quality
-- [ ] **Error Handling**: Add comprehensive error handling throughout
-- [ ] **Type Hints**: Complete type annotations for all functions
-- [ ] **Documentation**: Add docstrings to all classes and methods
-- [ ] **Code Style**: Ensure consistent formatting and naming
+- [x] **Error Handling**: Add comprehensive error handling throughout
+- [x] **Type Hints**: Complete type annotations for all functions
+- [x] **Documentation**: Add docstrings to all classes and methods
+- [x] **Code Style**: Ensure consistent formatting and naming
 
 ### Architecture
 - [ ] **Dependency Injection**: Reduce coupling between modules

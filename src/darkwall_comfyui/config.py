@@ -86,7 +86,7 @@ class Config:
     prompt: PromptConfig = field(default_factory=PromptConfig)
     logging: LoggingConfig = field(default_factory=LoggingConfig)
     
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Validate and post-process configuration."""
         # Validate ComfyUI settings
         if not self.comfyui.base_url.startswith(('http://', 'https://')):
@@ -418,7 +418,7 @@ class Config:
 class StateManager:
     """Manages persistent state for multi-monitor rotation."""
     
-    def __init__(self, config: Config):
+    def __init__(self, config: Config) -> None:
         self.config = config
         self.state_file = config.get_state_file()
         self.logger = logging.getLogger(__name__)

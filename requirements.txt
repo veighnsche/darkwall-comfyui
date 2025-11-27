@@ -1,0 +1,6 @@
+# Core dependencies for darkwall-comfyui
+# Install with: pip install -r requirements.txt
+
+requests>=2.25.0
+tomli>=2.0.0
+tomli-w>=1.0.0
