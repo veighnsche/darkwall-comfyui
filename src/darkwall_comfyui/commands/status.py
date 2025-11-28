@@ -26,7 +26,7 @@ def show_status(config: Config) -> None:
     
     # ComfyUI connectivity
     print(f"\nComfyUI Status")
-    client = ComfyClient(config)
+    client = ComfyClient(config.comfyui)
     health = client.detailed_health_check()
     
     if health['healthy']:
@@ -79,7 +79,7 @@ def show_status(config: Config) -> None:
     # Atom counts
     print(f"\nPrompt Atoms")
     try:
-        prompt_gen = PromptGenerator(config)
+        prompt_gen = PromptGenerator(config.prompt, Config.get_config_dir())
         for pillar, atoms in prompt_gen.atoms.items():
             print(f"  {pillar:12} {len(atoms)} atoms")
     except FileNotFoundError as e:

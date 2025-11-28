@@ -10,11 +10,13 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Optional
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse, urlunparse, urlencode
+import uuid
 
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
+import websocket
 
 from ..config import Config, ComfyUIConfig
 from ..exceptions import GenerationError, WorkflowError
@@ -63,6 +65,7 @@ class ComfyClient:
         self.base_url = comfyui_config.base_url.rstrip('/')
         self.timeout = comfyui_config.timeout
         self.poll_interval = comfyui_config.poll_interval
+        self.client_id = str(uuid.uuid4())
         
         # Configure retry strategy with exponential backoff
         retry_strategy = Retry(
@@ -321,123 +324,154 @@ class ComfyClient:
     
     def _submit(self, workflow: dict[str, Any]) -> str:
         """Submit workflow and return prompt_id."""
+        # Generate a prompt_id for this submission on the client side
+        prompt_id = str(uuid.uuid4())
+
+        payload = {
+            "prompt": workflow,
+            "client_id": self.client_id,
+            "prompt_id": prompt_id,
+        }
+
         try:
             response = self.session.post(
                 urljoin(self.base_url, '/prompt'),
-                json={'prompt': workflow},
-                timeout=30
+                json=payload,
+                timeout=30,
             )
             response.raise_for_status()
-            
-            data = response.json()
-            prompt_id = data.get('prompt_id')
-            if not prompt_id:
-                raise ComfyGenerationError("No prompt_id in response from ComfyUI")
-            
             self.logger.debug(f"Workflow submitted successfully: {prompt_id}")
             return prompt_id
-            
+
         except requests.ConnectionError as e:
             raise ComfyConnectionError(f"Cannot connect to ComfyUI at {self.base_url}: {e}")
         except requests.Timeout as e:
             raise ComfyConnectionError(f"Connection to ComfyUI timed out: {e}")
         except requests.HTTPError as e:
-            if e.response.status_code == 400:
-                raise ComfyGenerationError(f"Invalid workflow submitted to ComfyUI: {e.response.text}")
-            elif e.response.status_code == 500:
-                raise ComfyGenerationError(f"ComfyUI server error: {e.response.text}")
+            status = getattr(e.response, 'status_code', None)
+            text = getattr(e.response, 'text', '')
+            if status == 400:
+                raise ComfyGenerationError(f"Invalid workflow submitted to ComfyUI: {text}")
+            elif status == 500:
+                raise ComfyGenerationError(f"ComfyUI server error: {text}")
             else:
                 raise ComfyClientError(f"HTTP error from ComfyUI: {e}")
         except requests.RequestException as e:
             raise ComfyClientError(f"Failed to submit workflow to ComfyUI: {e}")
-        except json.JSONDecodeError as e:
-            raise ComfyClientError(f"Invalid JSON response from ComfyUI: {e}")
         except Exception as e:
             raise ComfyClientError(f"Unexpected error submitting workflow: {e}")
-    
+
+    def _build_ws_url(self) -> str:
+        parsed = urlparse(self.base_url)
+        if parsed.scheme == 'https':
+            ws_scheme = 'wss'
+        else:
+            ws_scheme = 'ws'
+
+        netloc = parsed.netloc or parsed.path
+        path = '/ws'
+        query = urlencode({"clientId": self.client_id})
+        return urlunparse((ws_scheme, netloc, path, "", query, ""))
+
     def _wait_for_result(self, prompt_id: str) -> dict[str, Any]:
-        """Poll for generation completion with adaptive polling."""
+        """Wait for generation completion via WebSocket and read history once."""
         start = time.time()
-        consecutive_failures = 0
-        adaptive_poll_interval = self.poll_interval
-        
-        self.logger.debug(f"Waiting for generation result: {prompt_id}")
-        
-        while time.time() - start < self.timeout:
-            try:
-                history = self._get_history(prompt_id)
-                
-                if history is None:
-                    # History not yet available; generation likely still in progress.
-                    # ComfyUI typically returns 404 for /history/<id> until the
-                    # prompt has finished, which is a normal condition and should
-                    # not be treated as a failure that triggers backoff.
-                    self.logger.debug(
-                        f"History not yet available for {prompt_id}; polling again in {adaptive_poll_interval}s"
-                    )
-                    time.sleep(adaptive_poll_interval)
+        ws_url = self._build_ws_url()
+
+        self.logger.debug(
+            f"Waiting for generation result via WebSocket: prompt_id={prompt_id} client_id={self.client_id}"
+        )
+
+        try:
+            ws = websocket.create_connection(ws_url, timeout=self.poll_interval)
+        except websocket.WebSocketException as e:
+            raise ComfyConnectionError(f"Failed to open WebSocket to ComfyUI at {ws_url}: {e}")
+
+        try:
+            ws.settimeout(self.poll_interval)
+            while time.time() - start < self.timeout:
+                try:
+                    message = ws.recv()
+                except websocket.WebSocketTimeoutException:
+                    # Check overall timeout in loop condition
                     continue
-                
-                # Reset failures on successful check
-                consecutive_failures = 0
-                adaptive_poll_interval = self.poll_interval
-                
-                # Check if generation is complete
-                if history:
-                    # Find first image output
-                    outputs = history.get('outputs', {})
-                    if not outputs:
-                        raise ComfyGenerationError(f"No outputs found for {prompt_id}")
-                    
-                    for node_id, output in outputs.items():
-                        if not isinstance(output, dict):
-                            continue
-                            
-                        images = output.get('images', [])
-                        if not images:
-                            continue
-                            
-                        image = images[0]
-                        if not isinstance(image, dict):
-                            continue
-                            
-                        filename = image.get('filename')
-                        if not filename:
-                            continue
-                            
-                        result = {
-                            "filename": filename,
-                            "subfolder": image.get('subfolder', ''),
-                            "type": image.get('type', 'output')
-                        }
-                        
+                except websocket.WebSocketConnectionClosedException as e:
+                    raise ComfyClientError(f"WebSocket closed while waiting for {prompt_id}: {e}")
+
+                if isinstance(message, bytes):
+                    # Binary previews; ignore for now.
+                    continue
+
+                try:
+                    data = json.loads(message)
+                except json.JSONDecodeError:
+                    self.logger.debug(f"Non-JSON WebSocket message: {message!r}")
+                    continue
+
+                if data.get("type") == "executing":
+                    payload = data.get("data", {})
+                    if payload.get("prompt_id") == prompt_id and payload.get("node") is None:
                         elapsed = time.time() - start
-                        self.logger.debug(f"Generation complete: {prompt_id} -> {filename} in {elapsed:.1f}s")
-                        return result
-                    
-                    # No images found in outputs
-                    raise ComfyGenerationError(f"No images in output for {prompt_id}")
-                
-                # Generation still in progress
-                time.sleep(adaptive_poll_interval)
-                
-            except ComfyClientError:
-                # Re-raise our own exceptions
-                raise
-            except Exception as e:
-                # Handle unexpected errors during polling
-                consecutive_failures += 1
-                self.logger.warning(f"Unexpected error during polling for {prompt_id}: {e}")
-                
-                if consecutive_failures >= 5:
-                    # Too many consecutive failures
-                    raise ComfyClientError(f"Too many polling failures for {prompt_id}: {e}")
-                
-                time.sleep(adaptive_poll_interval)
-        
-        # Timeout reached
-        elapsed = time.time() - start
-        raise ComfyTimeoutError(f"Generation timed out after {elapsed:.1f}s (limit: {self.timeout}s)")
+                        self.logger.debug(
+                            f"WebSocket reports execution complete for {prompt_id} in {elapsed:.1f}s"
+                        )
+                        break
+            else:
+                elapsed = time.time() - start
+                raise ComfyTimeoutError(
+                    f"Generation timed out after {elapsed:.1f}s (limit: {self.timeout}s)"
+                )
+        finally:
+            try:
+                ws.close()
+            except Exception:
+                pass
+
+        # Once WebSocket reports completion, read history once (with a small grace period
+        # in case the history entry lags slightly behind the executing event).
+        history = None
+        history_start = time.time()
+        while history is None and time.time() - history_start < max(self.poll_interval, 1):
+            history = self._get_history(prompt_id)
+            if history is None:
+                time.sleep(min(self.poll_interval, 1))
+
+        if not history:
+            raise ComfyGenerationError(f"No history found for completed prompt {prompt_id}")
+
+        outputs = history.get('outputs', {})
+        if not outputs:
+            raise ComfyGenerationError(f"No outputs found for {prompt_id}")
+
+        for node_id, output in outputs.items():
+            if not isinstance(output, dict):
+                continue
+
+            images = output.get('images', [])
+            if not images:
+                continue
+
+            image = images[0]
+            if not isinstance(image, dict):
+                continue
+
+            filename = image.get('filename')
+            if not filename:
+                continue
+
+            result = {
+                "filename": filename,
+                "subfolder": image.get('subfolder', ''),
+                "type": image.get('type', 'output'),
+            }
+
+            elapsed = time.time() - start
+            self.logger.debug(
+                f"Generation complete: {prompt_id} -> {filename} in {elapsed:.1f}s (via WebSocket)"
+            )
+            return result
+
+        raise ComfyGenerationError(f"No images in output for {prompt_id}")
     
     def _get_history(self, prompt_id: str) -> Optional[dict[str, Any]]:
         """Get generation history for prompt_id."""

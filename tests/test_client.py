@@ -34,7 +34,7 @@ def test_health_check_success(comfyui_config):
         assert result is True
         mock_get.assert_called_once_with(
             f"{client.base_url}/system_stats",
-            timeout=5
+            timeout=10
         )
 
 
@@ -139,9 +139,9 @@ def test_submit_workflow_success(comfyui_config):
     
     workflow = {"1": {"class_type": "TestNode", "inputs": {}}}
     
-    with patch.object(client.session, 'post') as mock_post:
+    with patch("darkwall_comfyui.comfy.client.uuid.uuid4", return_value="test-123"), \
+         patch.object(client.session, 'post') as mock_post:
         mock_response = Mock()
-        mock_response.json.return_value = {"prompt_id": "test-123"}
         mock_response.raise_for_status.return_value = None
         mock_post.return_value = mock_response
         
@@ -150,8 +150,12 @@ def test_submit_workflow_success(comfyui_config):
         assert prompt_id == "test-123"
         mock_post.assert_called_once_with(
             f"{client.base_url}/prompt",
-            json={"prompt": workflow},
-            timeout=30
+            json={
+                "prompt": workflow,
+                "client_id": client.client_id,
+                "prompt_id": "test-123",
+            },
+            timeout=30,
         )
 
 

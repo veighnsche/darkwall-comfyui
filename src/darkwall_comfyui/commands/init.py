@@ -86,7 +86,7 @@ def validate_config(config: Config) -> None:
     # Validate ComfyUI connectivity
     print("\nChecking ComfyUI connectivity...")
     try:
-        client = ComfyClient(config)
+        client = ComfyClient(config.comfyui)
         if client.health_check():
             print("  ✓ ComfyUI is reachable")
         else:
@@ -100,7 +100,7 @@ def validate_config(config: Config) -> None:
     print("\nChecking workflow file...")
     try:
         from ..comfy import WorkflowManager
-        workflow_mgr = WorkflowManager(config)
+        workflow_mgr = WorkflowManager(config.comfyui)
         workflow = workflow_mgr.load()
         workflow_warnings = workflow_mgr.validate(workflow)
         warnings.extend([f"Workflow: {w}" for w in workflow_warnings])
@@ -114,7 +114,7 @@ def validate_config(config: Config) -> None:
     # Validate prompt atoms
     print("\nChecking prompt atoms...")
     try:
-        prompt_gen = PromptGenerator(config)
+        prompt_gen = PromptGenerator(config.prompt, Config.get_config_dir())
         for pillar, atoms in prompt_gen.atoms.items():
             if not atoms:
                 warnings.append(f"No atoms found for {pillar}")
