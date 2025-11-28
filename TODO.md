@@ -47,7 +47,26 @@ Multi-monitor wallpaper generator using ComfyUI with deterministic prompts and r
 - [x] **Workflow Validation**: Validate workflow JSON structure on load - Enhanced dry-run to show validation warnings
 - [ ] **Workflow Templates**: Pre-configured workflows for common resolutions (1080p, 1440p, 4K)
 
-### 🟡 MEDIUM PRIORITY - New Features
+### 🔴 HIGH PRIORITY - Critical Issues
+
+#### Prompt Injection System (COMPLETED ✅)
+- [x] **Replace Heuristic Detection**: Current system uses fragile heuristics to detect prompt fields
+- [x] **Implement Placeholder System**: Require `__POSITIVE_PROMPT__` and `__NEGATIVE_PROMPT__` placeholders in workflows
+- [x] **Workflow Migration**: Create migration guide for existing workflows
+- [x] **Update Validation**: Warn when workflows don't contain required placeholders
+- [x] **Breaking Change**: This requires users to update their exported workflows
+
+**✅ RESOLVED**: Implemented deterministic placeholder-based prompt injection system:
+- Replaced fragile heuristic detection with exact placeholder matching
+- Updated default workflow (qwen_t2i.json) to include both placeholders
+- Removed backwards compatibility - placeholders now required
+- Added clear error messages with migration instructions
+- Created comprehensive migration guide (docs/workflow-migration.md)
+- Enhanced validation to fail fast on missing placeholders
+
+**User Experience**: New users get proper workflows via `darkwall init`, existing users get actionable error messages.
+
+### 🟡 MEDIUM PRIORITY - Features & Enhancements
 
 #### 🔄 PROMPT BUILDER REDESIGN (Replaces NSFW Mode)
 
@@ -203,11 +222,11 @@ template = "default.prompt"    # Uses default
 
 ### � LOW PRIORITY - Polish & Documentation
 
-#### Documentation
-- [ ] **Man Page**: Complete CLI documentation with examples
-- [ ] **Troubleshooting Guide**: Common issues and solutions (swaybg conflicts, permissions, etc.)
-- [ ] **API Documentation**: Document internal APIs for extensibility
-- [ ] **Configuration Reference**: Complete config.toml documentation
+#### Documentation (COMPLETED)
+- [x] **Man Page**: Complete CLI documentation with examples
+- [x] **Troubleshooting Guide**: Common issues and solutions (swaybg conflicts, permissions, etc.)
+- [x] **API Documentation**: Document internal APIs for extensibility
+- [x] **Configuration Reference**: Complete config.toml documentation
 
 #### Desktop Integration
 - [ ] **Desktop Notifications**: Notify when wallpaper changes

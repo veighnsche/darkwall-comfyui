@@ -91,6 +91,9 @@ class WorkflowManager:
         if not workflow:
             raise WorkflowError("Workflow is empty")
         
+        # Validate prompt placeholders
+        self._validate_placeholders(workflow, workflow_path)
+        
         # Cache the workflow
         self._cached_workflow = workflow
         self._cached_path = workflow_path
@@ -98,37 +101,75 @@ class WorkflowManager:
         self.logger.info(f"Loaded workflow from {workflow_path} ({len(workflow)} nodes)")
         return workflow
     
-    def validate(self, workflow: dict[str, Any]) -> list[str]:
-        """
-        Validate workflow structure.
+    def _validate_placeholders(self, workflow: dict[str, Any], workflow_path: Path) -> None:
+        """Validate workflow contains proper prompt placeholders (REQUIRED)."""
+        has_positive_placeholder = False
+        has_negative_placeholder = False
+        has_text_fields = False
         
-        Returns:
-            List of warning messages (empty if valid)
-        """
-        warnings = []
-        
-        has_prompt_node = False
-        has_output_node = False
-        
+        # Check for placeholders and text fields
         for node_id, node in workflow.items():
             if not isinstance(node, dict):
                 continue
             
-            class_type = node.get('class_type', '')
             inputs = node.get('inputs', {})
+            for field, value in inputs.items():
+                if isinstance(value, str):
+                    has_text_fields = True
+                    if value == "__POSITIVE_PROMPT__":
+                        has_positive_placeholder = True
+                    elif value == "__NEGATIVE_PROMPT__":
+                        has_negative_placeholder = True
+        
+        # Provide validation feedback
+        if not has_text_fields:
+            self.logger.error(f"Workflow {workflow_path.name} has no text fields for prompt injection")
+        
+        if has_positive_placeholder:
+            self.logger.info(f"Workflow {workflow_path.name} uses placeholder-based prompt injection")
+            if has_negative_placeholder:
+                self.logger.info(f"Workflow {workflow_path.name} supports negative prompts")
+            else:
+                self.logger.info(f"Workflow {workflow_path.name} doesn't support negative prompts (no __NEGATIVE_PROMPT__ placeholder)")
+        else:
+            self.logger.error(f"Workflow {workflow_path.name} doesn't use placeholder-based prompt injection")
+            self.logger.error(f"Please update workflow to use __POSITIVE_PROMPT__ and __NEGATIVE_PROMPT__ placeholders")
+            self.logger.error(f"See workflow migration guide for instructions")
+    
+    def validate(self, workflow_path: Path = None, config_dir: Path = None) -> list[str]:
+        """
+        Validate workflow file and return list of errors/warnings.
+        
+        Args:
+            workflow_path: Path to workflow file
+            config_dir: Config directory for resolving relative paths
             
-            # Check for prompt input nodes
-            if 'text' in inputs or 'prompt' in inputs or 'positive' in inputs:
-                has_prompt_node = True
+        Returns:
+            List of validation errors (empty if valid)
+        """
+        errors = []
+        
+        try:
+            workflow = self.load(workflow_path, config_dir)
             
-            # Check for output nodes
-            if 'SaveImage' in class_type or 'PreviewImage' in class_type:
-                has_output_node = True
+            # Check for required placeholders
+            has_positive_placeholder = False
+            for node_id, node in workflow.items():
+                if isinstance(node, dict):
+                    inputs = node.get('inputs', {})
+                    for field, value in inputs.items():
+                        if isinstance(value, str) and value == "__POSITIVE_PROMPT__":
+                            has_positive_placeholder = True
+                            break
+                    if has_positive_placeholder:
+                        break
+            
+            if not has_positive_placeholder:
+                errors.append("CRITICAL: Workflow missing __POSITIVE_PROMPT__ placeholder - prompt injection will fail")
+                errors.append("Solution: Add __POSITIVE_PROMPT__ to a CLIPTextEncode node text field")
+                errors.append("See workflow migration guide for detailed instructions")
+            
+        except WorkflowError as e:
+            errors.append(f"Workflow validation failed: {e}")
         
-        if not has_prompt_node:
-            warnings.append("No text/prompt input node found - prompt injection may fail")
-        
-        if not has_output_node:
-            warnings.append("No SaveImage/PreviewImage node found - may not produce output")
-        
-        return warnings
+        return errors

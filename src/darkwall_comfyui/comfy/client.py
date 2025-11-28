@@ -160,54 +160,47 @@ class ComfyClient:
         return workflow
     
     def _inject_prompts(self, workflow: dict[str, Any], prompts: PromptResult) -> dict[str, Any]:
-        """Inject both positive and negative prompts into workflow nodes."""
+        """Inject both positive and negative prompts into workflow nodes using placeholders."""
         import json
         workflow = json.loads(json.dumps(workflow))  # Deep copy
         
         positive_injected = False
         negative_injected = False
         
+        # Look for placeholder-based injection (REQUIRED)
         for node_id, node in workflow.items():
             if not isinstance(node, dict):
                 continue
             
             inputs = node.get('inputs', {})
-            class_type = node.get('class_type', '')
             
-            # Inject positive prompt
-            if not positive_injected:
-                for field in ['text', 'prompt', 'positive']:
-                    if field in inputs and isinstance(inputs[field], str):
-                        # Check if this looks like a positive prompt node
-                        # (avoid injecting into negative nodes)
-                        if 'negative' not in inputs[field].lower() and 'NEGATIVE' not in inputs[field]:
-                            inputs[field] = prompts.positive
-                            self.logger.debug(f"Injected positive prompt into node {node_id}.{field}")
-                            positive_injected = True
-                            break
-            
-            # Inject negative prompt
-            if not negative_injected and prompts.negative:
-                # Look for CLIPTextEncode nodes with negative prompts
-                if class_type == 'CLIPTextEncode':
-                    for field in ['text', 'prompt', 'negative']:
-                        if field in inputs and isinstance(inputs[field], str):
-                            # Check if this looks like a negative prompt node
-                            current_value = inputs[field].lower()
-                            if ('negative' in current_value or 
-                                'NEGATIVE' in inputs[field] or 
-                                field == 'negative'):
-                                inputs[field] = prompts.negative
-                                self.logger.debug(f"Injected negative prompt into node {node_id}.{field}")
-                                negative_injected = True
-                                break
+            # Check for placeholder-based injection
+            for field, value in inputs.items():
+                if isinstance(value, str):
+                    if value == "__POSITIVE_PROMPT__":
+                        inputs[field] = prompts.positive
+                        self.logger.debug(f"Injected positive prompt into placeholder node {node_id}.{field}")
+                        positive_injected = True
+                    elif value == "__NEGATIVE_PROMPT__" and prompts.negative:
+                        inputs[field] = prompts.negative
+                        self.logger.debug(f"Injected negative prompt into placeholder node {node_id}.{field}")
+                        negative_injected = True
         
+        # Validate injection was successful
         if not positive_injected:
-            self.logger.warning("No positive prompt field found in workflow")
+            raise ComfyError(
+                "Workflow missing __POSITIVE_PROMPT__ placeholder. "
+                "Please update your workflow to use placeholder-based prompt injection. "
+                "See docs/workflow-migration.md for migration guide."
+            )
         
         if prompts.negative and not negative_injected:
-            self.logger.info("Negative prompt provided but no negative prompt node found in workflow")
+            raise ComfyError(
+                "Negative prompt provided but workflow missing __NEGATIVE_PROMPT__ placeholder. "
+                "Please add __NEGATIVE_PROMPT__ to your workflow or remove negative prompt from template."
+            )
         
+        self.logger.info("Successfully injected prompts using placeholder-based system")
         return workflow
     
     def _submit(self, workflow: dict[str, Any]) -> str:
