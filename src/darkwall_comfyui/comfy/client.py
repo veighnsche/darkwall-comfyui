@@ -13,6 +13,8 @@ from typing import Any, Optional
 from urllib.parse import urljoin
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 from ..config import Config, ComfyUIConfig
 from ..exceptions import GenerationError
@@ -62,7 +64,28 @@ class ComfyClient:
         self.timeout = comfyui_config.timeout
         self.poll_interval = comfyui_config.poll_interval
         
+        # Configure retry strategy with exponential backoff
+        retry_strategy = Retry(
+            total=3,  # Maximum number of retries
+            status_forcelist=[500, 502, 503, 504],  # Retry on server errors
+            allowed_methods=["HEAD", "GET", "POST"],  # Methods to retry
+            backoff_factor=2,  # Exponential backoff: 2s, 4s, 8s
+            raise_on_status=False,  # Don't raise on retry status
+        )
+        
+        # Configure HTTP adapter with connection pooling
+        adapter = HTTPAdapter(
+            max_retries=retry_strategy,
+            pool_connections=10,  # Number of connection pools
+            pool_maxsize=20,      # Maximum number of connections in each pool
+            pool_block=False      # Don't block when pool is full
+        )
+        
+        # Create session with optimized configuration
         self.session = requests.Session()
+        self.session.mount("http://", adapter)
+        self.session.mount("https://", adapter)
+        
         self.session.headers.update({
             'Content-Type': 'application/json',
             'User-Agent': 'darkwall-comfyui/0.1.0'
@@ -71,6 +94,7 @@ class ComfyClient:
             self.session.headers.update(comfyui_config.headers)
         
         self.logger = logging.getLogger(__name__)
+        self.logger.debug("ComfyUI client initialized with retry logic and connection pooling")
     
     def generate(self, workflow: dict[str, Any], prompt: str | PromptResult) -> GenerationResult:
         """
@@ -109,11 +133,16 @@ class ComfyClient:
         )
     
     def health_check(self) -> bool:
-        """Check if ComfyUI is reachable."""
+        """
+        Check if ComfyUI is reachable with retry logic.
+        
+        Returns:
+            True if ComfyUI is reachable and healthy, False otherwise
+        """
         try:
             response = self.session.get(
                 urljoin(self.base_url, '/system_stats'),
-                timeout=5
+                timeout=10  # Increased timeout for health check
             )
             if response.status_code == 200:
                 self.logger.debug("ComfyUI health check passed")
@@ -122,17 +151,70 @@ class ComfyClient:
                 self.logger.warning(f"ComfyUI health check failed: HTTP {response.status_code}")
                 return False
         except requests.ConnectionError as e:
-            self.logger.debug(f"ComfyUI connection error: {e}")
+            self.logger.debug(f"ComfyUI connection error during health check: {e}")
             return False
         except requests.Timeout as e:
             self.logger.debug(f"ComfyUI health check timeout: {e}")
             return False
         except requests.RequestException as e:
-            self.logger.debug(f"ComfyUI health check error: {e}")
+            self.logger.debug(f"ComfyUI health check request error: {e}")
             return False
         except Exception as e:
             self.logger.error(f"Unexpected error during health check: {e}")
             return False
+    
+    def detailed_health_check(self) -> dict[str, Any]:
+        """
+        Perform detailed health check with system information.
+        
+        Returns:
+            Dictionary with health status and system information
+        """
+        health_info = {
+            'healthy': False,
+            'url': self.base_url,
+            'response_time_ms': None,
+            'system_stats': None,
+            'error': None
+        }
+        
+        try:
+            start_time = time.time()
+            response = self.session.get(
+                urljoin(self.base_url, '/system_stats'),
+                timeout=10
+            )
+            response_time = (time.time() - start_time) * 1000
+            
+            health_info['response_time_ms'] = round(response_time, 2)
+            
+            if response.status_code == 200:
+                health_info['healthy'] = True
+                try:
+                    health_info['system_stats'] = response.json()
+                except json.JSONDecodeError:
+                    self.logger.warning("ComfyUI returned invalid JSON in system_stats")
+                    health_info['system_stats'] = {'raw_response': response.text}
+                
+                self.logger.debug(f"ComfyUI detailed health check passed in {response_time:.2f}ms")
+            else:
+                health_info['error'] = f"HTTP {response.status_code}"
+                self.logger.warning(f"ComfyUI detailed health check failed: HTTP {response.status_code}")
+                
+        except requests.ConnectionError as e:
+            health_info['error'] = f"Connection error: {e}"
+            self.logger.debug(f"ComfyUI connection error during detailed health check: {e}")
+        except requests.Timeout as e:
+            health_info['error'] = f"Timeout error: {e}"
+            self.logger.debug(f"ComfyUI timeout during detailed health check: {e}")
+        except requests.RequestException as e:
+            health_info['error'] = f"Request error: {e}"
+            self.logger.debug(f"ComfyUI request error during detailed health check: {e}")
+        except Exception as e:
+            health_info['error'] = f"Unexpected error: {e}"
+            self.logger.error(f"Unexpected error during detailed health check: {e}")
+        
+        return health_info
     
     def _inject_prompt(self, workflow: dict[str, Any], prompt: str) -> dict[str, Any]:
         """Inject prompt into workflow nodes."""
@@ -240,8 +322,10 @@ class ComfyClient:
             raise ComfyClientError(f"Unexpected error submitting workflow: {e}")
     
     def _wait_for_result(self, prompt_id: str) -> dict[str, Any]:
-        """Poll for generation completion."""
+        """Poll for generation completion with adaptive polling."""
         start = time.time()
+        consecutive_failures = 0
+        adaptive_poll_interval = self.poll_interval
         
         self.logger.debug(f"Waiting for generation result: {prompt_id}")
         
@@ -250,9 +334,19 @@ class ComfyClient:
                 history = self._get_history(prompt_id)
                 
                 if history is None:
-                    # History check failed, continue polling
-                    time.sleep(self.poll_interval)
+                    # History check failed, may be temporary
+                    consecutive_failures += 1
+                    if consecutive_failures >= 3:
+                        # After 3 consecutive failures, increase poll interval
+                        adaptive_poll_interval = min(adaptive_poll_interval * 2, 30)
+                        self.logger.warning(f"Increasing poll interval to {adaptive_poll_interval}s due to repeated failures")
+                    
+                    time.sleep(adaptive_poll_interval)
                     continue
+                
+                # Reset failures on successful check
+                consecutive_failures = 0
+                adaptive_poll_interval = self.poll_interval
                 
                 # Check if generation is complete
                 if history:
@@ -283,24 +377,33 @@ class ComfyClient:
                             "type": image.get('type', 'output')
                         }
                         
-                        self.logger.debug(f"Generation complete: {prompt_id} -> {filename}")
+                        elapsed = time.time() - start
+                        self.logger.debug(f"Generation complete: {prompt_id} -> {filename} in {elapsed:.1f}s")
                         return result
                     
                     # No images found in outputs
                     raise ComfyGenerationError(f"No images in output for {prompt_id}")
                 
                 # Generation still in progress
-                time.sleep(self.poll_interval)
+                time.sleep(adaptive_poll_interval)
                 
             except ComfyClientError:
                 # Re-raise our own exceptions
                 raise
             except Exception as e:
-                self.logger.warning(f"Unexpected error while polling for {prompt_id}: {e}")
-                time.sleep(self.poll_interval)
+                # Handle unexpected errors during polling
+                consecutive_failures += 1
+                self.logger.warning(f"Unexpected error during polling for {prompt_id}: {e}")
+                
+                if consecutive_failures >= 5:
+                    # Too many consecutive failures
+                    raise ComfyClientError(f"Too many polling failures for {prompt_id}: {e}")
+                
+                time.sleep(adaptive_poll_interval)
         
         # Timeout reached
-        raise ComfyTimeoutError(f"Generation timed out after {self.timeout}s for prompt {prompt_id}")
+        elapsed = time.time() - start
+        raise ComfyTimeoutError(f"Generation timed out after {elapsed:.1f}s (limit: {self.timeout}s)")
     
     def _get_history(self, prompt_id: str) -> Optional[dict[str, Any]]:
         """Get generation history for prompt_id."""

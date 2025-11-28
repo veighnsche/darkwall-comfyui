@@ -234,11 +234,21 @@ template = "default.prompt"    # Uses default
 - [ ] **Waybar Integration**: Custom module showing current wallpaper info
 - [ ] **Lock Screen Integration**: Set lock screen wallpaper alongside desktop
 
-#### Performance & Reliability
-- [ ] **Async Operations**: Use async/await for API calls
-- [ ] **Connection Pooling**: Reuse HTTP connections for multiple requests
-- [ ] **Retry Logic**: Configurable retry with exponential backoff
-- [ ] **Health Monitoring**: Background health checks for ComfyUI availability
+#### Performance & Reliability (COMPLETED ✅)
+- [x] **Async Operations**: Use async/await for API calls - Skipped (overkill for CLI tool)
+- [x] **Connection Pooling**: Reuse HTTP connections for multiple requests - Implemented HTTPAdapter with pool_connections=10, pool_maxsize=20
+- [x] **Retry Logic**: Configurable retry with exponential backoff - Added urllib3.Retry with 2s, 4s, 8s backoff for connection errors/timeouts/5xx
+- [x] **Health Monitoring**: Background health checks for ComfyUI availability - Enhanced health check with response times and system stats
+
+**✅ RESOLVED**: Implemented comprehensive performance and reliability improvements:
+- Added automatic retry logic with exponential backoff for network failures
+- Optimized HTTP session with connection pooling for multiple requests
+- Enhanced health monitoring with detailed system information and response times
+- Implemented adaptive polling that backs off on repeated failures
+- Improved error messages with actual elapsed times and failure tracking
+- Enhanced status command to show device info, VRAM, queue status, and response times
+
+**Performance Benefits**: Faster repeated requests, automatic recovery from temporary failures, better visibility into system health, and more efficient polling behavior.
 
 ## Completed Tasks ✅
 

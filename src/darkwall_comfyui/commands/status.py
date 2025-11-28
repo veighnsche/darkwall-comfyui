@@ -27,10 +27,39 @@ def show_status(config: Config) -> None:
     # ComfyUI connectivity
     print(f"\nComfyUI Status")
     client = ComfyClient(config)
-    if client.health_check():
+    health = client.detailed_health_check()
+    
+    if health['healthy']:
         print(f"  Connection: ✓ OK")
+        if health['response_time_ms']:
+            print(f"  Response:   {health['response_time_ms']}ms")
+        
+        # Show system stats if available
+        if health['system_stats']:
+            stats = health['system_stats']
+            if 'devices' in stats:
+                devices = stats['devices']
+                if devices:
+                    print(f"  Devices:    {len(devices)} detected")
+                    for device in devices[:2]:  # Show first 2 devices
+                        device_type = device.get('type', 'unknown')
+                        device_name = device.get('name', 'unknown')
+                        memory = device.get('vram_total_mb', 0)
+                        if memory:
+                            print(f"    - {device_type}: {device_name} ({memory}MB VRAM)")
+                        else:
+                            print(f"    - {device_type}: {device_name}")
+            if 'queue_status' in stats:
+                queue = stats['queue_status']
+                queue_running = queue.get('queue_running', 0)
+                queue_pending = queue.get('queue_pending', 0)
+                if queue_running > 0 or queue_pending > 0:
+                    print(f"  Queue:      {queue_running} running, {queue_pending} pending")
     else:
         print(f"  Connection: ✗ UNREACHABLE")
+        if health['error']:
+            print(f"  Error:      {health['error']}")
+        print(f"  URL:        {health['url']}")
     
     # Rotation state
     print(f"\nRotation State")
