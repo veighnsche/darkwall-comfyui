@@ -188,12 +188,12 @@ template = "default.prompt"    # Uses default
 
 ---
 
-#### Wallpaper History & Gallery
-- [ ] **Save All Wallpapers**: Keep history of all generated wallpapers (not just current)
-- [ ] **History Directory**: `~/Pictures/wallpapers/history/` with timestamped files
-- [ ] **Gallery Command**: `gallery` subcommand to browse/manage history
-- [ ] **Favorites System**: Mark wallpapers as favorites to prevent deletion
-- [ ] **Cleanup Policy**: Configurable retention (keep last N, keep X days, etc.)
+#### Wallpaper History & Gallery (COMPLETED)
+- [x] **Save All Wallpapers**: Keep history of all generated wallpapers (not just current)
+- [x] **History Directory**: `~/Pictures/wallpapers/history/` with timestamped files in YYYY/MM/ structure
+- [x] **Gallery Command**: `gallery` subcommand to browse/manage history (list, info, favorite, delete, stats, cleanup)
+- [x] **Favorites System**: Mark wallpapers as favorites to prevent deletion with ★ markers
+- [x] **Cleanup Policy**: Configurable retention (keep last N, keep X days, size limits, protect favorites)
 
 #### Enhanced Prompt Generation (Superseded by Prompt Builder Redesign above)
 - [x] **Theme Packs**: ~~Multiple atom sets~~ → Solved by atoms/ subdirectories

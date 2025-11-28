@@ -8,6 +8,7 @@ from ..config import Config, StateManager, MonitorConfig, OutputConfig, ComfyUIC
 from ..comfy import ComfyClient, WorkflowManager
 from ..prompt_generator import PromptGenerator
 from ..wallpaper import WallpaperTarget
+from ..history import WallpaperHistory
 
 
 def generate_once(config: Config, dry_run: bool = False, workflow_path: str = None, template_path: str = None) -> None:
@@ -110,6 +111,18 @@ def generate_once(config: Config, dry_run: bool = False, workflow_path: str = No
         target = WallpaperTarget(config.monitors, config.output)
         saved_path = target.save_wallpaper(result.image_data, output_path)
         
+        # Save to history
+        history = WallpaperHistory(config.history)
+        history_entry = history.save_wallpaper(
+            image_data=result.image_data,
+            generation_result=result,
+            prompt_result=prompts,
+            monitor_index=monitor_index,
+            template=actual_template_path,
+            workflow=actual_workflow_path
+        )
+        logger.info(f"Saved to history: {history_entry.filename}")
+        
         # Set wallpaper
         if target.set_wallpaper(saved_path, monitor_index):
             logger.info(f"Wallpaper set for monitor {monitor_index}")
@@ -172,6 +185,7 @@ def generate_all(config: Config, dry_run: bool = False) -> None:
     workflow_mgr = WorkflowManager(config.comfyui)
     client = ComfyClient(config.comfyui)
     target = WallpaperTarget(config.monitors, config.output)
+    history = WallpaperHistory(config.history)
     
     if not client.health_check():
         logger.error(f"ComfyUI not reachable at {config.comfyui.base_url}")
@@ -202,6 +216,18 @@ def generate_all(config: Config, dry_run: bool = False) -> None:
             
             output_path = config.monitors.get_output_path(monitor_index)
             target.save_wallpaper(result.image_data, output_path)
+            
+            # Save to history
+            history_entry = history.save_wallpaper(
+                image_data=result.image_data,
+                generation_result=result,
+                prompt_result=prompts,
+                monitor_index=monitor_index,
+                template=template_path,
+                workflow=workflow_path
+            )
+            logger.info(f"Saved to history: {history_entry.filename}")
+            
             target.set_wallpaper(output_path, monitor_index)
             
             success_count += 1

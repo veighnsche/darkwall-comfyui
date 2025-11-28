@@ -22,6 +22,15 @@ except ImportError:
 from .exceptions import ConfigError, StateError
 
 
+@dataclass
+class CleanupPolicy:
+    """Cleanup policy for history management."""
+    max_count: Optional[int] = None  # Keep max N wallpapers
+    max_days: Optional[int] = None   # Keep wallpapers newer than X days
+    min_favorites: Optional[int] = None  # Always keep at least N favorites
+    max_size_mb: Optional[int] = None  # Keep history under X MB
+
+
 # URL validation regex
 URL_PATTERN = re.compile(
     r'^https?://'  # http:// or https://
@@ -76,6 +85,12 @@ def validate_toml_structure(config_dict: Dict[str, Any], config_file: Path) -> N
         'logging': {
             'level': str,
             'verbose': bool,
+        },
+        'history': {
+            'enabled': bool,
+            'history_dir': str,
+            'max_entries': int,
+            'cleanup_policy': dict,  # Optional
         },
     }
     
@@ -183,6 +198,19 @@ class LoggingConfig:
 
 
 @dataclass
+class HistoryConfig:
+    """Wallpaper history configuration."""
+    enabled: bool = True
+    history_dir: str = "~/Pictures/wallpapers/history"
+    max_entries: int = 1000
+    cleanup_policy: Optional[CleanupPolicy] = None
+    
+    def get_history_dir(self) -> Path:
+        """Get absolute history directory path."""
+        return Path(self.history_dir).expanduser()
+
+
+@dataclass
 class Config:
     """
     Main configuration class for DarkWall ComfyUI.
@@ -195,6 +223,7 @@ class Config:
     output: OutputConfig = field(default_factory=OutputConfig)
     prompt: PromptConfig = field(default_factory=PromptConfig)
     logging: LoggingConfig = field(default_factory=LoggingConfig)
+    history: HistoryConfig = field(default_factory=HistoryConfig)
     
     def __post_init__(self) -> None:
         """Validate and post-process configuration."""

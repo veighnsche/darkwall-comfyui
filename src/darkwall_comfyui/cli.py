@@ -29,6 +29,14 @@ from .commands import (
     validate_config,
 )
 from .commands.prompt import execute as prompt_command
+from .commands.gallery import (
+    gallery_list,
+    gallery_info,
+    gallery_favorite,
+    gallery_delete,
+    gallery_stats,
+    gallery_cleanup,
+)
 
 
 def setup_logging(level: str = "INFO") -> None:
@@ -126,6 +134,36 @@ def main() -> int:
         help="List atom files instead of templates"
     )
     
+    # Add gallery subcommand with its own subparsers
+    gallery_parser = subparsers.add_parser("gallery", help="Browse wallpaper history")
+    gallery_subparsers = gallery_parser.add_subparsers(dest="gallery_command", help="Gallery commands")
+    
+    # Gallery list
+    list_parser = gallery_subparsers.add_parser("list", help="List wallpapers in history")
+    list_parser.add_argument("--monitor", type=int, help="Filter by monitor index")
+    list_parser.add_argument("--favorites", action="store_true", help="Only show favorites")
+    list_parser.add_argument("--limit", type=int, help="Maximum number of entries")
+    list_parser.add_argument("--format", choices=["table", "json"], default="table", help="Output format")
+    
+    # Gallery info
+    info_parser = gallery_subparsers.add_parser("info", help="Show wallpaper details")
+    info_parser.add_argument("timestamp", help="Timestamp of wallpaper entry")
+    
+    # Gallery favorite
+    favorite_parser = gallery_subparsers.add_parser("favorite", help="Mark wallpaper as favorite")
+    favorite_parser.add_argument("timestamp", help="Timestamp of wallpaper entry")
+    favorite_parser.add_argument("--unfavorite", action="store_true", help="Remove favorite status")
+    
+    # Gallery delete
+    delete_parser = gallery_subparsers.add_parser("delete", help="Delete wallpaper from history")
+    delete_parser.add_argument("timestamp", help="Timestamp of wallpaper entry")
+    
+    # Gallery stats
+    gallery_subparsers.add_parser("stats", help="Show history statistics")
+    
+    # Gallery cleanup
+    gallery_subparsers.add_parser("cleanup", help="Run history cleanup")
+    
     args = parser.parse_args()
     
     try:
@@ -163,6 +201,24 @@ def main() -> int:
             validate_config(config)
         elif command == "prompt":
             prompt_command(args, config)
+        elif command == "gallery":
+            gallery_cmd = args.gallery_command
+            if gallery_cmd == "list":
+                gallery_list(config, monitor_index=args.monitor, favorites_only=args.favorites, 
+                            limit=args.limit, format_output=args.format)
+            elif gallery_cmd == "info":
+                gallery_info(config, args.timestamp)
+            elif gallery_cmd == "favorite":
+                gallery_favorite(config, args.timestamp, favorite=not args.unfavorite)
+            elif gallery_cmd == "delete":
+                gallery_delete(config, args.timestamp)
+            elif gallery_cmd == "stats":
+                gallery_stats(config)
+            elif gallery_cmd == "cleanup":
+                gallery_cleanup(config)
+            else:
+                gallery_parser.print_help()
+                return 1
         else:
             parser.print_help()
             return 1
