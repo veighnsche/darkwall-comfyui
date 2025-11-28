@@ -9,7 +9,7 @@ import logging
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, Callable
 from urllib.parse import urljoin, urlparse, urlunparse, urlencode
 import uuid
 
@@ -99,7 +99,12 @@ class ComfyClient:
         self.logger = logging.getLogger(__name__)
         self.logger.debug("ComfyUI client initialized with retry logic and connection pooling")
     
-    def generate(self, workflow: dict[str, Any], prompt: str | PromptResult) -> GenerationResult:
+    def generate(
+        self,
+        workflow: dict[str, Any],
+        prompt: str | PromptResult,
+        on_event: Optional[Callable[[dict[str, Any]], None]] = None,
+    ) -> GenerationResult:
         """
         Run a complete generation: inject prompt, submit, wait, download.
         
@@ -129,7 +134,7 @@ class ComfyClient:
         self.logger.info(f"Submitted workflow: {prompt_id}")
         
         # Wait for completion
-        result = self._wait_for_result(prompt_id)
+        result = self._wait_for_result(prompt_id, on_event=on_event)
         
         # Download image
         image_data = self._download_image(result["filename"])
@@ -373,8 +378,17 @@ class ComfyClient:
         query = urlencode({"clientId": self.client_id})
         return urlunparse((ws_scheme, netloc, path, "", query, ""))
 
-    def _wait_for_result(self, prompt_id: str) -> dict[str, Any]:
-        """Wait for generation completion via WebSocket and read history once."""
+    def _wait_for_result(
+        self,
+        prompt_id: str,
+        on_event: Optional[Callable[[dict[str, Any]], None]] = None,
+    ) -> dict[str, Any]:
+        """Wait for generation completion via WebSocket and read history once.
+
+        If on_event is provided, it will be called with each decoded WebSocket
+        message (as a dict) before internal handling, allowing higher-level
+        UIs or loggers to react to queue/progress events.
+        """
         start = time.time()
         ws_url = self._build_ws_url()
 
@@ -408,14 +422,38 @@ class ComfyClient:
                     self.logger.debug(f"Non-JSON WebSocket message: {message!r}")
                     continue
 
-                if data.get("type") == "executing":
+                # Surface raw events to any registered handler first.
+                if on_event is not None:
+                    try:
+                        on_event(data)
+                    except Exception as cb_err:
+                        self.logger.warning(f"on_event callback raised: {cb_err}")
+
+                event_type = data.get("type")
+                if event_type == "executing":
                     payload = data.get("data", {})
-                    if payload.get("prompt_id") == prompt_id and payload.get("node") is None:
+                    event_prompt_id = payload.get("prompt_id")
+                    node = payload.get("node")
+
+                    # Ignore events for other prompts (same clientId can be reused).
+                    if event_prompt_id != prompt_id:
+                        continue
+
+                    if node is None:
+                        # ComfyUI signals prompt-level completion with node=None.
                         elapsed = time.time() - start
                         self.logger.debug(
                             f"WebSocket reports execution complete for {prompt_id} in {elapsed:.1f}s"
                         )
                         break
+                    else:
+                        # Per-node execution progress.
+                        self.logger.debug(
+                            f"WebSocket executing node {node} for {prompt_id}"
+                        )
+                elif event_type is not None:
+                    # Log other structured WS events at debug level for richer telemetry.
+                    self.logger.debug(f"WebSocket event {event_type} for {prompt_id}: {data}")
             else:
                 elapsed = time.time() - start
                 raise ComfyTimeoutError(

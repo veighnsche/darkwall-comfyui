@@ -236,6 +236,57 @@ def test_get_history_not_found(comfyui_config):
         assert history is None
 
 
+def test_build_ws_url_uses_ws_scheme_and_client_id(comfyui_config):
+    """WebSocket URL should use ws scheme and include clientId query param."""
+    comfyui_config.base_url = "http://localhost:8188"
+    client = ComfyClient(comfyui_config)
+
+    ws_url = client._build_ws_url()
+
+    assert ws_url.startswith("ws://")
+    assert "clientId=" in ws_url
+    assert client.client_id in ws_url
+
+
+def test_wait_for_result_uses_websocket_and_history(comfyui_config):
+    """_wait_for_result should rely on WebSocket executing events and then history."""
+    client = ComfyClient(comfyui_config)
+    prompt_id = "prompt-123"
+
+    # First message: executing a node, second: execution done (node=None for this prompt).
+    msg_running = json.dumps({
+        "type": "executing",
+        "data": {"prompt_id": prompt_id, "node": "3"},
+    })
+    msg_done = json.dumps({
+        "type": "executing",
+        "data": {"prompt_id": prompt_id, "node": None},
+    })
+
+    ws_mock = Mock()
+    ws_mock.recv.side_effect = [msg_running, msg_done]
+    ws_mock.settimeout.return_value = None
+
+    history = {
+        "outputs": {
+            "1": {
+                "images": [
+                    {"filename": "test.png", "subfolder": "sub", "type": "output"}
+                ]
+            }
+        }
+    }
+
+    with patch("darkwall_comfyui.comfy.client.websocket.create_connection", return_value=ws_mock), \
+         patch.object(client, "_get_history", return_value=history):
+        result = client._wait_for_result(prompt_id)
+
+    assert result["filename"] == "test.png"
+    assert result["subfolder"] == "sub"
+    assert result["type"] == "output"
+    ws_mock.close.assert_called_once()
+
+
 def test_download_image_success(comfyui_config):
     """Test successful image download."""
     client = ComfyClient(comfyui_config)

@@ -25,6 +25,7 @@
             requests
             tomli
             tomli-w
+            websocket-client
           ];
           
           # Build dependencies
@@ -284,19 +285,23 @@ EOF
             python3Packages.requests
             python3Packages.tomli
             python3Packages.tomli-w
+            python3Packages.websocket-client
             python3Packages.pytest
             python3Packages.black
             python3Packages.isort
             python3Packages.mypy
-            
+            darkwall-comfyui
+
             # Runtime dependencies for testing
             swww
             swaybg
             feh
             nitrogen
           ];
-          
+
           shellHook = ''
+            export PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}"
+
             echo "🎨 DarkWall ComfyUI Development Environment"
             echo "Available commands:"
             echo "  python -m darkwall_comfyui.cli --help"
