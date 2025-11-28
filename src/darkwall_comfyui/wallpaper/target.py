@@ -104,7 +104,12 @@ class WallpaperTarget:
         Returns:
             True if successful
         """
-        return self.setter.set(wallpaper_path, monitor_index)
+        # Prefer an explicit monitor output name from configuration (e.g. "eDP-1",
+        # "HDMI-A-1") so setters don't have to guess based on index.
+        monitor_name = None
+        if hasattr(self.monitor_config, "get_monitor_name"):
+            monitor_name = self.monitor_config.get_monitor_name(monitor_index)
+        return self.setter.set(wallpaper_path, monitor_index, monitor_name)
     
     def _create_backup(self, current_path: Path) -> Optional[Path]:
         """Create backup of existing wallpaper."""

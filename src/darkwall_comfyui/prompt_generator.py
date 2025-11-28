@@ -29,6 +29,7 @@ class PromptResult:
     """Result of prompt generation with positive and negative prompts."""
     positive: str
     negative: str = ""
+    seed: Optional[int] = None
 
 
 class PromptGenerator:
@@ -384,7 +385,7 @@ class PromptGenerator:
             if negative:
                 self.logger.debug(f"Negative prompt: {negative[:80]}...")
             
-            return PromptResult(positive=positive, negative=negative)
+            return PromptResult(positive=positive, negative=negative, seed=seed)
             
         except PromptError:
             raise

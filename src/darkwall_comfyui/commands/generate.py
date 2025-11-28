@@ -9,6 +9,7 @@ from ..comfy import ComfyClient, WorkflowManager
 from ..prompt_generator import PromptGenerator
 from ..wallpaper import WallpaperTarget
 from ..history import WallpaperHistory
+from ..exceptions import ConfigError, WorkflowError, GenerationError, PromptError, CommandError
 
 
 def generate_once(config: Config, dry_run: bool = False, workflow_path: str = None, template_path: str = None) -> None:
@@ -101,8 +102,8 @@ def generate_once(config: Config, dry_run: bool = False, workflow_path: str = No
         workflow_mgr = WorkflowManager(config.comfyui)
         workflow = workflow_mgr.load(Path(actual_workflow_path), Config.get_config_dir())
         
-        # Validate workflow
-        warnings = workflow_mgr.validate(workflow)
+        # Validate workflow (by path, not by dict)
+        warnings = workflow_mgr.validate(Path(actual_workflow_path), Config.get_config_dir())
         for warning in warnings:
             logger.warning(f"Workflow: {warning}")
         
@@ -127,7 +128,8 @@ def generate_once(config: Config, dry_run: bool = False, workflow_path: str = No
             prompt_result=prompts,
             monitor_index=monitor_index,
             template=actual_template_path,
-            workflow=actual_workflow_path
+            workflow=actual_workflow_path,
+            seed=getattr(prompts, "seed", None),
         )
         logger.info(f"Saved to history: {history_entry.filename}")
         
@@ -214,6 +216,10 @@ def generate_all(config: Config, dry_run: bool = False) -> None:
     
     success_count = 0
     errors = []
+    variations = getattr(config.prompt, "variations_per_monitor", 1)
+    if variations < 1:
+        variations = 1
+    logger.info(f"Variations per monitor: {variations}")
     
     for monitor_index in range(config.monitors.count):
         logger.info(f"--- Monitor {monitor_index} ---")
@@ -226,31 +232,59 @@ def generate_all(config: Config, dry_run: bool = False) -> None:
             # Load workflow for this monitor
             workflow = workflow_mgr.load(Path(workflow_path), Config.get_config_dir())
             
-            # Validate workflow
-            warnings = workflow_mgr.validate(workflow)
+            # Validate workflow (by path, not by dict)
+            warnings = workflow_mgr.validate(Path(workflow_path), Config.get_config_dir())
             for warning in warnings:
                 logger.warning(f"Workflow: {warning}")
             
             # Generate prompt with per-monitor template
             template_path = config.monitors.get_template_path(monitor_index, config.prompt.default_template)
-            prompts = prompt_gen.generate_prompt_pair(monitor_index=monitor_index, template_path=template_path)
-            result = client.generate(workflow, prompts)
-            
             output_path = config.monitors.get_output_path(monitor_index)
-            target.save_wallpaper(result.image_data, output_path)
             
-            # Save to history
-            history_entry = history.save_wallpaper(
-                image_data=result.image_data,
-                generation_result=result,
-                prompt_result=prompts,
-                monitor_index=monitor_index,
-                template=template_path,
-                workflow=workflow_path
-            )
-            logger.info(f"Saved to history: {history_entry.filename}")
+            base_seed = prompt_gen.get_time_slot_seed(monitor_index=monitor_index)
+            last_output_path = None
             
-            target.set_wallpaper(output_path, monitor_index)
+            for variation_index in range(variations):
+                seed = base_seed + variation_index
+                prompts = prompt_gen.generate_prompt_pair(
+                    monitor_index=monitor_index,
+                    template_path=template_path,
+                    seed=seed,
+                )
+                logger.info(
+                    f"Monitor {monitor_index} variation {variation_index + 1}/{variations} "
+                    f"prompt: {prompts.positive[:100]}..."
+                )
+                if prompts.negative:
+                    logger.info(
+                        f"Monitor {monitor_index} variation {variation_index + 1}/{variations} "
+                        f"negative: {prompts.negative[:100]}..."
+                    )
+                
+                result = client.generate(workflow, prompts)
+                logger.info(
+                    f"Monitor {monitor_index} generated variation {variation_index + 1}/{variations}: "
+                    f"{result.filename}"
+                )
+                
+                # Save each variation to history
+                history_entry = history.save_wallpaper(
+                    image_data=result.image_data,
+                    generation_result=result,
+                    prompt_result=prompts,
+                    monitor_index=monitor_index,
+                    template=template_path,
+                    workflow=workflow_path,
+                    seed=getattr(prompts, "seed", None),
+                )
+                logger.info(f"Saved to history: {history_entry.filename}")
+                
+                # Only update the live wallpaper file for the final variation
+                if variation_index == variations - 1:
+                    last_output_path = target.save_wallpaper(result.image_data, output_path)
+            
+            if last_output_path is not None:
+                target.set_wallpaper(last_output_path, monitor_index)
             
             success_count += 1
             logger.info(f"Monitor {monitor_index}: OK")

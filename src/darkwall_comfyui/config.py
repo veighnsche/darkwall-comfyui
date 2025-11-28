@@ -67,6 +67,7 @@ def validate_toml_structure(config_dict: Dict[str, Any], config_file: Path) -> N
             'count': int,
             'pattern': str,
             'paths': list,  # Optional
+            'names': list,  # Optional per-monitor output names
             'command': str,
             'backup_pattern': str,
             'workflows': list,  # Optional
@@ -81,6 +82,7 @@ def validate_toml_structure(config_dict: Dict[str, Any], config_file: Path) -> N
             'atoms_dir': str,
             'use_monitor_seed': bool,
             'default_template': str,  # Optional
+            'variations_per_monitor': int,
         },
         'logging': {
             'level': str,
@@ -137,6 +139,7 @@ class MonitorConfig:
     backup_pattern: str = "~/Pictures/wallpapers/backups/monitor_{index}_{timestamp}.png"
     workflows: Optional[List[str]] = None  # Per-monitor workflow paths
     templates: Optional[List[str]] = None  # Per-monitor template files
+    names: Optional[List[str]] = None      # Per-monitor output names (e.g. eDP-1, HDMI-A-1)
     
     def get_output_path(self, index: int) -> Path:
         """Get output path for specific monitor index."""
@@ -163,6 +166,12 @@ class MonitorConfig:
         
         return default_template
 
+    def get_monitor_name(self, index: int) -> Optional[str]:
+        """Get configured monitor output name for a specific index, if available."""
+        if self.names and len(self.names) > index and self.names[index]:
+            return self.names[index]
+        return None
+
 
 @dataclass
 class ComfyUIConfig:
@@ -188,6 +197,7 @@ class PromptConfig:
     atoms_dir: str = "atoms"
     use_monitor_seed: bool = True
     default_template: str = "default.prompt"  # Default prompt template
+    variations_per_monitor: int = 1
 
 
 @dataclass
@@ -279,9 +289,19 @@ class Config:
                     f"Workflows array length ({len(self.monitors.workflows)}) must match monitor count ({self.monitors.count})"
                 )
         
+        # Validate names array if provided
+        if getattr(self.monitors, 'names', None) is not None:
+            if len(self.monitors.names) != self.monitors.count:
+                raise ConfigError(
+                    f"Names array length ({len(self.monitors.names)}) must match monitor count ({self.monitors.count})"
+                )
+        
         # Validate prompt settings
         if self.prompt.time_slot_minutes <= 0 or self.prompt.time_slot_minutes > 1440:
             raise ConfigError("Time slot minutes must be between 1 and 1440")
+        
+        if getattr(self.prompt, 'variations_per_monitor', 1) <= 0 or getattr(self.prompt, 'variations_per_monitor', 1) > 20:
+            raise ConfigError("variations_per_monitor must be between 1 and 20")
         
         # Validate atoms directory name
         if not self.prompt.atoms_dir.isidentifier() and self.prompt.atoms_dir != 'atoms':
@@ -318,6 +338,13 @@ class Config:
         logger = logging.getLogger(__name__)
         user_config_dir = cls.get_config_dir()
         user_config_dir.mkdir(parents=True, exist_ok=True)
+        
+        # If a user config already exists, consider the config initialized and
+        # avoid emitting noisy warnings about missing templates on every run.
+        existing_config = user_config_dir / "config.toml"
+        if existing_config.exists():
+            logger.debug(f"Config already initialized at {existing_config}, skipping template copy")
+            return
         
         # Use environment variable (set by Nix wrapper)
         config_templates_dir = os.environ.get('DARKWALL_CONFIG_TEMPLATES')
@@ -620,6 +647,7 @@ class Config:
                 'atoms_dir': self.prompt.atoms_dir,
                 'use_monitor_seed': self.prompt.use_monitor_seed,
                 'default_template': self.prompt.default_template,
+                'variations_per_monitor': getattr(self.prompt, 'variations_per_monitor', 1),
             },
             'logging': {
                 'level': self.logging.level,
@@ -630,6 +658,9 @@ class Config:
         # Add optional fields
         if self.monitors.paths:
             config_dict['monitors']['paths'] = self.monitors.paths
+        
+        if getattr(self.monitors, 'names', None):
+            config_dict['monitors']['names'] = self.monitors.names
         
         if self.comfyui.headers:
             config_dict['comfyui']['headers'] = self.comfyui.headers

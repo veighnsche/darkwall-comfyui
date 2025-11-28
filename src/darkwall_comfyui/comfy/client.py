@@ -113,6 +113,11 @@ class ComfyClient:
         # Inject prompt(s) into workflow
         if isinstance(prompt, PromptResult):
             workflow = self._inject_prompts(workflow, prompt)
+            # If the prompt generator provided a deterministic seed, inject it into
+            # any Seed (rgthree) nodes so ComfyUI doesn't auto-generate a seed
+            # and complain about "-1" seeds coming from the API.
+            if getattr(prompt, "seed", None) is not None:
+                workflow = self._inject_seed(workflow, prompt.seed)
         else:
             workflow = self._inject_prompt(workflow, prompt)
         
@@ -277,12 +282,41 @@ class ComfyClient:
             )
         
         if prompts.negative and not negative_injected:
-            raise WorkflowError(
-                "Negative prompt provided but workflow missing __NEGATIVE_PROMPT__ placeholder. "
-                "Please add __NEGATIVE_PROMPT__ to your workflow or remove negative prompt from template."
+            # Soft behavior: warn and continue with positive-only
+            self.logger.warning(
+                "Negative prompt provided but workflow missing __NEGATIVE_PROMPT__ placeholder; "
+                "continuing with positive prompt only."
             )
         
         self.logger.info("Successfully injected prompts using placeholder-based system")
+        return workflow
+
+    def _inject_seed(self, workflow: dict[str, Any], seed: int) -> dict[str, Any]:
+        """Inject deterministic seed into Seed (rgthree) nodes if present.
+
+        This keeps ComfyUI from treating "-1" as a special value and emitting
+        warnings while still allowing workflows without Seed (rgthree) nodes to
+        behave unchanged.
+        """
+        import json
+        workflow = json.loads(json.dumps(workflow))  # Deep copy
+
+        seed_injected = False
+        for node_id, node in workflow.items():
+            if not isinstance(node, dict):
+                continue
+
+            if node.get("class_type") == "Seed (rgthree)":
+                inputs = node.setdefault("inputs", {})
+                inputs["seed"] = int(seed)
+                self.logger.debug(f"Injected seed {seed} into Seed (rgthree) node {node_id}")
+                seed_injected = True
+
+        if not seed_injected:
+            self.logger.debug(
+                "No Seed (rgthree) node found for seed injection; workflow may manage seeds internally"
+            )
+
         return workflow
     
     def _submit(self, workflow: dict[str, Any]) -> str:
@@ -334,13 +368,13 @@ class ComfyClient:
                 history = self._get_history(prompt_id)
                 
                 if history is None:
-                    # History check failed, may be temporary
-                    consecutive_failures += 1
-                    if consecutive_failures >= 3:
-                        # After 3 consecutive failures, increase poll interval
-                        adaptive_poll_interval = min(adaptive_poll_interval * 2, 30)
-                        self.logger.warning(f"Increasing poll interval to {adaptive_poll_interval}s due to repeated failures")
-                    
+                    # History not yet available; generation likely still in progress.
+                    # ComfyUI typically returns 404 for /history/<id> until the
+                    # prompt has finished, which is a normal condition and should
+                    # not be treated as a failure that triggers backoff.
+                    self.logger.debug(
+                        f"History not yet available for {prompt_id}; polling again in {adaptive_poll_interval}s"
+                    )
                     time.sleep(adaptive_poll_interval)
                     continue
                 
