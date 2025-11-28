@@ -16,7 +16,7 @@ import requests
 
 from ..config import Config, ComfyUIConfig
 from ..exceptions import GenerationError
-
+from ..prompt_generator import PromptResult
 
 @dataclass
 class GenerationResult:
@@ -72,13 +72,13 @@ class ComfyClient:
         
         self.logger = logging.getLogger(__name__)
     
-    def generate(self, workflow: dict[str, Any], prompt: str) -> GenerationResult:
+    def generate(self, workflow: dict[str, Any], prompt: str | PromptResult) -> GenerationResult:
         """
         Run a complete generation: inject prompt, submit, wait, download.
         
         Args:
             workflow: ComfyUI workflow dict (API format)
-            prompt: Text prompt to inject
+            prompt: Text prompt to inject (str) or PromptResult with positive/negative
             
         Returns:
             GenerationResult with image data
@@ -86,8 +86,11 @@ class ComfyClient:
         Raises:
             ComfyClientError: On any failure
         """
-        # Inject prompt into workflow
-        workflow = self._inject_prompt(workflow, prompt)
+        # Inject prompt(s) into workflow
+        if isinstance(prompt, PromptResult):
+            workflow = self._inject_prompts(workflow, prompt)
+        else:
+            workflow = self._inject_prompt(workflow, prompt)
         
         # Submit workflow
         prompt_id = self._submit(workflow)
@@ -153,6 +156,57 @@ class ComfyClient:
         
         if not injected:
             self.logger.warning("No prompt field found in workflow")
+        
+        return workflow
+    
+    def _inject_prompts(self, workflow: dict[str, Any], prompts: PromptResult) -> dict[str, Any]:
+        """Inject both positive and negative prompts into workflow nodes."""
+        import json
+        workflow = json.loads(json.dumps(workflow))  # Deep copy
+        
+        positive_injected = False
+        negative_injected = False
+        
+        for node_id, node in workflow.items():
+            if not isinstance(node, dict):
+                continue
+            
+            inputs = node.get('inputs', {})
+            class_type = node.get('class_type', '')
+            
+            # Inject positive prompt
+            if not positive_injected:
+                for field in ['text', 'prompt', 'positive']:
+                    if field in inputs and isinstance(inputs[field], str):
+                        # Check if this looks like a positive prompt node
+                        # (avoid injecting into negative nodes)
+                        if 'negative' not in inputs[field].lower() and 'NEGATIVE' not in inputs[field]:
+                            inputs[field] = prompts.positive
+                            self.logger.debug(f"Injected positive prompt into node {node_id}.{field}")
+                            positive_injected = True
+                            break
+            
+            # Inject negative prompt
+            if not negative_injected and prompts.negative:
+                # Look for CLIPTextEncode nodes with negative prompts
+                if class_type == 'CLIPTextEncode':
+                    for field in ['text', 'prompt', 'negative']:
+                        if field in inputs and isinstance(inputs[field], str):
+                            # Check if this looks like a negative prompt node
+                            current_value = inputs[field].lower()
+                            if ('negative' in current_value or 
+                                'NEGATIVE' in inputs[field] or 
+                                field == 'negative'):
+                                inputs[field] = prompts.negative
+                                self.logger.debug(f"Injected negative prompt into node {node_id}.{field}")
+                                negative_injected = True
+                                break
+        
+        if not positive_injected:
+            self.logger.warning("No positive prompt field found in workflow")
+        
+        if prompts.negative and not negative_injected:
+            self.logger.info("Negative prompt provided but no negative prompt node found in workflow")
         
         return workflow
     

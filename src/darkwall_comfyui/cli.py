@@ -28,6 +28,7 @@ from .commands import (
     reset_rotation,
     validate_config,
 )
+from .commands.prompt import execute as prompt_command
 
 
 def setup_logging(level: str = "INFO") -> None:
@@ -77,6 +78,11 @@ def main() -> int:
         type=str,
         help="Override workflow path for generate command (per-monitor workflows still apply to generate-all)"
     )
+    parser.add_argument(
+        "--template",
+        type=str,
+        help="Override template file for generate command (per-monitor templates still apply to generate-all)"
+    )
     
     subparsers = parser.add_subparsers(dest="command", help="Commands")
     
@@ -87,6 +93,38 @@ def main() -> int:
     subparsers.add_parser("reset", help="Reset rotation")
     subparsers.add_parser("fix-permissions", help="Fix config permissions")
     subparsers.add_parser("validate", help="Validate configuration")
+    
+    # Add prompt subcommand with its own subparsers
+    prompt_parser = subparsers.add_parser("prompt", help="Manage prompt templates")
+    prompt_subparsers = prompt_parser.add_subparsers(dest="prompt_command", help="Prompt commands")
+    
+    # Prompt preview
+    preview_parser = prompt_subparsers.add_parser("preview", help="Preview prompt template")
+    preview_parser.add_argument(
+        "--template",
+        help="Template file to preview (default: default.prompt)",
+        default=None
+    )
+    preview_parser.add_argument(
+        "--monitor",
+        type=int,
+        help="Monitor index for seed variation (default: 0)",
+        default=0
+    )
+    preview_parser.add_argument(
+        "--seed",
+        type=int,
+        help="Specific seed to use (default: time-based)",
+        default=None
+    )
+    
+    # Prompt list
+    list_parser = prompt_subparsers.add_parser("list", help="List available templates and atoms")
+    list_parser.add_argument(
+        "--atoms",
+        action="store_true",
+        help="List atom files instead of templates"
+    )
     
     args = parser.parse_args()
     
@@ -110,7 +148,7 @@ def main() -> int:
         command = args.command or "generate"
         
         if command == "generate":
-            generate_once(config, dry_run=args.dry_run, workflow_path=args.workflow)
+            generate_once(config, dry_run=args.dry_run, workflow_path=args.workflow, template_path=args.template)
         elif command == "generate-all":
             generate_all(config, dry_run=args.dry_run)
         elif command == "status":
@@ -123,6 +161,8 @@ def main() -> int:
             fix_permissions(config)
         elif command == "validate":
             validate_config(config)
+        elif command == "prompt":
+            prompt_command(args, config)
         else:
             parser.print_help()
             return 1

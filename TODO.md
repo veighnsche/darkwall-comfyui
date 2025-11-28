@@ -51,7 +51,7 @@ Multi-monitor wallpaper generator using ComfyUI with deterministic prompts and r
 
 #### 🔄 PROMPT BUILDER REDESIGN (Replaces NSFW Mode)
 
-**STATUS**: Phase 1-2 Complete - Template system implemented
+**STATUS**: COMPLETE - Template system fully implemented with examples
 
 ##### Problem Statement
 The current 4-atom system (subject, environment, lighting, style) is too rigid:
@@ -149,6 +149,31 @@ template = "default.prompt"    # Uses default
   - Removed `_generate_legacy_template()` fallback
   - Renamed atom files: `subject.txt`, `environment.txt`, `lighting.txt`, `style.txt`
   - Template file is REQUIRED - no fallback
+
+- [x] **Phase 6: Template Examples & CLI** (COMPLETE)
+  - Added new atom categories: `colors.txt`, `moods.txt`, `compositions.txt`
+  - Created example templates: `cinematic.prompt`, `cyberpunk.prompt`, `minimal.prompt`
+  - Implemented `darkwall prompt preview` command with seed support
+  - Implemented `darkwall prompt list [--atoms]` command
+  - All templates showcase wildcard and variant syntax
+
+- [x] **Phase 7: Per-Monitor Templates** (COMPLETE)
+  - Added `templates` field to MonitorConfig dataclass (Optional[List[str]])
+  - Added get_template_path() method to MonitorConfig
+  - Added `--template` CLI flag to override template for generate command
+  - Updated generate commands to use per-monitor templates when available
+  - Template override only affects 'generate', not 'generate-all' (respects per-monitor)
+
+- [x] **Phase 8: Workflow Negative Prompt Injection** (COMPLETE)
+  - Added PromptResult support to ComfyClient.generate() method
+  - Implemented _inject_prompts() to detect CLIPTextEncode nodes with negative prompts
+  - Injects negative prompt into nodes with 'negative' field or NEGATIVE placeholder
+  - Logs warning when negative prompt provided but no negative node found
+  - Updated generate commands to pass PromptResult instead of just prompt string
+
+- [ ] **Phase 9: Atom Management Commands** (SKIPPED)
+  - Users can edit atom files directly in their text editor
+  - CLI commands would be redundant with existing file-based approach
 
 ##### Simplification Benefits
 

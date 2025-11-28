@@ -10,7 +10,7 @@ from ..prompt_generator import PromptGenerator
 from ..wallpaper import WallpaperTarget
 
 
-def generate_once(config: Config, dry_run: bool = False, workflow_path: str = None) -> None:
+def generate_once(config: Config, dry_run: bool = False, workflow_path: str = None, template_path: str = None) -> None:
     """
     Generate wallpaper for the next monitor in rotation.
     
@@ -54,8 +54,14 @@ def generate_once(config: Config, dry_run: bool = False, workflow_path: str = No
         
         # Show prompt that would be generated
         try:
+            if template_path:
+                actual_template_path = template_path
+            else:
+                actual_template_path = config.monitors.get_template_path(monitor_index, config.prompt.default_template)
+            
             prompt_gen = PromptGenerator(config.prompt, Config.get_config_dir())
-            prompt = prompt_gen.generate_prompt(monitor_index=monitor_index)
+            prompt = prompt_gen.generate_prompt(monitor_index=monitor_index, template_path=actual_template_path)
+            print(f"  Template: {actual_template_path}")
             print(f"  Prompt: {prompt[:100]}...")
         except Exception as e:
             print(f"  Prompt error: {e}")
@@ -69,10 +75,17 @@ def generate_once(config: Config, dry_run: bool = False, workflow_path: str = No
     logger.info(f"Workflow: {actual_workflow_path}")
     
     try:
-        # Generate prompt
+        # Generate prompt with per-monitor template (or override)
+        if template_path:
+            actual_template_path = template_path
+        else:
+            actual_template_path = config.monitors.get_template_path(monitor_index, config.prompt.default_template)
+        
         prompt_gen = PromptGenerator(config.prompt, Config.get_config_dir())
-        prompt = prompt_gen.generate_prompt(monitor_index=monitor_index)
-        logger.info(f"Prompt: {prompt[:100]}...")
+        prompts = prompt_gen.generate_prompt_pair(monitor_index=monitor_index, template_path=actual_template_path)
+        logger.info(f"Prompt: {prompts.positive[:100]}...")
+        if prompts.negative:
+            logger.info(f"Negative: {prompts.negative[:100]}...")
         
         # Load workflow
         workflow_mgr = WorkflowManager(config.comfyui)
@@ -90,7 +103,7 @@ def generate_once(config: Config, dry_run: bool = False, workflow_path: str = No
             logger.error(f"ComfyUI not reachable at {config.comfyui.base_url}")
             sys.exit(2)
         
-        result = client.generate(workflow, prompt)
+        result = client.generate(workflow, prompts)
         logger.info(f"Generated: {result.filename}")
         
         # Save wallpaper
@@ -130,8 +143,10 @@ def generate_all(config: Config, dry_run: bool = False) -> None:
             
             # Show prompt that would be generated
             try:
+                template_path = config.monitors.get_template_path(i, config.prompt.default_template)
                 prompt_gen = PromptGenerator(config.prompt, Config.get_config_dir())
-                prompt = prompt_gen.generate_prompt(monitor_index=i)
+                prompt = prompt_gen.generate_prompt(monitor_index=i, template_path=template_path)
+                print(f"    Template: {template_path}")
                 print(f"    Prompt: {prompt[:100]}...")
                 
                 # Show workflow validation warnings
@@ -180,8 +195,10 @@ def generate_all(config: Config, dry_run: bool = False) -> None:
             for warning in warnings:
                 logger.warning(f"Workflow: {warning}")
             
-            prompt = prompt_gen.generate_prompt(monitor_index=monitor_index)
-            result = client.generate(workflow, prompt)
+            # Generate prompt with per-monitor template
+            template_path = config.monitors.get_template_path(monitor_index, config.prompt.default_template)
+            prompts = prompt_gen.generate_prompt_pair(monitor_index=monitor_index, template_path=template_path)
+            result = client.generate(workflow, prompts)
             
             output_path = config.monitors.get_output_path(monitor_index)
             target.save_wallpaper(result.image_data, output_path)

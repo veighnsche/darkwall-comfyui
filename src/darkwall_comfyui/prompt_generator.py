@@ -327,13 +327,14 @@ class PromptGenerator:
         result = self.generate_prompt_pair(monitor_index, template_path)
         return result.positive
     
-    def generate_prompt_pair(self, monitor_index: int = None, template_path: str = None) -> PromptResult:
+    def generate_prompt_pair(self, monitor_index: int = None, template_path: str = None, seed: int = None) -> PromptResult:
         """
         Generate both positive and negative prompts.
         
         Args:
             monitor_index: Optional monitor index for variation
             template_path: Optional path to template file
+            seed: Optional specific seed to use (default: time-based)
             
         Returns:
             PromptResult with positive and negative prompts
@@ -342,7 +343,8 @@ class PromptGenerator:
             PromptError: If prompt generation fails
         """
         try:
-            seed = self.get_time_slot_seed(monitor_index=monitor_index)
+            if seed is None:
+                seed = self.get_time_slot_seed(monitor_index=monitor_index)
             self.logger.debug(f"Generated seed {seed} for monitor {monitor_index or 'default'}")
             
             # Load and parse template

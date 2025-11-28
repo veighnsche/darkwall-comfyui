@@ -61,6 +61,7 @@ def validate_toml_structure(config_dict: Dict[str, Any], config_file: Path) -> N
             'command': str,
             'backup_pattern': str,
             'workflows': list,  # Optional
+            'templates': list,  # Optional
         },
         'output': {
             'create_backup': bool,
@@ -120,6 +121,7 @@ class MonitorConfig:
     command: str = "swaybg"
     backup_pattern: str = "~/Pictures/wallpapers/backups/monitor_{index}_{timestamp}.png"
     workflows: Optional[List[str]] = None  # Per-monitor workflow paths
+    templates: Optional[List[str]] = None  # Per-monitor template files
     
     def get_output_path(self, index: int) -> Path:
         """Get output path for specific monitor index."""
@@ -138,6 +140,13 @@ class MonitorConfig:
             return self.workflows[index]
         
         return global_workflow_path
+    
+    def get_template_path(self, index: int, default_template: str) -> str:
+        """Get template path for specific monitor index."""
+        if self.templates and len(self.templates) > index and self.templates[index]:
+            return self.templates[index]
+        
+        return default_template
 
 
 @dataclass
