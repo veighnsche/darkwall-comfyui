@@ -17,7 +17,7 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
 from ..config import Config, ComfyUIConfig
-from ..exceptions import GenerationError
+from ..exceptions import GenerationError, WorkflowError
 from ..prompt_generator import PromptResult
 
 @dataclass
@@ -270,14 +270,14 @@ class ComfyClient:
         
         # Validate injection was successful
         if not positive_injected:
-            raise ComfyError(
+            raise WorkflowError(
                 "Workflow missing __POSITIVE_PROMPT__ placeholder. "
                 "Please update your workflow to use placeholder-based prompt injection. "
                 "See docs/workflow-migration.md for migration guide."
             )
         
         if prompts.negative and not negative_injected:
-            raise ComfyError(
+            raise WorkflowError(
                 "Negative prompt provided but workflow missing __NEGATIVE_PROMPT__ placeholder. "
                 "Please add __NEGATIVE_PROMPT__ to your workflow or remove negative prompt from template."
             )

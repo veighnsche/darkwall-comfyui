@@ -31,6 +31,23 @@ Multi-monitor wallpaper generator using ComfyUI with deterministic prompts and r
 
 ## Pending Tasks 📋
 
+### 🎯 HIGH PRIORITY - NixOS Integration & Deployment
+
+#### Nix Package Implementation (IN PROGRESS)
+- [x] **Comprehensive Flake.nix**: Created full flake with runtime dependencies, systemd integration, and modules
+- [x] **Runtime Dependencies**: Wrapped wallpaper setters (swww, swaybg, feh, nitrogen) in PATH
+- [x] **NixOS Module**: System-level deployment module with systemd service/timer configuration
+- [x] **Home Manager Module**: User-level deployment module for home-manager integration
+- [x] **Non-flake Compatibility**: Created pkgs/darkwall-comfyui.nix for classic NixOS configs
+- [ ] **Additional Wallpaper Setters**: Expand support beyond swww/swaybg/feh/nitrogen to include:
+  - [ ] **hyprpaper**: For Hyprland users
+  - [ ] **wallutils**: Cross-platform wallpaper utility
+  - [ ] **wpaperd**: Wallpaper daemon for Wayland
+  - [ ] **maliit**: For mobile/embedded environments
+  - [ ] **gnome-backgrounds**: GNOME desktop integration
+  - [ ] **plasma-workspace**: KDE Plasma integration
+- [ ] **Local Testing**: Verify build works immediately and systemd integration functions
+
 ### 🎯 HIGH PRIORITY - Refactoring & Architecture
 
 #### Code Quality Refactoring (COMPLETED)

@@ -84,6 +84,9 @@ class PromptGenerator:
             
         Returns:
             List of atom strings (empty list if file not found)
+            
+        Raises:
+            PromptError: If file loading fails critically
         """
         if path in self._atom_cache:
             return self._atom_cache[path]
@@ -96,14 +99,18 @@ class PromptGenerator:
         if atom_file.exists() and atom_file.is_file():
             try:
                 with open(atom_file, 'r', encoding='utf-8') as f:
-                    for line in f:
+                    for line_num, line in enumerate(f, 1):
                         line = line.strip()
                         if line and not line.startswith('#'):
                             atoms.append(line)
+                        elif not line and line_num > 1:  # Skip empty lines except first
+                            continue
                 
                 self.logger.debug(f"Loaded {len(atoms)} atoms from {atom_file}")
             except (OSError, UnicodeDecodeError) as e:
-                self.logger.warning(f"Failed to load {atom_file}: {e}")
+                raise PromptError(f"Failed to load atom file {atom_file}: {e}")
+            except Exception as e:
+                raise PromptError(f"Unexpected error loading atom file {atom_file}: {e}")
         else:
             self.logger.warning(f"Atom file not found: {atom_file}")
         
@@ -258,6 +265,9 @@ class PromptGenerator:
             
         Returns:
             Template content string
+            
+        Raises:
+            PromptError: If template loading fails
         """
         if template_path is None:
             template_path = getattr(self.config, 'default_template', 'default.prompt')
@@ -271,12 +281,19 @@ class PromptGenerator:
                 f"Create a .prompt file in {prompts_dir}/ or run 'darkwall init'"
             )
         
+        if not template_file.is_file():
+            raise PromptError(f"Template path is not a file: {template_file}")
+        
         try:
             content = template_file.read_text(encoding='utf-8')
+            if not content.strip():
+                raise PromptError(f"Template file is empty: {template_file}")
             self.logger.debug(f"Loaded template: {template_file}")
             return content
         except (OSError, UnicodeDecodeError) as e:
             raise PromptError(f"Failed to load template {template_file}: {e}")
+        except Exception as e:
+            raise PromptError(f"Unexpected error loading template {template_file}: {e}")
     
     
     def _parse_template_sections(self, template: str) -> Tuple[str, str]:

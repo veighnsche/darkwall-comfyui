@@ -53,6 +53,7 @@ packages = [
     "darkwall_comfyui",
     "darkwall_comfyui.comfy",
     "darkwall_comfyui.commands",
+    "darkwall_comfyui.history",
     "darkwall_comfyui.wallpaper",
 ]
 

@@ -345,13 +345,21 @@ class Config:
         Args:
             src: Source file path
             dst: Destination file path
+            
+        Raises:
+            ConfigError: If copy operation fails
         """
-        # Read content from source (works even if source is read-only)
-        content = src.read_bytes()
-        # Write to destination (creates with default permissions)
-        dst.write_bytes(content)
-        # Explicitly set write permissions
-        os.chmod(dst, 0o644)  # rw-r--r--
+        try:
+            # Read content from source (works even if source is read-only)
+            content = src.read_bytes()
+            # Write to destination (creates with default permissions)
+            dst.write_bytes(content)
+            # Explicitly set write permissions
+            os.chmod(dst, 0o644)  # rw-r--r--
+        except OSError as e:
+            raise ConfigError(f"Failed to copy file from {src} to {dst}: {e}")
+        except Exception as e:
+            raise ConfigError(f"Unexpected error copying file from {src} to {dst}: {e}")
     
     @classmethod
     def _copy_config_files(cls, source_dir: Path, target_dir: Path) -> None:
@@ -364,12 +372,18 @@ class Config:
         Args:
             source_dir: Source config directory
             target_dir: Target user config directory
+            
+        Raises:
+            ConfigError: If directory creation or file copying fails
         """
         logger = logging.getLogger(__name__)
         
-        # Ensure target directory has proper permissions
-        target_dir.mkdir(parents=True, exist_ok=True)
-        os.chmod(target_dir, 0o755)  # rwxr-xr-x
+        try:
+            # Ensure target directory has proper permissions
+            target_dir.mkdir(parents=True, exist_ok=True)
+            os.chmod(target_dir, 0o755)  # rwxr-xr-x
+        except OSError as e:
+            raise ConfigError(f"Failed to create config directory {target_dir}: {e}")
         
         # Files that should always be present
         required_files = ["config.toml"]
@@ -408,11 +422,18 @@ class Config:
                             should_copy = True
                             reason = "read-only, fixing"
                             # Remove the read-only file first
-                            dst_file.unlink()
+                            try:
+                                dst_file.unlink()
+                            except OSError as e:
+                                logger.warning(f"Failed to remove read-only file {dst_file}: {e}")
                         
                         if should_copy:
-                            cls._copy_file_mutable(src_file, dst_file)
-                            logger.debug(f"Copied {src_file.name} ({reason})")
+                            try:
+                                cls._copy_file_mutable(src_file, dst_file)
+                                logger.debug(f"Copied {src_file.name} ({reason})")
+                            except ConfigError as e:
+                                logger.error(f"Failed to copy {src_file.name}: {e}")
+                                # Continue with other files but don't fail completely
                 
                 # Final permission fix for any remaining read-only files
                 for file_path in dst_dir.rglob('*'):
@@ -421,12 +442,17 @@ class Config:
                             # Try to fix permissions in place
                             os.chmod(file_path, 0o644)
                         except PermissionError:
-                            # If that fails, replace the file
-                            content = file_path.read_bytes()
-                            file_path.unlink()
-                            file_path.write_bytes(content)
-                            os.chmod(file_path, 0o644)
-                            logger.debug(f"Replaced read-only file: {file_path.name}")
+                            try:
+                                # If that fails, replace the file
+                                content = file_path.read_bytes()
+                                file_path.unlink()
+                                file_path.write_bytes(content)
+                                os.chmod(file_path, 0o644)
+                                logger.debug(f"Replaced read-only file: {file_path.name}")
+                            except OSError as e:
+                                logger.warning(f"Failed to fix permissions for {file_path.name}: {e}")
+                        except OSError as e:
+                            logger.warning(f"Failed to fix permissions for {file_path.name}: {e}")
                 
                 logger.info(f"Initialized directory: {required_dir}")
     
@@ -508,14 +534,23 @@ class Config:
             overrides.setdefault('comfyui', {})['workflow_path'] = os.environ['COMFYUI_WORKFLOW_PATH']
         
         if 'COMFYUI_TIMEOUT' in os.environ:
-            overrides.setdefault('comfyui', {})['timeout'] = int(os.environ['COMFYUI_TIMEOUT'])
+            try:
+                overrides.setdefault('comfyui', {})['timeout'] = int(os.environ['COMFYUI_TIMEOUT'])
+            except ValueError as e:
+                raise ConfigError(f"Invalid COMFYUI_TIMEOUT value: {os.environ['COMFYUI_TIMEOUT']}: {e}")
         
         if 'COMFYUI_POLL_INTERVAL' in os.environ:
-            overrides.setdefault('comfyui', {})['poll_interval'] = int(os.environ['COMFYUI_POLL_INTERVAL'])
+            try:
+                overrides.setdefault('comfyui', {})['poll_interval'] = int(os.environ['COMFYUI_POLL_INTERVAL'])
+            except ValueError as e:
+                raise ConfigError(f"Invalid COMFYUI_POLL_INTERVAL value: {os.environ['COMFYUI_POLL_INTERVAL']}: {e}")
         
         # Monitor settings
         if 'MONITOR_COUNT' in os.environ:
-            overrides.setdefault('monitors', {})['count'] = int(os.environ['MONITOR_COUNT'])
+            try:
+                overrides.setdefault('monitors', {})['count'] = int(os.environ['MONITOR_COUNT'])
+            except ValueError as e:
+                raise ConfigError(f"Invalid MONITOR_COUNT value: {os.environ['MONITOR_COUNT']}: {e}")
         
         if 'MONITOR_PATTERN' in os.environ:
             overrides.setdefault('monitors', {})['pattern'] = os.environ['MONITOR_PATTERN']
@@ -525,7 +560,10 @@ class Config:
         
         # Prompt settings
         if 'TIME_SLOT_MINUTES' in os.environ:
-            overrides.setdefault('prompt', {})['time_slot_minutes'] = int(os.environ['TIME_SLOT_MINUTES'])
+            try:
+                overrides.setdefault('prompt', {})['time_slot_minutes'] = int(os.environ['TIME_SLOT_MINUTES'])
+            except ValueError as e:
+                raise ConfigError(f"Invalid TIME_SLOT_MINUTES value: {os.environ['TIME_SLOT_MINUTES']}: {e}")
         
         if 'DARKWALL_THEME' in os.environ:
             overrides.setdefault('prompt', {})['theme'] = os.environ['DARKWALL_THEME']
@@ -599,10 +637,15 @@ class Config:
         # Ensure directory exists
         config_file.parent.mkdir(parents=True, exist_ok=True)
         
-        with open(config_file, 'wb') as f:
-            tomli_w.dump(config_dict, f)
-        
-        logging.getLogger(__name__).info(f"Saved config to {config_file}")
+        try:
+            with open(config_file, 'wb') as f:
+                tomli_w.dump(config_dict, f)
+            
+            logging.getLogger(__name__).info(f"Saved config to {config_file}")
+        except OSError as e:
+            raise ConfigError(f"Failed to save config to {config_file}: {e}")
+        except Exception as e:
+            raise ConfigError(f"Unexpected error saving config to {config_file}: {e}")
 
 
 class StateManager:
@@ -619,10 +662,13 @@ class StateManager:
             return {'last_monitor_index': -1, 'rotation_count': 0}
         
         try:
-            with open(self.state_file, 'r') as f:
+            with open(self.state_file, 'r', encoding='utf-8') as f:
                 return json.load(f)
         except (FileNotFoundError, json.JSONDecodeError, OSError) as e:
             self.logger.warning(f"Failed to load state file: {e}")
+            return {'last_monitor_index': -1, 'rotation_count': 0}
+        except Exception as e:
+            self.logger.error(f"Unexpected error loading state file: {e}")
             return {'last_monitor_index': -1, 'rotation_count': 0}
     
     def save_state(self, state: Dict[str, Any]) -> None:
@@ -630,10 +676,12 @@ class StateManager:
         self.state_file.parent.mkdir(parents=True, exist_ok=True)
         
         try:
-            with open(self.state_file, 'w') as f:
+            with open(self.state_file, 'w', encoding='utf-8') as f:
                 json.dump(state, f, indent=2)
         except (OSError, PermissionError) as e:
-            self.logger.error(f"Failed to save state file: {e}")
+            raise StateError(f"Failed to save state file {self.state_file}: {e}")
+        except Exception as e:
+            raise StateError(f"Unexpected error saving state file {self.state_file}: {e}")
     
     def get_next_monitor_index(self) -> int:
         """Get the next monitor index to update."""
