@@ -103,7 +103,7 @@ class ComfyClient:
         self,
         workflow: dict[str, Any],
         prompt: str | PromptResult,
-        on_event: Optional[Callable[[dict[str, Any]], None]] = None,
+        on_event: Optional[Callable[[Any], None]] = None,
     ) -> GenerationResult:
         """
         Run a complete generation: inject prompt, submit, wait, download.
@@ -381,7 +381,7 @@ class ComfyClient:
     def _wait_for_result(
         self,
         prompt_id: str,
-        on_event: Optional[Callable[[dict[str, Any]], None]] = None,
+        on_event: Optional[Callable[[Any], None]] = None,
     ) -> dict[str, Any]:
         """Wait for generation completion via WebSocket and read history once.
 
@@ -420,6 +420,11 @@ class ComfyClient:
                     data = json.loads(message)
                 except json.JSONDecodeError:
                     self.logger.debug(f"Non-JSON WebSocket message: {message!r}")
+                    if on_event is not None:
+                        try:
+                            on_event(message)
+                        except Exception as cb_err:
+                            self.logger.warning(f"on_event callback raised: {cb_err}")
                     continue
 
                 # Surface raw events to any registered handler first.

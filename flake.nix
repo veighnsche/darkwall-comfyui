@@ -19,13 +19,14 @@
           src = ./.;
           
           pyproject = true;
-          
-          # Python dependencies from pyproject.toml
-          propagatedBuildInputs = with pkgs.python3Packages; [
+
+          # Python runtime dependencies (must satisfy wheel metadata)
+          dependencies = with pkgs.python3Packages; [
             requests
             tomli
             tomli-w
             websocket-client
+            tqdm
           ];
           
           # Build dependencies
@@ -286,6 +287,7 @@ EOF
             python3Packages.tomli
             python3Packages.tomli-w
             python3Packages.websocket-client
+            python3Packages.tqdm
             python3Packages.pytest
             python3Packages.black
             python3Packages.isort

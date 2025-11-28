@@ -1,8 +1,11 @@
 """Generation commands."""
 
+import json
 import logging
 import sys
 from pathlib import Path
+
+from tqdm import tqdm
 
 from ..config import Config, StateManager, MonitorConfig, OutputConfig, ComfyUIConfig, PromptConfig
 from ..comfy import ComfyClient, WorkflowManager
@@ -10,6 +13,76 @@ from ..prompt_generator import PromptGenerator
 from ..wallpaper import WallpaperTarget
 from ..history import WallpaperHistory
 from ..exceptions import ConfigError, WorkflowError, GenerationError, PromptError, CommandError
+
+
+_progress_bars = {}
+
+
+def _proxy_ws_event_to_stdout(event: object) -> None:
+    try:
+        if isinstance(event, dict):
+            event_type = event.get("type")
+            data = event.get("data", {})
+
+            if event_type == "executing" and isinstance(data, dict):
+                prompt_id = data.get("prompt_id")
+                node = data.get("node")
+
+                if node is None:
+                    bar = _progress_bars.pop(prompt_id, None)
+                    if bar is not None:
+                        bar.close()
+                    msg = f"[comfy] done prompt_id={prompt_id}"
+                else:
+                    msg = f"[comfy] executing node={node} prompt_id={prompt_id}"
+
+                print(msg, flush=True)
+                return
+
+            if event_type == "status" and isinstance(data, dict):
+                status = data.get("status") or data
+                queue_remaining = None
+
+                if isinstance(status, dict):
+                    exec_info = status.get("exec_info") or {}
+                    if isinstance(exec_info, dict):
+                        queue_remaining = exec_info.get("queue_remaining")
+                    if queue_remaining is None:
+                        queue_remaining = status.get("queue_remaining")
+
+                if queue_remaining is not None:
+                    print(f"[comfy] queue remaining: {queue_remaining}", flush=True)
+                    return
+
+            if event_type == "progress" and isinstance(data, dict):
+                prompt_id = data.get("prompt_id")
+                node = data.get("node")
+                value = data.get("value")
+                max_value = data.get("max")
+
+                if prompt_id and isinstance(value, (int, float)) and isinstance(max_value, (int, float)):
+                    bar = _progress_bars.get(prompt_id)
+                    if bar is None or bar.total != max_value:
+                        if bar is not None:
+                            bar.close()
+                        bar = tqdm(total=max_value, desc=f"comfy {node}", leave=False)
+                        _progress_bars[prompt_id] = bar
+
+                    if value < bar.n:
+                        bar.close()
+                        bar = tqdm(total=max_value, desc=f"comfy {node}", leave=False)
+                        _progress_bars[prompt_id] = bar
+
+                    delta = value - bar.n
+                    if delta > 0:
+                        bar.update(delta)
+
+                return
+
+        else:
+            print(str(event), flush=True)
+    except Exception:
+        pass
 
 
 def generate_once(config: Config, dry_run: bool = False, workflow_path: str = None, template_path: str = None) -> None:
@@ -113,7 +186,7 @@ def generate_once(config: Config, dry_run: bool = False, workflow_path: str = No
         if not client.health_check():
             raise GenerationError(f"ComfyUI not reachable at {config.comfyui.base_url}")
         
-        result = client.generate(workflow, prompts)
+        result = client.generate(workflow, prompts, on_event=_proxy_ws_event_to_stdout)
         logger.info(f"Generated: {result.filename}")
         
         # Save wallpaper
@@ -261,7 +334,7 @@ def generate_all(config: Config, dry_run: bool = False) -> None:
                         f"negative: {prompts.negative[:100]}..."
                     )
                 
-                result = client.generate(workflow, prompts)
+                result = client.generate(workflow, prompts, on_event=_proxy_ws_event_to_stdout)
                 logger.info(
                     f"Monitor {monitor_index} generated variation {variation_index + 1}/{variations}: "
                     f"{result.filename}"

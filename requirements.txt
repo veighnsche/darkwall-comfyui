@@ -5,3 +5,6 @@ requests>=2.25.0
 tomli>=2.0.0
 tomli-w>=1.0.0
 websocket-client>=1.6.0
+
+# Progress bar for CLI WebSocket progress events
+tqdm>=4.60.0

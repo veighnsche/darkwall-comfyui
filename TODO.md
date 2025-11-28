@@ -64,6 +64,35 @@ Multi-monitor wallpaper generator using ComfyUI with deterministic prompts and r
 - [x] **Workflow Validation**: Validate workflow JSON structure on load - Enhanced dry-run to show validation warnings
 - [ ] **Workflow Templates**: Pre-configured workflows for common resolutions (1080p, 1440p, 4K)
 
+#### Prompt / Workflow / Monitor Hierarchy (PLANNED)
+- [ ] **Canonical Hierarchy**: Make the data model explicit and config-driven:
+  - Multiple wildcards per atom file (lines in `atoms/*.txt`)
+  - Multiple atoms per prompt template (`prompts/*.prompt`)
+  - Multiple prompt templates per workflow
+  - Multiple workflows per monitor
+- [ ] **Config: Workflow-Centric Prompts**: Introduce a `[workflows]` table in `config.toml` so each workflow can declare:
+  - `path = "workflows/z-image.json"`
+  - `prompts = ["default.prompt", "cinematic.prompt", "cyberpunk.prompt", "minimal.prompt"]`
+  This makes prompts belong to workflows, not directly to monitors.
+- [ ] **Config: Monitor → Workflow Mapping**: Change monitor configuration so monitors reference workflows (by ID or index) instead of raw JSON paths + templates:
+  - Each monitor selects a workflow from the `[workflows]` table
+  - Workflows then control which prompt templates are eligible
+- [ ] **Selection Semantics**: Define deterministic selection using existing seeding so that:
+  - For a given monitor + workflow, prompts are chosen from that workflow's `prompts` list
+  - Over time, all configured prompts for that workflow are used across all monitors (no prompt stranded on a single monitor unless explicitly configured).
+- [ ] **Code: Config Types**: Add a `WorkflowConfig` dataclass (or similar) to model workflows + their prompts, and wire it into `Config` loading/validation.
+- [ ] **Code: Generate Path**: Update `commands/generate.py` so the flow is:
+  1. Monitor index → workflow selection from config
+  2. Workflow → prompt template list
+  3. PromptGenerator → pick a template from that list (using the deterministic seed), then resolve atoms/wildcards inside the template
+  4. ComfyClient → run the selected workflow with the resolved prompt
+- [ ] **Migration & Cleanup**: Remove or deprecate `MonitorConfig.templates` and the direct `workflows` array usage in favor of the workflow table (break callers and fix them rather than duplicating behavior).
+- [ ] **Tests & Docs**: Add tests for:
+  - Per-workflow prompt pools
+  - Per-monitor workflow mapping
+  - Deterministic prompt/workflow selection across runs
+  And update docs/configuration.md to describe the new hierarchy and config options.
+
 ### 🔴 HIGH PRIORITY - Critical Issues
 
 #### Prompt Injection System (COMPLETED ✅)
