@@ -1,18 +1,5 @@
 {
-  "60": {
-    "inputs": {
-      "filename_prefix": "z-image-turbo-2327x1309",
-      "images": [
-        "75:8",
-        0
-      ]
-    },
-    "class_type": "SaveImage",
-    "_meta": {
-      "title": "Save Image"
-    }
-  },
-  "83": {
+  "39": {
     "inputs": {
       "seed": -1
     },
@@ -21,51 +8,566 @@
       "title": "Seed (rgthree)"
     }
   },
-  "75:58": {
+  "103": {
     "inputs": {
-      "width": 2327,
-      "height": 1309,
-      "batch_size": 1
-    },
-    "class_type": "EmptySD3LatentImage",
-    "_meta": {
-      "title": "EmptySD3LatentImage"
-    }
-  },
-  "75:7": {
-    "inputs": {
-      "text": "__NEGATIVE_PROMPT__",
-      "clip": [
-        "75:38",
+      "filename_prefix": "wallpaper",
+      "images": [
+        "109:107",
         0
       ]
     },
-    "class_type": "CLIPTextEncode",
+    "class_type": "SaveImage",
     "_meta": {
-      "title": "CLIP Text Encode (Negative Prompt)"
+      "title": "Save Image"
     }
   },
-  "75:66": {
+  "165:120:106": {
     "inputs": {
-      "shift": 3.1000000000000005,
-      "model": [
-        "75:73",
+      "op": "Round",
+      "a": [
+        "165:120:105",
         0
       ]
     },
-    "class_type": "ModelSamplingAuraFlow",
+    "class_type": "CM_FloatUnaryOperation",
     "_meta": {
-      "title": "ModelSamplingAuraFlow"
+      "title": "FloatUnaryOperation"
     }
   },
-  "75:8": {
+  "165:120:105": {
+    "inputs": {
+      "op": "Div",
+      "a": [
+        "165:143",
+        0
+      ],
+      "b": 16
+    },
+    "class_type": "CM_FloatBinaryOperation",
+    "_meta": {
+      "title": "FloatBinaryOperation"
+    }
+  },
+  "165:120:107": {
+    "inputs": {
+      "op": "Mul",
+      "a": [
+        "165:120:106",
+        0
+      ],
+      "b": 16
+    },
+    "class_type": "CM_FloatBinaryOperation",
+    "_meta": {
+      "title": "FloatBinaryOperation"
+    }
+  },
+  "165:121": {
+    "inputs": {
+      "a": [
+        "165:122:107",
+        0
+      ]
+    },
+    "class_type": "CM_FloatToInt",
+    "_meta": {
+      "title": "FloatToInt"
+    }
+  },
+  "165:122:106": {
+    "inputs": {
+      "op": "Round",
+      "a": [
+        "165:122:105",
+        0
+      ]
+    },
+    "class_type": "CM_FloatUnaryOperation",
+    "_meta": {
+      "title": "FloatUnaryOperation"
+    }
+  },
+  "165:122:105": {
+    "inputs": {
+      "op": "Div",
+      "a": [
+        "165:142",
+        0
+      ],
+      "b": 16
+    },
+    "class_type": "CM_FloatBinaryOperation",
+    "_meta": {
+      "title": "FloatBinaryOperation"
+    }
+  },
+  "165:122:107": {
+    "inputs": {
+      "op": "Mul",
+      "a": [
+        "165:122:106",
+        0
+      ],
+      "b": 16
+    },
+    "class_type": "CM_FloatBinaryOperation",
+    "_meta": {
+      "title": "FloatBinaryOperation"
+    }
+  },
+  "165:126:105": {
+    "inputs": {
+      "op": "Div",
+      "a": [
+        "165:164",
+        0
+      ],
+      "b": 16
+    },
+    "class_type": "CM_FloatBinaryOperation",
+    "_meta": {
+      "title": "FloatBinaryOperation"
+    }
+  },
+  "165:126:106": {
+    "inputs": {
+      "op": "Round",
+      "a": [
+        "165:126:105",
+        0
+      ]
+    },
+    "class_type": "CM_FloatUnaryOperation",
+    "_meta": {
+      "title": "FloatUnaryOperation"
+    }
+  },
+  "165:126:107": {
+    "inputs": {
+      "op": "Mul",
+      "a": [
+        "165:126:106",
+        0
+      ],
+      "b": 16
+    },
+    "class_type": "CM_FloatBinaryOperation",
+    "_meta": {
+      "title": "FloatBinaryOperation"
+    }
+  },
+  "165:127": {
+    "inputs": {
+      "a": [
+        "165:126:107",
+        0
+      ]
+    },
+    "class_type": "CM_FloatToInt",
+    "_meta": {
+      "title": "FloatToInt"
+    }
+  },
+  "165:128": {
+    "inputs": {
+      "a": [
+        "165:120:107",
+        0
+      ]
+    },
+    "class_type": "CM_FloatToInt",
+    "_meta": {
+      "title": "FloatToInt"
+    }
+  },
+  "165:129": {
+    "inputs": {
+      "a": [
+        "165:130:107",
+        0
+      ]
+    },
+    "class_type": "CM_FloatToInt",
+    "_meta": {
+      "title": "FloatToInt"
+    }
+  },
+  "165:132": {
+    "inputs": {
+      "a": [
+        "165:131:107",
+        0
+      ]
+    },
+    "class_type": "CM_FloatToInt",
+    "_meta": {
+      "title": "FloatToInt"
+    }
+  },
+  "165:144": {
+    "inputs": {
+      "a": [
+        "165:137",
+        0
+      ]
+    },
+    "class_type": "CM_IntToFloat",
+    "_meta": {
+      "title": "IntToFloat"
+    }
+  },
+  "165:141": {
+    "inputs": {
+      "a": [
+        "165:138",
+        0
+      ]
+    },
+    "class_type": "CM_IntToFloat",
+    "_meta": {
+      "title": "IntToFloat"
+    }
+  },
+  "165:131:106": {
+    "inputs": {
+      "op": "Round",
+      "a": [
+        "165:131:105",
+        0
+      ]
+    },
+    "class_type": "CM_FloatUnaryOperation",
+    "_meta": {
+      "title": "FloatUnaryOperation"
+    }
+  },
+  "165:131:105": {
+    "inputs": {
+      "op": "Div",
+      "a": [
+        "165:154",
+        0
+      ],
+      "b": 16
+    },
+    "class_type": "CM_FloatBinaryOperation",
+    "_meta": {
+      "title": "FloatBinaryOperation"
+    }
+  },
+  "165:131:107": {
+    "inputs": {
+      "op": "Mul",
+      "a": [
+        "165:131:106",
+        0
+      ],
+      "b": 16
+    },
+    "class_type": "CM_FloatBinaryOperation",
+    "_meta": {
+      "title": "FloatBinaryOperation"
+    }
+  },
+  "165:130:106": {
+    "inputs": {
+      "op": "Round",
+      "a": [
+        "165:130:105",
+        0
+      ]
+    },
+    "class_type": "CM_FloatUnaryOperation",
+    "_meta": {
+      "title": "FloatUnaryOperation"
+    }
+  },
+  "165:130:105": {
+    "inputs": {
+      "op": "Div",
+      "a": [
+        "165:155",
+        0
+      ],
+      "b": 16
+    },
+    "class_type": "CM_FloatBinaryOperation",
+    "_meta": {
+      "title": "FloatBinaryOperation"
+    }
+  },
+  "165:130:107": {
+    "inputs": {
+      "op": "Mul",
+      "a": [
+        "165:130:106",
+        0
+      ],
+      "b": 16
+    },
+    "class_type": "CM_FloatBinaryOperation",
+    "_meta": {
+      "title": "FloatBinaryOperation"
+    }
+  },
+  "165:159": {
+    "inputs": {
+      "preview": "",
+      "source": [
+        "165:155",
+        0
+      ]
+    },
+    "class_type": "PreviewAny",
+    "_meta": {
+      "title": "Preview Any"
+    }
+  },
+  "165:154": {
+    "inputs": {
+      "op": "Mul",
+      "a": [
+        "165:143",
+        0
+      ],
+      "b": [
+        "165:153",
+        0
+      ]
+    },
+    "class_type": "CM_FloatBinaryOperation",
+    "_meta": {
+      "title": "FloatBinaryOperation"
+    }
+  },
+  "165:155": {
+    "inputs": {
+      "op": "Mul",
+      "a": [
+        "165:142",
+        0
+      ],
+      "b": [
+        "165:153",
+        0
+      ]
+    },
+    "class_type": "CM_FloatBinaryOperation",
+    "_meta": {
+      "title": "FloatBinaryOperation"
+    }
+  },
+  "165:153": {
+    "inputs": {
+      "op": "Sqrt",
+      "a": [
+        "165:152",
+        0
+      ]
+    },
+    "class_type": "CM_FloatUnaryOperation",
+    "_meta": {
+      "title": "FloatUnaryOperation"
+    }
+  },
+  "165:160": {
+    "inputs": {
+      "preview": "",
+      "source": [
+        "165:153",
+        0
+      ]
+    },
+    "class_type": "PreviewAny",
+    "_meta": {
+      "title": "Preview Any"
+    }
+  },
+  "165:152": {
+    "inputs": {
+      "op": "Div",
+      "a": [
+        "165:149",
+        0
+      ],
+      "b": [
+        "165:151",
+        0
+      ]
+    },
+    "class_type": "CM_FloatBinaryOperation",
+    "_meta": {
+      "title": "FloatBinaryOperation"
+    }
+  },
+  "165:161": {
+    "inputs": {
+      "preview": "",
+      "source": [
+        "165:152",
+        0
+      ]
+    },
+    "class_type": "PreviewAny",
+    "_meta": {
+      "title": "Preview Any"
+    }
+  },
+  "165:162": {
+    "inputs": {
+      "preview": "",
+      "source": [
+        "165:151",
+        0
+      ]
+    },
+    "class_type": "PreviewAny",
+    "_meta": {
+      "title": "Preview Any"
+    }
+  },
+  "165:151": {
+    "inputs": {
+      "op": "Mul",
+      "a": [
+        "165:143",
+        0
+      ],
+      "b": [
+        "165:142",
+        0
+      ]
+    },
+    "class_type": "CM_FloatBinaryOperation",
+    "_meta": {
+      "title": "FloatBinaryOperation"
+    }
+  },
+  "165:163": {
+    "inputs": {
+      "preview": "",
+      "source": [
+        "165:149",
+        0
+      ]
+    },
+    "class_type": "PreviewAny",
+    "_meta": {
+      "title": "Preview Any"
+    }
+  },
+  "165:149": {
+    "inputs": {
+      "op": "Mul",
+      "a": [
+        "165:144",
+        0
+      ],
+      "b": [
+        "165:141",
+        0
+      ]
+    },
+    "class_type": "CM_FloatBinaryOperation",
+    "_meta": {
+      "title": "FloatBinaryOperation"
+    }
+  },
+  "165:138": {
+    "inputs": {
+      "value": 1536
+    },
+    "class_type": "PrimitiveInt",
+    "_meta": {
+      "title": "generation height"
+    }
+  },
+  "165:139": {
+    "inputs": {
+      "value": 2327
+    },
+    "class_type": "PrimitiveInt",
+    "_meta": {
+      "title": "output width"
+    }
+  },
+  "165:140": {
+    "inputs": {
+      "value": 1309
+    },
+    "class_type": "PrimitiveInt",
+    "_meta": {
+      "title": "output height"
+    }
+  },
+  "165:142": {
+    "inputs": {
+      "a": [
+        "165:140",
+        0
+      ]
+    },
+    "class_type": "CM_IntToFloat",
+    "_meta": {
+      "title": "IntToFloat"
+    }
+  },
+  "165:143": {
+    "inputs": {
+      "a": [
+        "165:139",
+        0
+      ]
+    },
+    "class_type": "CM_IntToFloat",
+    "_meta": {
+      "title": "IntToFloat"
+    }
+  },
+  "165:158": {
+    "inputs": {
+      "preview": "",
+      "source": [
+        "165:154",
+        0
+      ]
+    },
+    "class_type": "PreviewAny",
+    "_meta": {
+      "title": "Preview Any"
+    }
+  },
+  "165:164": {
+    "inputs": {
+      "op": "Div",
+      "a": [
+        "165:143",
+        0
+      ],
+      "b": 2
+    },
+    "class_type": "CM_FloatBinaryOperation",
+    "_meta": {
+      "title": "FloatBinaryOperation"
+    }
+  },
+  "165:137": {
+    "inputs": {
+      "value": 1536
+    },
+    "class_type": "PrimitiveInt",
+    "_meta": {
+      "title": "generation width"
+    }
+  },
+  "34:8": {
     "inputs": {
       "samples": [
-        "75:3",
+        "34:3",
         0
       ],
       "vae": [
-        "75:39",
+        "34:29",
         0
       ]
     },
@@ -74,74 +576,61 @@
       "title": "VAE Decode"
     }
   },
-  "75:37": {
+  "34:11": {
     "inputs": {
-      "unet_name": "qwen_image_fp8_e4m3fn.safetensors",
-      "weight_dtype": "default"
-    },
-    "class_type": "UNETLoader",
-    "_meta": {
-      "title": "Load Diffusion Model"
-    }
-  },
-  "75:6": {
-    "inputs": {
-      "text": "__POSITIVE_PROMPT__",
-      "clip": [
-        "75:38",
+      "shift": 3,
+      "model": [
+        "34:28",
         0
       ]
     },
-    "class_type": "CLIPTextEncode",
+    "class_type": "ModelSamplingAuraFlow",
     "_meta": {
-      "title": "CLIP Text Encode (Positive Prompt)"
+      "title": "ModelSamplingAuraFlow"
     }
   },
-  "75:38": {
+  "34:13": {
     "inputs": {
-      "clip_name": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
-      "type": "qwen_image",
-      "device": "default"
-    },
-    "class_type": "CLIPLoader",
-    "_meta": {
-      "title": "Load CLIP"
-    }
-  },
-  "75:39": {
-    "inputs": {
-      "vae_name": "qwen_image_vae.safetensors"
-    },
-    "class_type": "VAELoader",
-    "_meta": {
-      "title": "Load VAE"
-    }
-  },
-  "75:3": {
-    "inputs": {
-      "seed": [
-        "83",
+      "width": [
+        "165:132",
         0
       ],
-      "steps": 4,
+      "height": [
+        "165:129",
+        0
+      ],
+      "batch_size": 1
+    },
+    "class_type": "EmptySD3LatentImage",
+    "_meta": {
+      "title": "EmptySD3LatentImage"
+    }
+  },
+  "34:3": {
+    "inputs": {
+      "seed": [
+        "39",
+        0
+      ],
+      "steps": 9,
       "cfg": 1,
-      "sampler_name": "euler",
+      "sampler_name": "res_multistep",
       "scheduler": "simple",
       "denoise": 1,
       "model": [
-        "75:66",
+        "34:11",
         0
       ],
       "positive": [
-        "75:6",
+        "34:27",
         0
       ],
       "negative": [
-        "75:7",
+        "34:33",
         0
       ],
       "latent_image": [
-        "75:58",
+        "34:13",
         0
       ]
     },
@@ -150,18 +639,136 @@
       "title": "KSampler"
     }
   },
-  "75:73": {
+  "34:28": {
     "inputs": {
-      "lora_name": "Qwen-Image-Lightning-4steps-V1.0.safetensors",
-      "strength_model": 1,
-      "model": [
-        "75:37",
+      "unet_name": "z_image_turbo_bf16.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "Load Diffusion Model"
+    }
+  },
+  "34:30": {
+    "inputs": {
+      "clip_name": "qwen_3_4b.safetensors",
+      "type": "lumina2",
+      "device": "default"
+    },
+    "class_type": "CLIPLoader",
+    "_meta": {
+      "title": "Load CLIP"
+    }
+  },
+  "34:27": {
+    "inputs": {
+      "text": "__POSITIVE_PROMPT__",
+      "clip": [
+        "34:30",
         0
       ]
     },
-    "class_type": "LoraLoaderModelOnly",
+    "class_type": "CLIPTextEncode",
     "_meta": {
-      "title": "LoraLoaderModelOnly"
+      "title": "CLIP Text Encode (Prompt)"
+    }
+  },
+  "34:33": {
+    "inputs": {
+      "conditioning": [
+        "34:27",
+        0
+      ]
+    },
+    "class_type": "ConditioningZeroOut",
+    "_meta": {
+      "title": "ConditioningZeroOut"
+    }
+  },
+  "34:29": {
+    "inputs": {
+      "vae_name": "ae.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "Load VAE"
+    }
+  },
+  "109:107": {
+    "inputs": {
+      "seed": [
+        "39",
+        0
+      ],
+      "steps": 9,
+      "cfg": 1,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "denoise": 0.33,
+      "mode_type": "Linear",
+      "tile_width": [
+        "165:127",
+        0
+      ],
+      "tile_height": [
+        "165:121",
+        0
+      ],
+      "mask_blur": 32,
+      "tile_padding": 128,
+      "seam_fix_mode": "Band Pass",
+      "seam_fix_denoise": 1,
+      "seam_fix_width": 256,
+      "seam_fix_mask_blur": 32,
+      "seam_fix_padding": 64,
+      "force_uniform_tiles": true,
+      "tiled_decode": true,
+      "upscaled_image": [
+        "109:108",
+        0
+      ],
+      "model": [
+        "34:28",
+        0
+      ],
+      "positive": [
+        "34:27",
+        0
+      ],
+      "negative": [
+        "34:33",
+        0
+      ],
+      "vae": [
+        "34:29",
+        0
+      ]
+    },
+    "class_type": "UltimateSDUpscaleNoUpscale",
+    "_meta": {
+      "title": "Ultimate SD Upscale (No Upscale)"
+    }
+  },
+  "109:108": {
+    "inputs": {
+      "upscale_method": "nearest-exact",
+      "width": [
+        "165:128",
+        0
+      ],
+      "height": [
+        "165:121",
+        0
+      ],
+      "crop": "disabled",
+      "image": [
+        "34:8",
+        0
+      ]
+    },
+    "class_type": "ImageScale",
+    "_meta": {
+      "title": "Upscale Image"
     }
   }
 }

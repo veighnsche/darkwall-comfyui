@@ -145,13 +145,16 @@ def test_full_prompt_generation(prompt_config, config_dir):
 
 def test_missing_template_error(prompt_config, config_dir):
     """Test error when template file is missing."""
-    from darkwall_comfyui.exceptions import PromptError
-    
     gen = PromptGenerator(prompt_config, config_dir)
     
-    # Should raise PromptError when template doesn't exist
-    with pytest.raises(PromptError, match="Template not found"):
+    # Should raise an exception when template doesn't exist
+    # Use Exception to avoid module identity issues between installed/local package
+    with pytest.raises(Exception) as exc_info:
         gen._load_template("nonexistent.prompt")
+    
+    # Verify it's the right exception type and message
+    assert "TemplateNotFoundError" in type(exc_info.value).__name__ or "PromptError" in type(exc_info.value).__name__
+    assert "Template not found" in str(exc_info.value)
 
 
 def test_missing_wildcard_handling(prompt_config, config_dir):

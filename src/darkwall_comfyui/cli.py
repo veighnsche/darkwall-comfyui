@@ -196,6 +196,17 @@ def main() -> int:
         default=None
     )
     
+    # Prompt interactive
+    interactive_parser = prompt_subparsers.add_parser(
+        "interactive",
+        help="Interactive prompt generator with theme/template selection"
+    )
+    interactive_parser.add_argument(
+        "--no-clipboard",
+        action="store_true",
+        help="Disable clipboard copy options"
+    )
+    
     # Add gallery subcommand with its own subparsers
     gallery_parser = subparsers.add_parser("gallery", help="Browse wallpaper history")
     gallery_subparsers = gallery_parser.add_subparsers(dest="gallery_command", help="Gallery commands")
@@ -246,8 +257,9 @@ def main() -> int:
             )
         except (ConfigError, ConfigMigrationError, ConfigValidationError, TypeError) as e:
             config_error = e
-            # For prompt generate, we can continue without config
-            if command == "prompt" and getattr(args, 'prompt_command', None) == "generate":
+            # For prompt generate/interactive, we can continue without config
+            prompt_cmd = getattr(args, 'prompt_command', None)
+            if command == "prompt" and prompt_cmd in ("generate", "interactive"):
                 logger.warning(f"Config load failed, using defaults: {e}")
             else:
                 raise  # Re-raise for other commands

@@ -102,6 +102,17 @@ def add_parser(subparsers) -> argparse.ArgumentParser:
         default=None
     )
     
+    # Interactive command
+    interactive_parser = prompt_subparsers.add_parser(
+        "interactive",
+        help="Interactive prompt generator with theme/template selection"
+    )
+    interactive_parser.add_argument(
+        "--no-clipboard",
+        action="store_true",
+        help="Disable clipboard copy options"
+    )
+    
     return parser
 
 
@@ -299,6 +310,226 @@ def handle_list_command(args, config: Config) -> None:
     print()
 
 
+def handle_interactive_command(args, config: Optional[Config]) -> None:
+    """
+    Interactive prompt generator with theme and template selection.
+    
+    TEAM_006: Full interactive mode for manual prompt generation.
+    """
+    import subprocess
+    import shutil
+    from ..config import ThemeConfig, PromptConfig, Config as ConfigClass
+    
+    # Terminal colors
+    BOLD = '\033[1m'
+    GREEN = '\033[0;32m'
+    CYAN = '\033[0;36m'
+    YELLOW = '\033[0;33m'
+    NC = '\033[0m'
+    
+    config_dir = ConfigClass.get_config_dir()
+    clipboard_enabled = not getattr(args, 'no_clipboard', False) and shutil.which('wl-copy')
+    
+    def print_header():
+        print(f"\n{BOLD}{CYAN}═══════════════════════════════════════════════════════════{NC}")
+        print(f"{BOLD}{CYAN}  🎨 DarkWall Interactive Prompt Generator{NC}")
+        print(f"{BOLD}{CYAN}═══════════════════════════════════════════════════════════{NC}\n")
+    
+    def get_themes() -> list:
+        """Get available themes from config directory."""
+        themes_dir = config_dir / "themes"
+        if themes_dir.exists():
+            return sorted([d.name for d in themes_dir.iterdir() if d.is_dir() and not d.name.startswith('.')])
+        return ["dark", "light"]
+    
+    def get_prompts(theme: str) -> list:
+        """Get available prompts for a theme."""
+        prompts_dir = config_dir / "themes" / theme / "prompts"
+        if prompts_dir.exists():
+            return sorted([f.stem for f in prompts_dir.glob("*.prompt")])
+        return ["default"]
+    
+    def select_option(prompt_text: str, options: list, allow_random: bool = True) -> str:
+        """Interactive selection menu."""
+        print(f"{YELLOW}{prompt_text}{NC}")
+        
+        display_options = options.copy()
+        if allow_random:
+            display_options.append("random")
+        
+        for i, opt in enumerate(display_options, 1):
+            print(f"  {i}) {opt}")
+        
+        while True:
+            try:
+                choice = input(f"Enter number (1-{len(display_options)}): ").strip().lower()
+                
+                if choice == 'r' and allow_random:
+                    import random
+                    return random.choice(options)
+                
+                idx = int(choice) - 1
+                if 0 <= idx < len(display_options):
+                    selected = display_options[idx]
+                    if selected == "random":
+                        import random
+                        return random.choice(options)
+                    return selected
+                print(f"{YELLOW}Invalid choice, try again{NC}")
+            except (ValueError, KeyboardInterrupt):
+                if isinstance(choice, str) and choice == '':
+                    continue
+                raise
+    
+    def generate_prompt(theme: str, template: str, new_seed: bool = True) -> tuple:
+        """Generate a prompt and return (positive, negative, seed).
+        
+        Args:
+            theme: Theme name
+            template: Template name
+            new_seed: If True, generate a fresh random seed. If False, use time-slot seed.
+        """
+        import random
+        
+        theme_config = ThemeConfig(
+            name=theme,
+            atoms_dir="atoms",
+            prompts_dir="prompts",
+            default_template="default.prompt"
+        )
+        
+        prompt_config = config.prompt if config else PromptConfig()
+        atoms_dir = theme_config.get_atoms_path(config_dir)
+        prompts_dir = theme_config.get_prompts_path(config_dir)
+        
+        prompt_gen = PromptGenerator(prompt_config, config_dir, atoms_dir=atoms_dir, prompts_dir=prompts_dir)
+        # TEAM_006: Use random seed for interactive mode so each generation is unique
+        seed = random.randint(0, 2**32 - 1) if new_seed else prompt_gen.get_time_slot_seed(monitor_index=0)
+        
+        template_file = f"{template}.prompt" if not template.endswith('.prompt') else template
+        result = prompt_gen.generate_prompt_pair(
+            monitor_index=0,
+            template_path=template_file,
+            seed=seed
+        )
+        
+        return result.positive, result.negative, seed
+    
+    def copy_to_clipboard(text: str) -> bool:
+        """Copy text to clipboard using wl-copy."""
+        if not clipboard_enabled:
+            return False
+        try:
+            subprocess.run(['wl-copy'], input=text.encode(), check=True)
+            return True
+        except Exception:
+            return False
+    
+    def display_prompt(positive: str, negative: str, theme: str, template: str, seed: int):
+        """Display generated prompt."""
+        print()
+        print("=" * 60)
+        print("POSITIVE PROMPT:")
+        print("=" * 60)
+        print()
+        print(positive)
+        print()
+        print("=" * 60)
+        print("NEGATIVE PROMPT:")
+        print("=" * 60)
+        print()
+        print(negative)
+        print()
+        print("-" * 60)
+        print(f"Theme: {theme} | Template: {template} | Seed: {seed}")
+        print("-" * 60)
+    
+    # Main loop
+    last_theme = None
+    last_template = None
+    
+    try:
+        while True:
+            print_header()
+            
+            # Theme selection
+            print(f"{BOLD}Step 1: Select Theme{NC}")
+            themes = get_themes()
+            if last_theme:
+                print(f"{GREEN}(Last: {last_theme}){NC}")
+            theme = select_option("Choose theme:", themes)
+            last_theme = theme
+            
+            # Template selection
+            print(f"\n{BOLD}Step 2: Select Prompt Template{NC}")
+            prompts = get_prompts(theme)
+            if last_template and last_template in prompts:
+                print(f"{GREEN}(Last: {last_template}){NC}")
+            template = select_option("Choose template:", prompts)
+            last_template = template
+            
+            # Generate
+            print(f"\n{BOLD}Generating prompt...{NC}")
+            try:
+                positive, negative, seed = generate_prompt(theme, template)
+                display_prompt(positive, negative, theme, template, seed)
+            except Exception as e:
+                print(f"{YELLOW}Error generating prompt: {e}{NC}")
+                continue
+            
+            # Action menu
+            while True:
+                print(f"\n{BOLD}═══════════════════════════════════════════════════════════{NC}")
+                print(f"{YELLOW}What next?{NC}")
+                
+                actions = [
+                    "Generate another (same settings)",
+                    "Generate another (new settings)",
+                ]
+                if clipboard_enabled:
+                    actions.extend([
+                        "Copy positive to clipboard",
+                        "Copy negative to clipboard",
+                    ])
+                actions.append("Exit")
+                
+                for i, action in enumerate(actions, 1):
+                    print(f"  {i}) {action}")
+                
+                try:
+                    choice = input("Choose: ").strip()
+                    idx = int(choice) - 1
+                    
+                    if idx == 0:  # Same settings
+                        positive, negative, seed = generate_prompt(theme, template)
+                        display_prompt(positive, negative, theme, template, seed)
+                    elif idx == 1:  # New settings
+                        break
+                    elif clipboard_enabled and idx == 2:  # Copy positive
+                        if copy_to_clipboard(positive):
+                            print(f"{GREEN}✓ Positive prompt copied to clipboard!{NC}")
+                        else:
+                            print(f"{YELLOW}Failed to copy to clipboard{NC}")
+                    elif clipboard_enabled and idx == 3:  # Copy negative
+                        if copy_to_clipboard(negative):
+                            print(f"{GREEN}✓ Negative prompt copied to clipboard!{NC}")
+                        else:
+                            print(f"{YELLOW}Failed to copy to clipboard{NC}")
+                    elif idx == len(actions) - 1:  # Exit
+                        print(f"\n{GREEN}Goodbye! 🎨{NC}\n")
+                        return
+                    else:
+                        print(f"{YELLOW}Invalid choice{NC}")
+                except (ValueError, EOFError):
+                    continue
+                except KeyboardInterrupt:
+                    print(f"\n{GREEN}Goodbye! 🎨{NC}\n")
+                    return
+                    
+    except KeyboardInterrupt:
+        print(f"\n{GREEN}Goodbye! 🎨{NC}\n")
+
+
 def execute(args, config: Config) -> None:
     """Execute prompt command."""
     if args.prompt_command == "generate":
@@ -307,13 +538,16 @@ def execute(args, config: Config) -> None:
         handle_preview_command(args, config)
     elif args.prompt_command == "list":
         handle_list_command(args, config)
+    elif args.prompt_command == "interactive":
+        handle_interactive_command(args, config)
     else:
-        # Default to generate if no subcommand specified
+        # Default to help if no subcommand specified
         print("Usage: darkwall prompt <command>")
         print()
         print("Commands:")
-        print("  generate  Generate a prompt ready to copy-paste into ComfyUI")
-        print("  preview   Preview prompt template with metadata")
-        print("  list      List available templates and atom files")
+        print("  generate     Generate a prompt ready to copy-paste into ComfyUI")
+        print("  interactive  Interactive mode with theme/template selection")
+        print("  preview      Preview prompt template with metadata")
+        print("  list         List available templates and atom files")
         print()
-        print("Run 'darkwall prompt generate --help' for more options.")
+        print("Run 'darkwall prompt <command> --help' for more options.")
