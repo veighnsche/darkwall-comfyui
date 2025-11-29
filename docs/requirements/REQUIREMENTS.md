@@ -13,6 +13,7 @@
 | `REQ-CORE-xxx` | Core generation pipeline |
 | `REQ-COMFY-xxx` | ComfyUI integration |
 | `REQ-PROMPT-xxx` | Prompt generation & templates |
+| `REQ-WORKFLOW-xxx` | Workflow system |
 | `REQ-THEME-xxx` | Theme system |
 | `REQ-MONITOR-xxx` | Multi-monitor support |
 | `REQ-SCHED-xxx` | Scheduling & time-based features |
@@ -20,6 +21,7 @@
 | `REQ-HIST-xxx` | History & gallery |
 | `REQ-CLI-xxx` | CLI interface |
 | `REQ-CONFIG-xxx` | Configuration system |
+| `REQ-MISC-xxx` | Miscellaneous features |
 | `REQ-NIX-xxx` | NixOS/Nix integration |
 
 ## Status Legend
@@ -208,7 +210,54 @@
 
 ---
 
-# 4. Theme System
+# 4. Workflow System
+
+## REQ-WORKFLOW-001: Workflow ID = Filename ✅ FROZEN
+
+**Behavior**: Workflow identifiers are the filename without `.json` extension.
+
+**Example**: `workflows/2327x1309.json` → workflow ID is `"2327x1309"`
+
+**No custom IDs**: No separate mapping table; filename IS the ID.
+
+**Test**: `tests/test_config.py`
+
+---
+
+## REQ-WORKFLOW-002: Workflow → Prompts Relationship ✅ FROZEN
+
+**Behavior**: Two modes for associating prompts with workflows:
+
+**Default (C)**: All prompts in theme available to all workflows
+```toml
+# No explicit prompts config needed
+# Any .prompt file in themes/{theme}/prompts/ can be used
+```
+
+**Explicit (B)**: Workflow declares specific prompts
+```toml
+[workflows.2327x1309]
+prompts = ["cinematic.prompt", "nature.prompt"]
+# Only these templates will be used for this workflow
+```
+
+**Priority**: If `[workflows.{name}]` section exists with `prompts`, use it. Otherwise, all prompts available.
+
+**Test**: `tests/test_config.py::test_workflow_prompts`
+
+---
+
+## REQ-WORKFLOW-003: Random Template Selection ✅ FROZEN
+
+**Behavior**: When multiple prompts are available for a workflow, selection is random (seeded).
+
+**Seed**: Based on time slot + monitor name (deterministic per generation).
+
+**Test**: `tests/test_prompt_generator.py::test_template_selection`
+
+---
+
+# 5. Theme System
 
 ## REQ-THEME-001: Theme Directory Structure ✅ FROZEN
 
@@ -261,71 +310,148 @@ default_template = "default.prompt"
 
 ---
 
-## REQ-THEME-004: Per-Monitor Theme Selection ❓ OPEN
+## REQ-THEME-004: Global Theme Only ✅ FROZEN
 
-**Status**: See QUESTIONNAIRE.md Q-THEME-001
+**Behavior**: All monitors use the same theme. No per-monitor theme overrides.
+
+**Rationale**: Simplicity. Theme switching is time-based via scheduling, not per-monitor.
+
+**Test**: `tests/test_config.py`
+
+---
+
+## REQ-THEME-005: Theme Fallback on Missing ✅ FROZEN
+
+**Behavior**: When a configured theme doesn't exist:
+1. Log a WARNING with the missing theme name
+2. Fall back to "default" theme
+3. Continue operation (do not error)
+
+**Test**: `tests/test_config.py::test_theme_fallback`
 
 ---
 
 # 5. Multi-Monitor Support
 
-## REQ-MONITOR-001: Monitor Count Config ✅ FROZEN
+## REQ-MONITOR-001: Auto-Detection via Compositor ✅ FROZEN
 
-**Behavior**: `monitors.count` defines number of monitors (1-10).
+**Behavior**: Monitors are auto-detected from the compositor, not manually configured.
+
+**Primary support**: niri (`niri msg outputs`)
+
+**TODO**: Add support for sway (`swaymsg -t get_outputs`), hyprland (`hyprctl monitors`)
+
+**Test**: `tests/test_monitor_detection.py`
+
+---
+
+## REQ-MONITOR-002: Compositor Names as Identifiers ✅ FROZEN
+
+**Behavior**: Monitors are identified by compositor output names (e.g., `DP-1`, `HDMI-A-1`), NOT by index.
+
+**User's Setup** (reference):
+| Output | Model | Resolution | Logical Size |
+|--------|-------|------------|--------------|
+| `DP-1` | HP OMEN 27 | 2560x1440 | 2327x1309 |
+| `HDMI-A-2` | LG IPS FULLHD | 1920x1080 | 1920x1080 |
+| `HDMI-A-1` | LG Ultra HD | 2560x1440 | 2327x1309 |
 
 **Test**: `tests/test_config.py`
 
 ---
 
-## REQ-MONITOR-002: Rotation State Persistence ✅ FROZEN
+## REQ-MONITOR-003: Inline Monitor Config Sections ✅ FROZEN
+
+**Behavior**: Each monitor is configured via `[monitors.{output_name}]` sections:
+
+```toml
+[monitors.DP-1]
+workflow = "2327x1309"
+
+[monitors.HDMI-A-2]
+workflow = "1920x1080"
+
+[monitors.HDMI-A-1]
+workflow = "2327x1309"
+```
+
+**Test**: `tests/test_config.py`
+
+---
+
+## REQ-MONITOR-004: Error on Unconfigured Monitor ✅ FROZEN
+
+**Behavior**: If a connected monitor has no `[monitors.{name}]` section:
+1. Log ERROR with monitor name
+2. Exit with code 1 (configuration error)
+
+**Rationale**: Explicit config prevents accidental wallpaper mismatches.
+
+**Test**: `tests/test_config.py::test_unconfigured_monitor_error`
+
+---
+
+## REQ-MONITOR-005: Rotation State Persistence ✅ FROZEN
 
 **Behavior**: State file (`~/.local/state/darkwall-comfyui/state.json`) tracks:
-- Current monitor index
+- Current monitor name (not index)
 - Last generation timestamps per monitor
 
 **Commands**:
 - `generate` — generates for next monitor in rotation
 - `generate-all` — generates for all monitors
-- `reset` — resets rotation to monitor 0
+- `reset` — resets rotation
 
 **Test**: `tests/test_state.py`
 
 ---
 
-## REQ-MONITOR-003: Per-Monitor Output Paths ✅ FROZEN
+## REQ-MONITOR-006: Per-Monitor Output Paths ✅ FROZEN
 
-**Behavior**: Two modes:
-1. **Pattern mode**: `monitors.pattern = "monitor_{index}.png"` → auto-generates paths
-2. **Explicit mode**: `monitors.paths = ["path1.png", "path2.png"]` → exact paths per monitor
+**Behavior**: Output paths derived from monitor name:
 
-**Test**: `tests/test_config.py`
+```toml
+[monitors.DP-1]
+output = "~/Pictures/wallpapers/DP-1.png"
+```
 
----
-
-## REQ-MONITOR-004: Per-Monitor Workflows ✅ FROZEN
-
-**Behavior**: `monitors.workflows = ["workflow1.json", "workflow2.json"]` assigns different workflows per monitor.
-
-**Use case**: Different resolutions/aspect ratios per monitor.
+**Default pattern**: `~/Pictures/wallpapers/{monitor_name}.png`
 
 **Test**: `tests/test_config.py`
 
 ---
 
-## REQ-MONITOR-005: Per-Monitor Templates ✅ FROZEN
+## REQ-MONITOR-007: Per-Monitor Workflows ✅ FROZEN
 
-**Behavior**: `monitors.templates = ["cinematic.prompt", "minimal.prompt"]` assigns different prompt templates per monitor.
+**Behavior**: Each monitor specifies its workflow (by filename without .json):
+
+```toml
+[monitors.DP-1]
+workflow = "2327x1309"  # Uses workflows/2327x1309.json
+```
 
 **Test**: `tests/test_config.py`
 
 ---
 
-## REQ-MONITOR-006: CLI Override ✅ FROZEN
+## REQ-MONITOR-008: Independent Template Selection ✅ FROZEN
+
+**Behavior**: When two monitors share a workflow, each selects templates independently.
+
+**Implementation**: Seed offset based on monitor name hash.
+
+**Rationale**: Same time slot should NOT produce identical wallpapers on all monitors.
+
+**Test**: `tests/test_prompt_generator.py::test_monitor_independence`
+
+---
+
+## REQ-MONITOR-009: CLI Override ✅ FROZEN
 
 **Behavior**:
 - `--workflow FILE` — override workflow for single generation
 - `--template FILE` — override template for single generation
-- `--monitor N` — generate for specific monitor (skip rotation)
+- `--monitor NAME` — generate for specific monitor (skip rotation)
 
 **Test**: `tests/test_commands.py`
 
@@ -349,7 +475,7 @@ default_template = "default.prompt"
 - Day: use `day_theme` (default: "default")
 - Night: use `night_theme` (default: "nsfw")
 
-**Config**:
+**Config** (solar-based):
 ```toml
 [schedule]
 latitude = 52.52
@@ -358,22 +484,58 @@ day_theme = "default"
 night_theme = "nsfw"
 ```
 
-**Alternative**: Manual time ranges:
+**Config** (manual override):
 ```toml
 [schedule]
 nsfw_start = "22:00"
 nsfw_end = "06:00"
+day_theme = "default"
+night_theme = "nsfw"
 ```
 
-**Dependency**: `astral` Python library
+**Priority**: Manual times override solar calculation if both specified.
 
-**Status**: Not yet implemented; see TODO.md
+**Dependency**: `astral` Python library (confirmed)
+
+**Test**: `tests/test_schedule.py`
 
 ---
 
-## REQ-SCHED-003: Status Shows Next Transition 📋 PLANNED
+## REQ-SCHED-003: Probability Blend Transitions 📋 PLANNED
 
-**Behavior**: `darkwall status` shows current theme and next scheduled transition time.
+**Behavior**: During transition periods (around sunset/sunrise), themes blend via probability:
+
+| Time relative to sunset | SFW probability | NSFW probability |
+|-------------------------|-----------------|------------------|
+| -30 min (before) | 80% | 20% |
+| 0 (at sunset) | 50% | 50% |
+| +30 min (after) | 20% | 80% |
+
+**Config**:
+```toml
+[schedule]
+blend_duration_minutes = 30  # default
+```
+
+**Test**: `tests/test_schedule.py::test_blend_probability`
+
+---
+
+## REQ-SCHED-004: 24-Hour Schedule Status 📋 PLANNED
+
+**Behavior**: `darkwall status` shows full 24-hour schedule as table:
+
+```
+Theme Schedule (next 24h):
+TIME        THEME     PROBABILITY
+06:00       default   100%
+18:30       (blend)   SFW 70% / NSFW 30%
+19:00       nsfw      100%
+```
+
+**Flag**: `--json` outputs machine-readable format for waybar/polybar integration.
+
+**Test**: `tests/test_commands.py::test_status_schedule`
 
 ---
 
@@ -571,7 +733,70 @@ Candidates:
 
 ---
 
-# 11. NixOS Integration
+## REQ-CONFIG-005: Breaking Changes — Fail Hard ✅ FROZEN
+
+**Behavior**: When config format changes:
+1. Detect deprecated/removed keys
+2. ERROR with specific key name and migration instructions
+3. Exit with code 1
+
+**NO backwards compatibility hacks. NO auto-migration. BREAK THE CODE.**
+
+**Rationale**: Prevents forever tech debt from sad attempts at compatibility.
+
+**Test**: `tests/test_config.py::test_deprecated_keys`
+
+---
+
+## REQ-CONFIG-006: No Profiles ✅ FROZEN
+
+**Behavior**: Profiles feature is explicitly NOT implemented.
+
+**Rationale**: Themes + scheduling cover all use cases. Profiles would add redundant complexity.
+
+---
+
+## REQ-CONFIG-007: No Multi-Host Support ✅ FROZEN
+
+**Behavior**: Multi-host configuration is explicitly NOT implemented.
+
+**Rationale**: Tool runs on one host. Different hosts use different config files via NixOS.
+
+---
+
+# 11. Miscellaneous Features
+
+## REQ-MISC-001: Optional Desktop Notifications 📋 PLANNED
+
+**Behavior**: When `notifications.enabled = true`, send desktop notification on wallpaper change.
+
+**Config**:
+```toml
+[notifications]
+enabled = false  # default
+```
+
+**Test**: `tests/test_notifications.py`
+
+---
+
+## REQ-MISC-002: No Lock Screen Integration ✅ FROZEN
+
+**Behavior**: Lock screen wallpaper is explicitly NOT managed by this tool.
+
+**Rationale**: Separate concern; user can configure swaylock independently.
+
+---
+
+## REQ-MISC-003: JSON Status Output 📋 PLANNED
+
+**Behavior**: `darkwall status --json` outputs machine-readable JSON for integration with waybar/polybar.
+
+**Test**: `tests/test_commands.py::test_status_json`
+
+---
+
+# 12. NixOS Integration
 
 ## REQ-NIX-001: Flake Package ✅ FROZEN
 
@@ -625,15 +850,29 @@ Candidates:
 | Core | 3 | 0 | 0 | 0 |
 | ComfyUI | 5 | 0 | 0 | 0 |
 | Prompt | 7 | 0 | 0 | 0 |
-| Theme | 3 | 1 | 0 | 1 |
-| Monitor | 6 | 0 | 0 | 0 |
-| Scheduling | 1 | 0 | 2 | 0 |
+| Workflow | 3 | 0 | 0 | 0 |
+| Theme | 5 | 0 | 0 | 0 |
+| Monitor | 9 | 0 | 0 | 0 |
+| Scheduling | 1 | 0 | 3 | 0 |
 | Wallpaper | 3 | 0 | 1 | 0 |
 | History | 4 | 0 | 0 | 0 |
 | CLI | 3 | 0 | 0 | 0 |
-| Config | 4 | 0 | 0 | 0 |
+| Config | 7 | 0 | 0 | 0 |
+| Misc | 1 | 0 | 2 | 0 |
 | NixOS | 5 | 0 | 0 | 0 |
-| **Total** | **44** | **1** | **3** | **1** |
+| **Total** | **56** | **0** | **6** | **0** |
+
+---
+
+## User's Monitor Setup (Reference)
+
+Auto-detected via `niri msg outputs`:
+
+| Output | Model | Resolution | Logical Size |
+|--------|-------|------------|--------------|
+| `DP-1` | HP OMEN 27 | 2560x1440 | 2327x1309 |
+| `HDMI-A-2` | LG IPS FULLHD | 1920x1080 | 1920x1080 |
+| `HDMI-A-1` | LG Ultra HD | 2560x1440 | 2327x1309 |
 
 ---
 

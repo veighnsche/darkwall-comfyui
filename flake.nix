@@ -289,6 +289,7 @@ EOF
             python3Packages.websocket-client
             python3Packages.tqdm
             python3Packages.pytest
+            python3Packages.pytest-bdd
             python3Packages.black
             python3Packages.isort
             python3Packages.mypy
@@ -305,15 +306,18 @@ EOF
             export PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}"
 
             echo "🎨 DarkWall ComfyUI Development Environment"
+            echo ""
             echo "Available commands:"
+            echo "  pytest                           # Run all tests"
+            echo "  pytest tests/step_definitions/   # Run BDD tests only"
+            echo "  pytest --collect-only            # List all test scenarios"
             echo "  python -m darkwall_comfyui.cli --help"
-            echo "  pytest"
-            echo "  black src/"
-            echo "  isort src/"
-            echo "  mypy src/"
+            echo ""
+            echo "BDD:"
+            echo "  Feature files:    tests/features/*.feature"
+            echo "  Step definitions: tests/step_definitions/*.py"
             echo ""
             echo "Build with: nix build"
-            echo "Install with: nix profile install ."
             echo "Run with: nix run . -- --help"
           '';
         };

@@ -36,6 +36,7 @@ dependencies = [
 dev = [
     "pytest>=6.0",
     "pytest-cov",
+    "pytest-bdd>=7.0",
     "black",
     "isort",
     "mypy",

@@ -8,31 +8,91 @@ This directory contains the formal requirements specification for DarkWall Comfy
 |------|---------|
 | `REQUIREMENTS.md` | Frozen behavior requirements with unique IDs |
 | `QUESTIONNAIRE.md` | Open questions requiring user decisions |
+| `UNCLEAR_BEHAVIORS.md` | Questions discovered during BDD writing |
 | `TRACEABILITY.md` | Mapping requirements → code → tests |
 
-## Workflow
+---
 
-### Adding New Behavior
+## BDD Workflow (Preferred)
 
-1. **Check QUESTIONNAIRE.md** — Is there an open question about this?
-2. **If yes** — Get user answer first, then convert to requirement
-3. **If no** — Add new requirement ID to REQUIREMENTS.md
-4. **Update TRACEABILITY.md** — Add source file and test mappings
-5. **Write tests first** — TDD: test → implement → verify
+We use **Behavior-Driven Development** with `pytest-bdd`.
 
-### Modifying Existing Behavior
+### Directory Structure
 
-1. **Find requirement ID** in REQUIREMENTS.md
-2. **Check TRACEABILITY.md** for affected files and tests
-3. **Update requirement** if behavior is changing
-4. **Update tests** to match new expected behavior
-5. **Implement change**
+```
+tests/
+├── features/           # Gherkin .feature files
+│   ├── monitor_detection.feature
+│   ├── monitor_config.feature
+│   ├── workflow_system.feature
+│   ├── theme_system.feature
+│   ├── scheduling.feature
+│   ├── generation.feature
+│   └── cli_status.feature
+└── step_definitions/   # Python step implementations
+    └── test_*.py
+```
 
-### Answering Open Questions
+### Running BDD Tests
 
-1. **Edit QUESTIONNAIRE.md** — Fill in answers inline
-2. **AI will convert** — Answered questions become frozen requirements
-3. **Remove from questionnaire** — Once converted
+```bash
+# Enter dev shell
+nix develop
+
+# Run all tests
+pytest
+
+# Run BDD tests only
+pytest tests/step_definitions/
+
+# Run specific feature
+pytest tests/step_definitions/test_monitor_detection.py
+
+# List all scenarios
+pytest --collect-only
+
+# Run tests for specific requirement
+pytest -m "REQ-MONITOR-001"
+```
+
+### Writing New Behaviors
+
+1. **Write Feature File** (Gherkin)
+   ```gherkin
+   @REQ-XXX-001
+   Feature: Your Feature
+       Scenario: Specific behavior
+           Given some precondition
+           When some action
+           Then expected result
+   ```
+
+2. **Document Unclear Behaviors**
+   - Add `# UNCLEAR: ...` comments in feature file
+   - Add to `UNCLEAR_BEHAVIORS.md` for user to answer
+
+3. **Write Step Definitions**
+   ```python
+   from pytest_bdd import scenarios, given, when, then
+   
+   scenarios("../features/your_feature.feature")
+   
+   @given("some precondition")
+   def given_precondition():
+       pass
+   ```
+
+4. **Run and Iterate**
+   - Tests fail first (red)
+   - Implement code (green)
+   - Refactor
+
+### IDE Setup
+
+Install VSCode/Windsurf extension: **Cucumber (Gherkin) Full Support**
+- Extension ID: `alexkrechik.cucumberautocomplete`
+
+---
 
 ## Requirement ID Convention
 
@@ -45,6 +105,7 @@ REQ-{CATEGORY}-{NUMBER}
 | CORE | Core generation pipeline |
 | COMFY | ComfyUI integration |
 | PROMPT | Prompt generation & templates |
+| WORKFLOW | Workflow system |
 | THEME | Theme system |
 | MONITOR | Multi-monitor support |
 | SCHED | Scheduling & time-based features |
@@ -52,6 +113,7 @@ REQ-{CATEGORY}-{NUMBER}
 | HIST | History & gallery |
 | CLI | CLI interface |
 | CONFIG | Configuration system |
+| MISC | Miscellaneous features |
 | NIX | NixOS/Nix integration |
 
 ## Status Legend
@@ -63,13 +125,22 @@ REQ-{CATEGORY}-{NUMBER}
 | 📋 PLANNED | Designed, not implemented |
 | ❓ OPEN | Requires user decision |
 
-## TDD Workflow
+## Gherkin Tags
 
+Feature files use tags to link to requirements:
+
+```gherkin
+@REQ-MONITOR-001 @REQ-MONITOR-002
+Feature: Monitor Detection
+
+    @planned
+    Scenario: Not yet implemented
 ```
-1. Write failing test for requirement
-2. Implement minimal code to pass
-3. Refactor while keeping tests green
-4. Mark requirement as FROZEN when stable
+
+Run specific requirements:
+```bash
+pytest -m "REQ-MONITOR-001"
+pytest -m "planned"  # Skip planned tests
 ```
 
 ---

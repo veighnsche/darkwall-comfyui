@@ -2,6 +2,7 @@
 
 > **Purpose**: Map each requirement to its implementation location(s) and test(s).
 > **Usage**: When modifying code, check which requirements are affected.
+> **Last Updated**: 2025-11-29 (after questionnaire completion)
 
 ---
 
@@ -52,6 +53,16 @@
 
 ---
 
+# Workflow System
+
+| Req ID | Source Files | Test Files | Config Keys |
+|--------|--------------|------------|-------------|
+| REQ-WORKFLOW-001 | `config.py:WorkflowConfig` | `tests/test_config.py` | `workflows.*` |
+| REQ-WORKFLOW-002 | `config.py:get_workflow_prompts()` | `tests/test_config.py` | `workflows.*.prompts` |
+| REQ-WORKFLOW-003 | `prompt_generator.py:select_template()` | `tests/test_prompt_generator.py` | — |
+
+---
+
 # Theme System
 
 | Req ID | Source Files | Test Files | Config Keys |
@@ -59,7 +70,8 @@
 | REQ-THEME-001 | `config.py:ThemeConfig` | `tests/test_config.py` | `themes.*` |
 | REQ-THEME-002 | `config.py:Config.load()` | `tests/test_config.py` | `themes.*.atoms_dir`, `themes.*.prompts_dir` |
 | REQ-THEME-003 | `config.py:Config.get_theme()` | `tests/test_config.py` | — |
-| REQ-THEME-004 | — (not implemented) | — | `monitors.*.theme` |
+| REQ-THEME-004 | `config.py` | `tests/test_config.py` | — (global theme only) |
+| REQ-THEME-005 | `config.py:get_theme()` | `tests/test_config.py::test_theme_fallback` | `prompt.theme` |
 
 ---
 
@@ -67,12 +79,15 @@
 
 | Req ID | Source Files | Test Files | Config Keys |
 |--------|--------------|------------|-------------|
-| REQ-MONITOR-001 | `config.py:MonitorConfig` | `tests/test_config.py` | `monitors.count` |
-| REQ-MONITOR-002 | `state.py:StateManager` | `tests/test_state.py` | — |
-| REQ-MONITOR-003 | `config.py:MonitorConfig.get_output_path()` | `tests/test_config.py` | `monitors.pattern`, `monitors.paths` |
-| REQ-MONITOR-004 | `config.py:MonitorConfig` | `tests/test_config.py` | `monitors.workflows` |
-| REQ-MONITOR-005 | `config.py:MonitorConfig` | `tests/test_config.py` | `monitors.templates` |
-| REQ-MONITOR-006 | `cli.py`, `commands/generate.py` | `tests/test_commands.py` | — |
+| REQ-MONITOR-001 | `monitor_detection.py` (NEW) | `tests/test_monitor_detection.py` | — |
+| REQ-MONITOR-002 | `config.py` | `tests/test_config.py` | `monitors.*` |
+| REQ-MONITOR-003 | `config.py:MonitorConfig` | `tests/test_config.py` | `monitors.{name}.*` |
+| REQ-MONITOR-004 | `config.py:validate_monitors()` | `tests/test_config.py` | — |
+| REQ-MONITOR-005 | `state.py:StateManager` | `tests/test_state.py` | — |
+| REQ-MONITOR-006 | `config.py:MonitorConfig` | `tests/test_config.py` | `monitors.{name}.output` |
+| REQ-MONITOR-007 | `config.py:MonitorConfig` | `tests/test_config.py` | `monitors.{name}.workflow` |
+| REQ-MONITOR-008 | `prompt_generator.py` | `tests/test_prompt_generator.py` | — |
+| REQ-MONITOR-009 | `cli.py`, `commands/generate.py` | `tests/test_commands.py` | — |
 
 ---
 
@@ -81,8 +96,9 @@
 | Req ID | Source Files | Test Files | Config Keys |
 |--------|--------------|------------|-------------|
 | REQ-SCHED-001 | `prompt_generator.py:get_time_slot_seed()` | `tests/test_prompt_generator.py` | `prompt.time_slot_minutes` |
-| REQ-SCHED-002 | — (not implemented) | — | `schedule.latitude`, `schedule.longitude`, `schedule.nsfw_start`, `schedule.nsfw_end` |
-| REQ-SCHED-003 | — (not implemented) | — | — |
+| REQ-SCHED-002 | `schedule.py` (NEW) | `tests/test_schedule.py` | `schedule.latitude`, `schedule.longitude`, `schedule.day_theme`, `schedule.night_theme` |
+| REQ-SCHED-003 | `schedule.py:get_blend_probability()` | `tests/test_schedule.py` | `schedule.blend_duration_minutes` |
+| REQ-SCHED-004 | `commands/status.py` | `tests/test_commands.py` | — |
 
 ---
 
@@ -126,6 +142,19 @@
 | REQ-CONFIG-002 | `config.py:_apply_env_overrides()` | `tests/test_config.py` | — |
 | REQ-CONFIG-003 | `config.py:Config.init_config_dir()` | `tests/test_config.py` | — |
 | REQ-CONFIG-004 | `config.py:Config.__post_init__()` | `tests/test_config.py` | — |
+| REQ-CONFIG-005 | `config.py:_check_deprecated_keys()` | `tests/test_config.py` | — |
+| REQ-CONFIG-006 | — (explicitly not implemented) | — | — |
+| REQ-CONFIG-007 | — (explicitly not implemented) | — | — |
+
+---
+
+# Miscellaneous Features
+
+| Req ID | Source Files | Test Files | Config Keys |
+|--------|--------------|------------|-------------|
+| REQ-MISC-001 | `notifications.py` (NEW) | `tests/test_notifications.py` | `notifications.enabled` |
+| REQ-MISC-002 | — (explicitly not implemented) | — | — |
+| REQ-MISC-003 | `commands/status.py` | `tests/test_commands.py` | — |
 
 ---
 
@@ -147,15 +176,19 @@ Quick lookup: which requirements does this file affect?
 
 | Directory/File | Affects Requirements |
 |----------------|---------------------|
-| `src/darkwall_comfyui/cli.py` | REQ-CLI-001, REQ-CLI-002, REQ-CORE-003 |
-| `src/darkwall_comfyui/config.py` | REQ-CONFIG-*, REQ-THEME-*, REQ-MONITOR-001 through 005 |
-| `src/darkwall_comfyui/prompt_generator.py` | REQ-PROMPT-*, REQ-SCHED-001 |
+| `src/darkwall_comfyui/cli.py` | REQ-CLI-*, REQ-CORE-003, REQ-MONITOR-009 |
+| `src/darkwall_comfyui/config.py` | REQ-CONFIG-*, REQ-THEME-*, REQ-WORKFLOW-*, REQ-MONITOR-002 through 007 |
+| `src/darkwall_comfyui/prompt_generator.py` | REQ-PROMPT-*, REQ-WORKFLOW-003, REQ-SCHED-001, REQ-MONITOR-008 |
 | `src/darkwall_comfyui/comfy/client.py` | REQ-COMFY-* |
 | `src/darkwall_comfyui/wallpaper/setter.py` | REQ-WALL-* |
 | `src/darkwall_comfyui/history/manager.py` | REQ-HIST-* |
 | `src/darkwall_comfyui/commands/generate.py` | REQ-CORE-001, REQ-CORE-002, REQ-CLI-003 |
+| `src/darkwall_comfyui/commands/status.py` | REQ-COMFY-005, REQ-SCHED-004, REQ-MISC-003 |
 | `src/darkwall_comfyui/commands/gallery.py` | REQ-HIST-002 |
 | `src/darkwall_comfyui/commands/prompt.py` | REQ-PROMPT-006, REQ-PROMPT-007 |
+| `src/darkwall_comfyui/monitor_detection.py` (NEW) | REQ-MONITOR-001 |
+| `src/darkwall_comfyui/schedule.py` (NEW) | REQ-SCHED-002, REQ-SCHED-003 |
+| `src/darkwall_comfyui/notifications.py` (NEW) | REQ-MISC-001 |
 | `flake.nix` | REQ-NIX-* |
 
 ---
@@ -165,14 +198,17 @@ Quick lookup: which requirements does this file affect?
 | Test File | Verifies Requirements |
 |-----------|----------------------|
 | `tests/test_cli.py` | REQ-CLI-* |
-| `tests/test_commands.py` | REQ-CORE-*, REQ-PROMPT-006, REQ-PROMPT-007, REQ-COMFY-005 |
-| `tests/test_config.py` | REQ-CONFIG-*, REQ-THEME-*, REQ-MONITOR-001 through 005 |
+| `tests/test_commands.py` | REQ-CORE-*, REQ-PROMPT-006, REQ-PROMPT-007, REQ-COMFY-005, REQ-SCHED-004, REQ-MISC-003 |
+| `tests/test_config.py` | REQ-CONFIG-*, REQ-THEME-*, REQ-WORKFLOW-*, REQ-MONITOR-002 through 007 |
 | `tests/test_comfy_client.py` | REQ-COMFY-001 through 004 |
-| `tests/test_prompt_generator.py` | REQ-PROMPT-001 through 005, REQ-SCHED-001 |
-| `tests/test_wallpaper.py` | REQ-WALL-001 through 003 |
+| `tests/test_prompt_generator.py` | REQ-PROMPT-*, REQ-WORKFLOW-003, REQ-SCHED-001, REQ-MONITOR-008 |
+| `tests/test_wallpaper.py` | REQ-WALL-* |
 | `tests/test_history.py` | REQ-HIST-* |
-| `tests/test_state.py` | REQ-MONITOR-002 |
+| `tests/test_state.py` | REQ-MONITOR-005 |
 | `tests/test_integration.py` | REQ-CORE-002 |
+| `tests/test_monitor_detection.py` (NEW) | REQ-MONITOR-001 |
+| `tests/test_schedule.py` (NEW) | REQ-SCHED-002, REQ-SCHED-003 |
+| `tests/test_notifications.py` (NEW) | REQ-MISC-001 |
 
 ---
 
