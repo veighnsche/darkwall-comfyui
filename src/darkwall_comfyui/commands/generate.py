@@ -532,7 +532,6 @@ def retry_last(
         positive=prompt,
         negative=negative_prompt,
         seed=new_seed,
-        template=template,
     )
     
     logger.info(f"Generating with same prompt, new seed {new_seed}")

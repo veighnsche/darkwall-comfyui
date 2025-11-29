@@ -4,7 +4,7 @@ import logging
 import os
 from pathlib import Path
 
-from ..config import Config, StateManager
+from ..config import Config, NamedStateManager
 from ..prompt_generator import PromptGenerator
 from ..comfy import ComfyClient
 
@@ -70,7 +70,8 @@ def fix_permissions(config: Config) -> None:
 
 def reset_rotation(config: Config) -> None:
     """Reset monitor rotation state."""
-    state_mgr = StateManager(config)
+    active_monitors = config.get_active_monitor_names()
+    state_mgr = NamedStateManager(active_monitors)
     state_mgr.reset_rotation()
     print("Rotation state reset")
 

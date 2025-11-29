@@ -10,7 +10,6 @@ __author__ = "Vince"
 
 from .config import (
     Config,
-    StateManager,
     NamedStateManager,
     MonitorsConfig,
     PerMonitorConfig,
@@ -74,7 +73,6 @@ except ImportError:
 __all__ = [
     # Config
     "Config",
-    "StateManager",
     "NamedStateManager",
     "MonitorsConfig",
     "PerMonitorConfig",

@@ -23,7 +23,6 @@ from .exceptions import (
     DarkWallError,
     ConfigError,
     ConfigValidationError,
-    ConfigMigrationError,
     WorkflowError,
     GenerationError,
     ComfyConnectionError,
@@ -272,7 +271,7 @@ def main() -> int:
                 config_file=args.config,
                 initialize=not args.no_init
             )
-        except (ConfigError, ConfigMigrationError, ConfigValidationError, TypeError) as e:
+        except (ConfigError, ConfigValidationError, TypeError) as e:
             config_error = e
             # For prompt generate/interactive, we can continue without config
             prompt_cmd = getattr(args, 'prompt_command', None)
@@ -349,12 +348,6 @@ def main() -> int:
     except KeyboardInterrupt:
         print("\nCancelled by user", file=sys.stderr)
         return 130
-    
-    except ConfigMigrationError as e:
-        # Config needs migration - show clear instructions
-        print(f"\n❌ Configuration Migration Required\n", file=sys.stderr)
-        print(str(e), file=sys.stderr)
-        return 78  # EX_CONFIG
     
     except ConfigValidationError as e:
         print(f"\n❌ Configuration Validation Error: {e}", file=sys.stderr)

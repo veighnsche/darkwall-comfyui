@@ -7,7 +7,7 @@ import pytest
 from pathlib import Path
 
 from darkwall_comfyui.config import (
-    ComfyUIConfig, MonitorsConfig, PerMonitorConfig, OutputConfig, PromptConfig, StateManager
+    ComfyUIConfig, MonitorsConfig, PerMonitorConfig, OutputConfig, PromptConfig, NamedStateManager
 )
 from darkwall_comfyui.comfy.client import ComfyClient
 from darkwall_comfyui.comfy.workflow import WorkflowManager
@@ -93,22 +93,15 @@ class TestDependencyInjection:
         assert len(target.monitors_config) == 2
         assert target.output_config.create_backup is True
     
-    def test_state_manager_accepts_monitors_config(self):
-        """Test StateManager accepts MonitorsConfig only."""
-        # TEAM_006: Use MonitorsConfig instead of MonitorConfig
-        monitors_config = MonitorsConfig(
-            monitors={
-                "DP-1": PerMonitorConfig(name="DP-1", workflow="default"),
-                "HDMI-A-1": PerMonitorConfig(name="HDMI-A-1", workflow="default"),
-                "DP-2": PerMonitorConfig(name="DP-2", workflow="default"),
-            },
-            command="swaybg"
-        )
+    def test_named_state_manager_accepts_monitor_names(self):
+        """Test NamedStateManager accepts list of monitor names."""
+        # TEAM_007: Updated to use NamedStateManager (StateManager deleted)
+        monitor_names = ["DP-1", "HDMI-A-1", "DP-2"]
         
-        state_mgr = StateManager(monitors_config)
+        state_mgr = NamedStateManager(monitor_names)
         
-        assert state_mgr.monitors_config == monitors_config
-        assert len(state_mgr.monitors_config) == 3
+        assert state_mgr.monitor_names == monitor_names
+        assert len(state_mgr.monitor_names) == 3
     
     def test_classes_dont_accept_full_config_anymore(self):
         """Test that classes have been properly refactored and don't expect full Config."""
