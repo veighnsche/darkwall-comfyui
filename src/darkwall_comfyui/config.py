@@ -68,6 +68,86 @@ URL_PATTERN = re.compile(
     r'(?:/?|[/?]\S+)$', re.IGNORECASE)
 
 
+# ============================================================================
+# DEPRECATED CONFIG KEYS (REQ-CONFIG-005)
+# ============================================================================
+
+# Keys that are deprecated and must error with migration instructions
+DEPRECATED_KEYS: Dict[str, str] = {
+    "monitors.count": (
+        "Auto-detection from compositor replaces manual count.\n"
+        "  Migration: Remove 'count' and add [monitors.{name}] sections for each monitor.\n"
+        "  Example:\n"
+        "    [monitors.DP-1]\n"
+        "    workflow = \"2327x1309\"\n"
+        "    [monitors.HDMI-A-1]\n"
+        "    workflow = \"1920x1080\""
+    ),
+    "monitors.pattern": (
+        "Per-monitor output paths replace global pattern.\n"
+        "  Migration: Add 'output' to each [monitors.{name}] section.\n"
+        "  Example:\n"
+        "    [monitors.DP-1]\n"
+        "    output = \"~/Pictures/wallpapers/DP-1.png\""
+    ),
+    "monitors.backup_pattern": (
+        "Per-monitor backup paths replace global pattern.\n"
+        "  Migration: Add 'backup' to each [monitors.{name}] section."
+    ),
+    "monitors.workflows": (
+        "Array-style workflows are deprecated.\n"
+        "  Migration: Add 'workflow' to each [monitors.{name}] section.\n"
+        "  Example:\n"
+        "    [monitors.DP-1]\n"
+        "    workflow = \"2327x1309\""
+    ),
+    "monitors.templates": (
+        "Array-style templates are deprecated.\n"
+        "  Migration: Configure templates per workflow in [workflows.{name}] sections."
+    ),
+    "monitors.paths": (
+        "Array-style paths are deprecated.\n"
+        "  Migration: Add 'output' to each [monitors.{name}] section."
+    ),
+    "monitors.names": (
+        "Array-style names are deprecated.\n"
+        "  Migration: Use [monitors.{name}] sections directly with compositor output names."
+    ),
+}
+
+
+def check_deprecated_keys(config_dict: Dict[str, Any], config_file: Path) -> None:
+    """
+    Check for deprecated config keys and error with migration instructions.
+    
+    REQ-CONFIG-005: Breaking changes fail hard with clear errors.
+    
+    Args:
+        config_dict: Loaded TOML configuration dictionary
+        config_file: Path to config file for error messages
+        
+    Raises:
+        ConfigError: If deprecated keys are found
+    """
+    errors = []
+    
+    # Check monitors section for deprecated keys
+    monitors = config_dict.get("monitors", {})
+    if isinstance(monitors, dict):
+        for key in monitors:
+            full_key = f"monitors.{key}"
+            if full_key in DEPRECATED_KEYS:
+                errors.append(f'"{full_key}" is deprecated.\n{DEPRECATED_KEYS[full_key]}')
+    
+    if errors:
+        error_msg = (
+            f"Deprecated configuration keys found in {config_file}:\n\n"
+            + "\n\n".join(errors)
+            + "\n\nSee docs/requirements/REQUIREMENTS.md for full migration guide."
+        )
+        raise ConfigError(error_msg)
+
+
 def validate_toml_structure(config_dict: Dict[str, Any], config_file: Path) -> None:
     """
     Validate TOML structure before creating dataclasses.
@@ -82,6 +162,8 @@ def validate_toml_structure(config_dict: Dict[str, Any], config_file: Path) -> N
         ConfigError: If structure validation fails
     """
     # Define valid sections and their keys
+    # NOTE: monitors section now uses [monitors.{name}] format (per-monitor config)
+    # The old flat monitors keys are caught by check_deprecated_keys() first
     valid_structure = {
         'comfyui': {
             'base_url': str,
@@ -90,16 +172,7 @@ def validate_toml_structure(config_dict: Dict[str, Any], config_file: Path) -> N
             'poll_interval': int,
             'headers': dict,  # Optional
         },
-        'monitors': {
-            'count': int,
-            'pattern': str,
-            'paths': list,  # Optional
-            'names': list,  # Optional per-monitor output names
-            'command': str,
-            'backup_pattern': str,
-            'workflows': list,  # Optional
-            'templates': list,  # Optional
-        },
+        'monitors': dict,  # Dynamic: [monitors.{name}] sections with per-monitor config
         'output': {
             'create_backup': bool,
         },
@@ -142,6 +215,11 @@ def validate_toml_structure(config_dict: Dict[str, Any], config_file: Path) -> N
         
         valid_keys = valid_structure[section_name]
         
+        # Skip validation for dynamic sections (monitors, themes)
+        # These use [section.{name}] format with arbitrary keys
+        if valid_keys == dict:
+            continue
+        
         for key, value in section_config.items():
             if key not in valid_keys:
                 raise ConfigError(
@@ -159,8 +237,92 @@ def validate_toml_structure(config_dict: Dict[str, Any], config_file: Path) -> N
 
 
 @dataclass
+class PerMonitorConfig:
+    """
+    Configuration for a single monitor (new format).
+    
+    REQ-MONITOR-003: Inline config sections per monitor.
+    """
+    name: str  # Compositor output name (e.g., "DP-1")
+    workflow: str = "default"  # Workflow ID (filename without .json)
+    output: Optional[str] = None  # Output path (defaults to ~/Pictures/wallpapers/{name}.png)
+    backup: Optional[str] = None  # Backup path pattern
+    templates: Optional[List[str]] = None  # Allowed templates for this monitor
+    
+    def get_output_path(self) -> Path:
+        """Get output path for this monitor."""
+        if self.output:
+            return Path(self.output).expanduser()
+        return Path(f"~/Pictures/wallpapers/{self.name}.png").expanduser()
+    
+    def get_backup_path(self, timestamp: str) -> Path:
+        """Get backup path for this monitor."""
+        if self.backup:
+            return Path(self.backup.format(name=self.name, timestamp=timestamp)).expanduser()
+        return Path(f"~/Pictures/wallpapers/backups/{self.name}_{timestamp}.png").expanduser()
+    
+    def get_workflow_path(self, config_dir: Path) -> Path:
+        """Get workflow file path."""
+        workflow_id = self.workflow
+        if not workflow_id.endswith(".json"):
+            workflow_id = f"{workflow_id}.json"
+        return config_dir / "workflows" / workflow_id
+
+
+@dataclass
+class MonitorsConfig:
+    """
+    New-style monitors configuration using compositor names.
+    
+    REQ-MONITOR-001: Auto-detection via compositor
+    REQ-MONITOR-002: Compositor names as identifiers
+    REQ-MONITOR-003: Inline config sections
+    """
+    monitors: Dict[str, PerMonitorConfig] = field(default_factory=dict)
+    command: str = "swaybg"  # Wallpaper setter command
+    
+    def get_monitor(self, name: str) -> Optional[PerMonitorConfig]:
+        """Get configuration for a specific monitor."""
+        return self.monitors.get(name)
+    
+    def get_monitor_names(self) -> List[str]:
+        """Get list of configured monitor names."""
+        return list(self.monitors.keys())
+    
+    @classmethod
+    def from_dict(cls, config_dict: Dict[str, Any]) -> 'MonitorsConfig':
+        """
+        Create MonitorsConfig from config dictionary.
+        
+        Expects format:
+        {
+            "DP-1": {"workflow": "2327x1309"},
+            "HDMI-A-1": {"workflow": "1920x1080"},
+            "command": "swaybg"
+        }
+        """
+        monitors = {}
+        command = "swaybg"
+        
+        for key, value in config_dict.items():
+            if key == "command":
+                command = value
+            elif isinstance(value, dict):
+                # This is a monitor config
+                monitors[key] = PerMonitorConfig(
+                    name=key,
+                    workflow=value.get("workflow", "default"),
+                    output=value.get("output"),
+                    backup=value.get("backup"),
+                    templates=value.get("templates"),
+                )
+        
+        return cls(monitors=monitors, command=command)
+
+
+@dataclass
 class MonitorConfig:
-    """Configuration for monitor management."""
+    """Configuration for monitor management (legacy format - deprecated)."""
     count: int = 3
     pattern: str = "~/Pictures/wallpapers/monitor_{index}.png"
     paths: Optional[List[str]] = None
@@ -605,6 +767,9 @@ class Config:
                 with open(config_file, 'rb') as f:
                     config_dict = tomli.load(f)
                 
+                # REQ-CONFIG-005: Check for deprecated keys FIRST (fail hard)
+                check_deprecated_keys(config_dict, config_file)
+                
                 # Validate TOML structure before proceeding
                 validate_toml_structure(config_dict, config_file)
                 
@@ -843,4 +1008,109 @@ class StateManager:
     def reset_rotation(self) -> None:
         """Reset rotation state."""
         self.save_state({'last_monitor_index': -1, 'rotation_count': 0})
+        self.logger.info("Reset monitor rotation state")
+
+
+class NamedStateManager:
+    """
+    Manages persistent state for named monitor rotation.
+    
+    REQ-MONITOR-002: Uses compositor output names instead of indices.
+    """
+    
+    def __init__(self, monitor_names: List[str]) -> None:
+        """
+        Initialize with list of monitor names.
+        
+        Args:
+            monitor_names: List of compositor output names (e.g., ["DP-1", "HDMI-A-1"])
+        """
+        self.monitor_names = monitor_names
+        self.state_file = Config.get_state_file()
+        self.logger = logging.getLogger(__name__)
+    
+    def get_state(self) -> Dict[str, Any]:
+        """Load current state."""
+        if not self.state_file.exists():
+            return {
+                'last_monitor': None,
+                'rotation_count': 0,
+                'monitor_order': self.monitor_names,
+            }
+        
+        try:
+            with open(self.state_file, 'r', encoding='utf-8') as f:
+                state = json.load(f)
+                # Ensure monitor_order is up to date
+                state['monitor_order'] = self.monitor_names
+                return state
+        except (FileNotFoundError, json.JSONDecodeError, OSError) as e:
+            self.logger.warning(f"Failed to load state file: {e}")
+            return {
+                'last_monitor': None,
+                'rotation_count': 0,
+                'monitor_order': self.monitor_names,
+            }
+    
+    def save_state(self, state: Dict[str, Any]) -> None:
+        """Save current state."""
+        self.state_file.parent.mkdir(parents=True, exist_ok=True)
+        
+        try:
+            with open(self.state_file, 'w', encoding='utf-8') as f:
+                json.dump(state, f, indent=2)
+        except (OSError, PermissionError) as e:
+            raise StateError(f"Failed to save state file {self.state_file}: {e}")
+    
+    def get_next_monitor(self) -> str:
+        """
+        Get the next monitor name in rotation.
+        
+        Returns:
+            Monitor name (e.g., "DP-1")
+        """
+        if not self.monitor_names:
+            raise ConfigError("No monitors configured")
+        
+        state = self.get_state()
+        last_monitor = state.get('last_monitor')
+        
+        # Find next monitor in rotation
+        if last_monitor is None or last_monitor not in self.monitor_names:
+            next_monitor = self.monitor_names[0]
+        else:
+            current_idx = self.monitor_names.index(last_monitor)
+            next_idx = (current_idx + 1) % len(self.monitor_names)
+            next_monitor = self.monitor_names[next_idx]
+        
+        # Update state
+        state['last_monitor'] = next_monitor
+        state['rotation_count'] = state.get('rotation_count', 0) + 1
+        self.save_state(state)
+        
+        self.logger.info(f"Rotating to monitor {next_monitor} (rotation #{state['rotation_count']})")
+        return next_monitor
+    
+    def peek_next_monitor(self) -> str:
+        """Get next monitor without advancing rotation."""
+        if not self.monitor_names:
+            raise ConfigError("No monitors configured")
+        
+        state = self.get_state()
+        last_monitor = state.get('last_monitor')
+        
+        if last_monitor is None or last_monitor not in self.monitor_names:
+            return self.monitor_names[0]
+        
+        current_idx = self.monitor_names.index(last_monitor)
+        next_idx = (current_idx + 1) % len(self.monitor_names)
+        return self.monitor_names[next_idx]
+    
+    def reset_rotation(self) -> None:
+        """Reset rotation state."""
+        self.save_state({
+            'last_monitor': None,
+            'rotation_count': 0,
+            'monitor_order': self.monitor_names,
+        })
         self.logger.info("Reset monitor rotation state")

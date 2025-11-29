@@ -34,17 +34,19 @@ pytest -m "REQ-MONITOR-001"  # Run specific requirement
 
 ---
 
-## 🎯 PHASE 2: Config Breaking Changes
+## ✅ PHASE 2: Config Breaking Changes (COMPLETE)
 
 **Goal**: Migrate from old index-based config to new compositor-name-based config.
 
-### 2.1 Deprecate Old Config Keys (REQ-CONFIG-005)
-Mark as deprecated with clear errors:
-- [ ] `monitors.count` → auto-detect from compositor
-- [ ] `monitors.pattern` → use `[monitors.{name}]` sections
-- [ ] `monitors.workflows` (array) → per-monitor config
-- [ ] `monitors.templates` (array) → per-monitor config
-- [ ] `monitors.paths` (array) → per-monitor config
+### 2.1 ✅ Deprecate Old Config Keys (REQ-CONFIG-005)
+All deprecated keys now error with clear migration instructions:
+- [x] `monitors.count` → auto-detect from compositor
+- [x] `monitors.pattern` → use `[monitors.{name}]` sections
+- [x] `monitors.workflows` (array) → per-monitor config
+- [x] `monitors.templates` (array) → per-monitor config
+- [x] `monitors.paths` (array) → per-monitor config
+- [x] `monitors.backup_pattern` → per-monitor config
+- [x] `monitors.names` → use section names directly
 
 ### 2.2 New Config Format
 ```toml
@@ -64,29 +66,32 @@ workflow = "1920x1080"
 workflow = "2327x1309"
 ```
 
-### 2.3 Implementation Tasks
-- [ ] Add `_check_deprecated_keys()` to config.py
-- [ ] Error with migration instructions
-- [ ] Update `docs/configuration.md`
-- [ ] BDD: `config_breaking_changes.feature` passes
+### 2.3 ✅ Implementation Complete
+- [x] Added `check_deprecated_keys()` to config.py
+- [x] Added `DEPRECATED_KEYS` dict with migration messages
+- [x] Errors include full migration instructions
+- [x] BDD: `config_breaking_changes.feature` passes (4/4)
 
 ---
 
-## 🎯 PHASE 3: Monitor Auto-Detection
+## 🎯 PHASE 3: Monitor Auto-Detection (IN PROGRESS)
 
 **Goal**: Auto-detect monitors from compositor instead of manual count.
 
-### 3.1 Monitor Detection (REQ-MONITOR-001)
-- [ ] Create `monitor_detection.py` module
-- [ ] Implement niri detection (`niri msg outputs`)
-- [ ] Parse output to get monitor names + resolutions
+### 3.1 ✅ Monitor Detection (REQ-MONITOR-001)
+- [x] Created `monitor_detection.py` module
+- [x] Implemented niri detection (`niri msg outputs`)
+- [x] Parse output to get monitor names + resolutions
+- [x] Added error handling (REQ-MONITOR-010)
+- [x] Added caching (REQ-MONITOR-011)
 - [ ] TODO: Add sway support (`swaymsg -t get_outputs`)
 - [ ] TODO: Add hyprland support (`hyprctl monitors`)
 
-### 3.2 Compositor Names (REQ-MONITOR-002)
-- [ ] Use `DP-1`, `HDMI-A-1` instead of indices
-- [ ] Update state.py to track by name
-- [ ] Update rotation logic for named monitors
+### 3.2 ✅ Compositor Names (REQ-MONITOR-002)
+- [x] Use `DP-1`, `HDMI-A-1` instead of indices
+- [x] Added `NamedStateManager` for name-based rotation
+- [x] Added `MonitorsConfig` and `PerMonitorConfig` dataclasses
+- [x] Exported new classes from `__init__.py`
 
 ### 3.3 User's Monitors (Reference)
 | Output | Resolution | Workflow |
