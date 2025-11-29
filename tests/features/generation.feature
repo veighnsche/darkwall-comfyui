@@ -60,6 +60,6 @@ Feature: Wallpaper Generation
         And no files should be created
         And no network requests should be made
 
-    # UNCLEAR: What if ComfyUI queue is full?
-    # UNCLEAR: Should we retry on ComfyUI errors?
-    # UNCLEAR: What if wallpaper setter fails but image is saved?
+    # REQ-COMFY-006: Queue full → Report queue position, continue polling
+    # REQ-COMFY-004: ComfyUI errors → Retry with exponential backoff
+    # REQ-WALL-005: Setter fails after save → Keep image, log error

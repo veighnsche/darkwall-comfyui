@@ -36,6 +36,7 @@
 | REQ-COMFY-003 | `comfy/client.py:poll_result()` | `tests/test_comfy_client.py` | `comfyui.timeout`, `comfyui.poll_interval` |
 | REQ-COMFY-004 | `comfy/client.py:_create_session()` | `tests/test_comfy_client.py` | — |
 | REQ-COMFY-005 | `comfy/client.py:health_check()`, `commands/status.py` | `tests/test_commands.py` | `comfyui.base_url` |
+| REQ-COMFY-006 | `comfy/client.py:queue_prompt()` | `tests/test_comfy_client.py` | — |
 
 ---
 
@@ -60,6 +61,8 @@
 | REQ-WORKFLOW-001 | `config.py:WorkflowConfig` | `tests/test_config.py` | `workflows.*` |
 | REQ-WORKFLOW-002 | `config.py:get_workflow_prompts()` | `tests/test_config.py` | `workflows.*.prompts` |
 | REQ-WORKFLOW-003 | `prompt_generator.py:select_template()` | `tests/test_prompt_generator.py` | — |
+| REQ-WORKFLOW-004 | `comfy/client.py:load_workflow()` | `tests/test_comfy_client.py` | — |
+| REQ-WORKFLOW-005 | `comfy/client.py:load_workflow()` | `tests/test_comfy_client.py` | — |
 
 ---
 
@@ -72,6 +75,8 @@
 | REQ-THEME-003 | `config.py:Config.get_theme()` | `tests/test_config.py` | — |
 | REQ-THEME-004 | `config.py` | `tests/test_config.py` | — (global theme only) |
 | REQ-THEME-005 | `config.py:get_theme()` | `tests/test_config.py::test_theme_fallback` | `prompt.theme` |
+| REQ-THEME-006 | `config.py:_ensure_default_theme()` | `tests/test_config.py` | — |
+| REQ-THEME-007 | `config.py:init_config_dir()` | `tests/test_config.py` | — |
 
 ---
 
@@ -88,6 +93,10 @@
 | REQ-MONITOR-007 | `config.py:MonitorConfig` | `tests/test_config.py` | `monitors.{name}.workflow` |
 | REQ-MONITOR-008 | `prompt_generator.py` | `tests/test_prompt_generator.py` | — |
 | REQ-MONITOR-009 | `cli.py`, `commands/generate.py` | `tests/test_commands.py` | — |
+| REQ-MONITOR-010 | `monitor_detection.py` | `tests/test_monitor_detection.py` | — |
+| REQ-MONITOR-011 | `monitor_detection.py` | `tests/test_monitor_detection.py` | — |
+| REQ-MONITOR-012 | `monitor_detection.py`, `commands/generate.py` | `tests/test_monitor_detection.py` | — |
+| REQ-MONITOR-013 | `monitor_detection.py`, `commands/generate.py` | `tests/test_monitor_detection.py` | — |
 
 ---
 
@@ -110,6 +119,7 @@
 | REQ-WALL-002 | `wallpaper/setter.py:_run_custom_command()` | `tests/test_wallpaper.py` | `monitors.command` |
 | REQ-WALL-003 | `wallpaper/setter.py:_set_swaybg()` | `tests/test_wallpaper.py` | — |
 | REQ-WALL-004 | — (not implemented) | — | — |
+| REQ-WALL-005 | `wallpaper/setter.py`, `commands/generate.py` | `tests/test_wallpaper.py` | — |
 
 ---
 

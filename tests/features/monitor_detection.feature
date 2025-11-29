@@ -32,6 +32,6 @@ Feature: Monitor Detection
         When I run monitor detection
         Then I should see the connected monitors
 
-    # UNCLEAR: What if compositor is not running?
-    # UNCLEAR: What if niri msg outputs fails?
-    # UNCLEAR: Should we cache monitor detection results?
+    # REQ-MONITOR-010: Compositor not running → Error with clear message
+    # REQ-MONITOR-010: Detection command fails → Error with actual message
+    # REQ-MONITOR-011: Cache until monitor change detected

@@ -131,8 +131,22 @@
 - Response time
 - Device info (GPU, VRAM)
 - Queue status
+- Current rotation position
 
 **Test**: `tests/test_commands.py::test_status`
+
+---
+
+## REQ-COMFY-006: Queue Position Reporting ✅ FROZEN
+
+**Behavior**: When ComfyUI queue is not empty, report queue position:
+1. Log INFO: "Queued at position N"
+2. Continue polling until generation starts
+3. DO NOT error on queue full
+
+**Rationale**: ComfyUI handles queueing internally; just report position.
+
+**Test**: `tests/test_comfy_client.py::test_queue_position`
 
 ---
 
@@ -257,6 +271,31 @@ prompts = ["cinematic.prompt", "nature.prompt"]
 
 ---
 
+## REQ-WORKFLOW-004: Missing Workflow Error ✅ FROZEN
+
+**Behavior**: When a workflow file doesn't exist:
+1. Error with full path that was tried (e.g., "Workflow not found: /home/user/.config/darkwall-comfyui/workflows/2327x1309.json")
+2. Exit with code 1
+
+**NO listing available workflows.** Keep error message simple and direct.
+
+**Test**: `tests/test_comfy_client.py::test_missing_workflow`
+
+---
+
+## REQ-WORKFLOW-005: Workflow JSON Validation ✅ FROZEN
+
+**Behavior**: Workflow JSON validation is minimal:
+1. Check it's valid JSON (parse succeeds)
+2. Let ComfyUI validate the workflow structure
+3. Show ComfyUI's error message if workflow is invalid
+
+**Rationale**: ComfyUI knows its own schema best; don't duplicate validation logic.
+
+**Test**: `tests/test_comfy_client.py::test_invalid_workflow_json`
+
+---
+
 # 5. Theme System
 
 ## REQ-THEME-001: Theme Directory Structure ✅ FROZEN
@@ -328,6 +367,41 @@ default_template = "default.prompt"
 3. Continue operation (do not error)
 
 **Test**: `tests/test_config.py::test_theme_fallback`
+
+---
+
+## REQ-THEME-006: Default Theme Auto-Creation ✅ FROZEN
+
+**Behavior**: When "default" fallback theme also doesn't exist:
+1. Create empty default theme directory structure
+2. Log INFO: "Created default theme directory, see config folder for defaults"
+3. Continue operation with empty prompts (may error later if no prompts available)
+
+**Rationale**: Self-healing; point user to packaged defaults.
+
+**Test**: `tests/test_config.py::test_default_theme_creation`
+
+---
+
+## REQ-THEME-007: Init Creates Theme Structure ✅ FROZEN
+
+**Behavior**: `darkwall init` creates full theme directory structure with examples:
+
+```
+themes/
+└── default/
+    ├── atoms/
+    │   ├── subjects.txt (with examples)
+    │   ├── environments.txt
+    │   └── ...
+    └── prompts/
+        ├── default.prompt
+        └── cinematic.prompt
+```
+
+**Content**: Actual example atoms and prompts, not empty files.
+
+**Test**: `tests/test_config.py::test_init_theme_structure`
 
 ---
 
@@ -457,6 +531,53 @@ workflow = "2327x1309"  # Uses workflows/2327x1309.json
 
 ---
 
+## REQ-MONITOR-010: Compositor Error Handling ✅ FROZEN
+
+**Behavior**: When compositor is not running or detection fails:
+1. Error with clear message (e.g., "Could not detect monitors: niri not running")
+2. Show actual error from detection command (permission denied, command not found, etc.)
+3. Exit with code 1
+
+**NO fallback to manual config.** User must fix the issue.
+
+**Test**: `tests/test_monitor_detection.py`
+
+---
+
+## REQ-MONITOR-011: Monitor Detection Caching ✅ FROZEN
+
+**Behavior**: Cache detected monitors until monitor change detected.
+
+**Cache invalidation**: When monitor connects/disconnects (detected via compositor).
+
+**Rationale**: Avoid unnecessary compositor calls on every generation.
+
+**Test**: `tests/test_monitor_detection.py`
+
+---
+
+## REQ-MONITOR-012: Unconfigured Monitor Handling ✅ FROZEN
+
+**Behavior**: When a connected monitor has no config section:
+1. Log WARNING: "Monitor {name} has no configuration, skipping"
+2. Continue with configured monitors only
+
+**Default behavior**: Skip unconfigured monitors with warning (not error).
+
+**Test**: `tests/test_monitor_detection.py`
+
+---
+
+## REQ-MONITOR-013: Disconnected Monitor Handling ✅ FROZEN
+
+**Behavior**: When a configured monitor is disconnected:
+1. Log WARNING: "Configured monitor {name} is not connected, skipping"
+2. Continue with connected monitors only
+
+**Test**: `tests/test_monitor_detection.py`
+
+---
+
 # 6. Scheduling & Time-Based Features
 
 ## REQ-SCHED-001: Time Slot Determinism ✅ FROZEN
@@ -495,6 +616,12 @@ night_theme = "nsfw"
 
 **Priority**: Manual times override solar calculation if both specified.
 
+**Timezone**: Manual times use system local timezone.
+
+**Error handling**: If `astral` fails to calculate sunset, error with message (no fallback).
+
+**DST handling**: Astral library handles daylight saving time automatically.
+
 **Dependency**: `astral` Python library (confirmed)
 
 **Test**: `tests/test_schedule.py`
@@ -514,8 +641,10 @@ night_theme = "nsfw"
 **Config**:
 ```toml
 [schedule]
-blend_duration_minutes = 30  # default
+blend_duration_minutes = 30  # default, configurable
 ```
+
+**Configurable**: Yes, with sensible default of 30 minutes.
 
 **Test**: `tests/test_schedule.py::test_blend_probability`
 
@@ -582,12 +711,25 @@ TIME        THEME     PROBABILITY
 
 ## REQ-WALL-004: Additional Setters 📋 PLANNED
 
-**Status**: See QUESTIONNAIRE.md Q-WALL-001 for priority.
+**Status**: Low priority — current setters are sufficient.
 
 Candidates:
 - `hyprpaper` (Hyprland)
 - `wpaperd` (Wayland daemon)
 - `wallutils` (cross-platform)
+
+---
+
+## REQ-WALL-005: Setter Failure After Save ✅ FROZEN
+
+**Behavior**: When wallpaper image is saved but setter command fails:
+1. Keep the saved image (do not rollback)
+2. Log ERROR with command output
+3. Exit with code 5 (filesystem error)
+
+**Rationale**: Image is valuable; don't delete it just because setter failed.
+
+**Test**: `tests/test_wallpaper.py::test_setter_failure`
 
 ---
 
@@ -848,19 +990,19 @@ enabled = false  # default
 | Category | Frozen | Implemented | Planned | Open |
 |----------|--------|-------------|---------|------|
 | Core | 3 | 0 | 0 | 0 |
-| ComfyUI | 5 | 0 | 0 | 0 |
+| ComfyUI | 6 | 0 | 0 | 0 |
 | Prompt | 7 | 0 | 0 | 0 |
-| Workflow | 3 | 0 | 0 | 0 |
-| Theme | 5 | 0 | 0 | 0 |
-| Monitor | 9 | 0 | 0 | 0 |
+| Workflow | 5 | 0 | 0 | 0 |
+| Theme | 7 | 0 | 0 | 0 |
+| Monitor | 13 | 0 | 0 | 0 |
 | Scheduling | 1 | 0 | 3 | 0 |
-| Wallpaper | 3 | 0 | 1 | 0 |
+| Wallpaper | 4 | 0 | 1 | 0 |
 | History | 4 | 0 | 0 | 0 |
 | CLI | 3 | 0 | 0 | 0 |
 | Config | 7 | 0 | 0 | 0 |
 | Misc | 1 | 0 | 2 | 0 |
 | NixOS | 5 | 0 | 0 | 0 |
-| **Total** | **56** | **0** | **6** | **0** |
+| **Total** | **66** | **0** | **6** | **0** |
 
 ---
 

@@ -71,11 +71,11 @@ workflow = "portrait"
 
 **Question**: What happens for monitors NOT in config?
 
-- [X] **A) Error** — Every connected monitor must be configured
+- [ ] **A) Error** — Every connected monitor must be configured
 - [ ] **B) Default workflow** — Use a default workflow for unconfigured monitors
-- [ ] **C) Skip** — Only generate wallpapers for configured monitors
+- [X] **C) Skip with warning** — Only generate wallpapers for configured monitors
 
-**Your answer**: _________________________________
+**Your answer**: Skip with warning (generate only for configured monitors)
 
 ---
 
@@ -188,6 +188,70 @@ Theme (time-based) → Monitor → Workflow → Prompt → Atoms → Lines
 ```
 
 No profiles. No multi-host. Clean and simple.
+
+---
+
+# BDD Questions (Answered 2025-11-29)
+
+Questions discovered while writing BDD feature files.
+
+## Monitor Detection
+
+| ID | Question | Answer |
+|----|----------|--------|
+| Q-BDD-001 | Compositor not running? | Error with clear message |
+| Q-BDD-002 | Detection command fails? | Error with actual error message |
+| Q-BDD-003 | Cache monitor detection? | Cache until monitor change detected |
+
+## Workflow System
+
+| ID | Question | Answer |
+|----|----------|--------|
+| Q-BDD-004 | Missing workflow file? | Error with path that was tried |
+| Q-BDD-005 | Workflow JSON validation? | Just check valid JSON; let ComfyUI validate and return errors |
+
+## Theme System
+
+| ID | Question | Answer |
+|----|----------|--------|
+| Q-BDD-006 | Default theme also missing? | Create empty default theme + tell user about config folder |
+| Q-BDD-007 | Init creates theme dirs? | Yes, create default theme with example atoms/prompts |
+
+## Scheduling
+
+| ID | Question | Answer |
+|----|----------|--------|
+| Q-BDD-008 | Timezone for manual times? | System local timezone |
+| Q-BDD-009 | Blend duration configurable? | Yes, with sensible default (30 min) |
+| Q-BDD-010 | DST handling? | Astral library handles automatically |
+| Q-BDD-011 | Astral calculation fails? | Error with message |
+
+## Generation
+
+| ID | Question | Answer |
+|----|----------|--------|
+| Q-BDD-012 | ComfyUI queue full? | Report queue position |
+| Q-BDD-013 | Wallpaper setter fails after save? | Keep image, log error |
+
+## Config
+
+| ID | Question | Answer |
+|----|----------|--------|
+| Q-BDD-014 | Deprecated keys list? | monitors.count, monitors.pattern, monitors.workflows/templates/paths |
+| Q-BDD-015 | Migration command? | No — just break, not released yet |
+
+## CLI Status
+
+| ID | Question | Answer |
+|----|----------|--------|
+| Q-BDD-016 | Additional status info? | Current rotation position |
+
+## Partial Generation
+
+| ID | Question | Answer |
+|----|----------|--------|
+| Q-BDD-017 | Unconfigured monitors? | Skip with warning (default behavior) |
+| Q-BDD-018 | Disconnected monitor in config? | Warn and skip |
 
 ---
 

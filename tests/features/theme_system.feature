@@ -49,6 +49,5 @@ Feature: Theme System
         Then the log should contain "WARNING"
         And the log should mention "fantasy"
 
-    # UNCLEAR: What if "default" theme also doesn't exist?
-    # UNCLEAR: Should we create theme directories on init?
-    # UNCLEAR: Can themes inherit from other themes?
+    # REQ-THEME-006: Default missing → Create empty default theme + tell user
+    # REQ-THEME-007: Init → Create default theme with example atoms/prompts

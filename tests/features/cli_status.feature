@@ -57,6 +57,4 @@ Feature: CLI Status Command
         And the exit code should still be 0
         # Status command should not fail, just report state
 
-    # UNCLEAR: What other info should status show?
-    # UNCLEAR: Should status show last generation time per monitor?
-    # UNCLEAR: Should status show disk usage of history?
+    # REQ-COMFY-005: Status shows current rotation position

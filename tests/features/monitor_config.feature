@@ -45,5 +45,5 @@ Feature: Monitor Configuration
         When I validate the configuration
         Then validation should succeed
 
-    # UNCLEAR: Should we allow partial generation (only configured monitors)?
-    # UNCLEAR: What if a monitor is disconnected after config is written?
+    # REQ-MONITOR-012: Unconfigured monitors → Skip with warning (default)
+    # REQ-MONITOR-013: Disconnected configured monitor → Warn and skip

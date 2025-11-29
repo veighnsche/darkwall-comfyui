@@ -42,5 +42,5 @@ Feature: Breaking Changes - Fail Hard
             | Use [monitors.{name}] sections       |
             | See docs/requirements/REQUIREMENTS.md |
 
-    # UNCLEAR: What is the full list of deprecated keys?
-    # UNCLEAR: Should we provide a migration command?
+    # REQ-CONFIG-005: Deprecated keys: monitors.count, monitors.pattern, monitors.workflows/templates/paths
+    # REQ-CONFIG-005: No migration command — just break it, not released yet

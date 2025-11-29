@@ -79,7 +79,7 @@ Feature: Time-Based Theme Scheduling
             | TIME | THEME | PROBABILITY |
         And the table should show transitions for the next 24 hours
 
-    # UNCLEAR: What timezone should be used for manual times?
-    # UNCLEAR: Should blend duration be configurable?
-    # UNCLEAR: How do we handle daylight saving time transitions?
-    # UNCLEAR: What if astral library fails to calculate sunset?
+    # REQ-SCHED-002: Timezone → System local timezone
+    # REQ-SCHED-003: Blend duration → Configurable with 30 min default
+    # REQ-SCHED-002: DST → Astral handles automatically
+    # REQ-SCHED-002: Astral fails → Error with message (no fallback)

@@ -52,6 +52,5 @@ Feature: Workflow System
         Then the same prompt is selected on repeated runs
         And different time slots select different prompts
 
-    # UNCLEAR: What if workflow file doesn't exist?
-    # UNCLEAR: Should we validate workflow JSON structure?
-    # UNCLEAR: Error message format for missing workflow?
+    # REQ-WORKFLOW-004: Missing workflow → Error with full path that was tried
+    # REQ-WORKFLOW-005: JSON validation → Just check valid JSON, let ComfyUI validate

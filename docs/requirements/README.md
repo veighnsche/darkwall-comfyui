@@ -7,8 +7,7 @@ This directory contains the formal requirements specification for DarkWall Comfy
 | File | Purpose |
 |------|---------|
 | `REQUIREMENTS.md` | Frozen behavior requirements with unique IDs |
-| `QUESTIONNAIRE.md` | Open questions requiring user decisions |
-| `UNCLEAR_BEHAVIORS.md` | Questions discovered during BDD writing |
+| `QUESTIONNAIRE.md` | Open questions requiring user decisions (all answered) |
 | `TRACEABILITY.md` | Mapping requirements → code → tests |
 
 ---
@@ -69,7 +68,7 @@ pytest -m "REQ-MONITOR-001"
 
 2. **Document Unclear Behaviors**
    - Add `# UNCLEAR: ...` comments in feature file
-   - Add to `UNCLEAR_BEHAVIORS.md` for user to answer
+   - Add question to `QUESTIONNAIRE.md` for user to answer
 
 3. **Write Step Definitions**
    ```python
