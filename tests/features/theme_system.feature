@@ -6,20 +6,7 @@ Feature: Theme System
 
     @REQ-THEME-001
     Scenario: Theme directory structure
-        Given a config directory with themes:
-            """
-            themes/
-            ├── default/
-            │   ├── atoms/
-            │   │   └── subjects.txt
-            │   └── prompts/
-            │       └── default.prompt
-            └── nsfw/
-                ├── atoms/
-                │   └── subjects.txt
-                └── prompts/
-                    └── default.prompt
-            """
+        Given themes "default" and "nsfw" exist in config directory
         When I load theme "default"
         Then atoms should be loaded from "themes/default/atoms/"
         And prompts should be loaded from "themes/default/prompts/"
@@ -34,7 +21,7 @@ Feature: Theme System
 
     @REQ-THEME-005
     Scenario: Fallback to default when theme missing
-        Given theme is set to "nonexistent"
+        Given global theme is set to "nonexistent"
         And theme "default" exists
         When I load the configuration
         Then I should see a warning about "nonexistent"
@@ -43,7 +30,7 @@ Feature: Theme System
 
     @REQ-THEME-005
     Scenario: Warning logged for missing theme
-        Given theme is set to "fantasy"
+        Given global theme is set to "fantasy"
         And theme "fantasy" does not exist
         When I load the configuration
         Then the log should contain "WARNING"

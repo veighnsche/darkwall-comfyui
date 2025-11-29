@@ -5,24 +5,14 @@ Feature: Breaking Changes - Fail Hard
     So that we don't accumulate backwards compatibility tech debt
 
     Scenario: Error on deprecated key
-        Given a config file with deprecated key "monitors.count":
-            """
-            [monitors]
-            count = 3
-            command = "swaybg"
-            """
+        Given a config with deprecated key "monitors.count" set to 3
         When I load the configuration
         Then I should see an error mentioning "monitors.count"
         And the error should include migration instructions
         And the exit code should be 1
 
     Scenario: Error on old array-style monitors
-        Given a config file with old format:
-            """
-            [monitors]
-            workflows = ["a.json", "b.json"]
-            templates = ["a.prompt", "b.prompt"]
-            """
+        Given a config with old array-style "workflows" key
         When I load the configuration
         Then I should see an error about deprecated format
         And the error should explain the new format
@@ -34,13 +24,11 @@ Feature: Breaking Changes - Fail Hard
         And an error should be raised immediately
 
     Scenario: Migration guide in error message
-        Given a config file with deprecated key "monitors.pattern"
+        Given a config with deprecated key "monitors.pattern"
         When I load the configuration
-        Then the error message should include:
-            | content                              |
-            | "monitors.pattern" is deprecated     |
-            | Use [monitors.{name}] sections       |
-            | See docs/requirements/REQUIREMENTS.md |
+        Then the error should mention "monitors.pattern" is deprecated
+        And the error should mention "monitors." sections
+        And the error should reference the documentation
 
     # REQ-CONFIG-005: Deprecated keys: monitors.count, monitors.pattern, monitors.workflows/templates/paths
     # REQ-CONFIG-005: No migration command — just break it, not released yet

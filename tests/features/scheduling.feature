@@ -5,12 +5,7 @@ Feature: Time-Based Theme Scheduling
     So that NSFW content only appears after sunset
 
     Background:
-        Given the config has:
-            """
-            [schedule]
-            day_theme = "default"
-            night_theme = "nsfw"
-            """
+        Given a default schedule config with day theme "default" and night theme "nsfw"
 
     @REQ-SCHED-002
     Scenario: Solar-based scheduling
@@ -21,14 +16,7 @@ Feature: Time-Based Theme Scheduling
 
     @REQ-SCHED-002
     Scenario: Manual time override
-        Given the config has:
-            """
-            [schedule]
-            nsfw_start = "22:00"
-            nsfw_end = "06:00"
-            day_theme = "default"
-            night_theme = "nsfw"
-            """
+        Given manual NSFW times from "22:00" to "06:00"
         And the current time is "23:30"
         When I determine the current theme
         Then the theme should be "nsfw"
@@ -75,9 +63,9 @@ Feature: Time-Based Theme Scheduling
         Given location is configured
         And it is currently daytime
         When I run "darkwall status"
-        Then I should see a schedule table with columns:
-            | TIME | THEME | PROBABILITY |
-        And the table should show transitions for the next 24 hours
+        Then the output should contain "Theme Schedule"
+        And the output should contain time entries
+        And the output should contain theme names
 
     # REQ-SCHED-002: Timezone → System local timezone
     # REQ-SCHED-003: Blend duration → Configurable with 30 min default

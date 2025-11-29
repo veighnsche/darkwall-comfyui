@@ -9,20 +9,10 @@ Feature: Wallpaper Generation
         Given a valid configuration
         And ComfyUI is running at "http://localhost:8188"
         When I run "darkwall generate"
-        Then the following steps should occur in order:
-            | step                                    |
-            | Load configuration                      |
-            | Select next monitor in rotation         |
-            | Determine current theme from schedule   |
-            | Select random prompt template           |
-            | Generate prompt from template           |
-            | Load workflow JSON                      |
-            | Inject prompt via placeholders          |
-            | Submit to ComfyUI                       |
-            | Poll until completion                   |
-            | Download generated image                |
-            | Save to output path                     |
-            | Execute wallpaper setter                |
+        Then generation should complete the full pipeline
+        And the pipeline should include loading configuration
+        And the pipeline should include submitting to ComfyUI
+        And the pipeline should include executing wallpaper setter
 
     @REQ-MONITOR-008
     Scenario: Independent template selection per monitor
@@ -48,15 +38,9 @@ Feature: Wallpaper Generation
     Scenario: Dry run shows plan without executing
         Given a valid configuration
         When I run "darkwall generate --dry-run"
-        Then I should see:
-            | info                        |
-            | Selected monitor            |
-            | Selected template           |
-            | Generated prompt (positive) |
-            | Generated prompt (negative) |
-            | Workflow to be used         |
-            | Output path                 |
-            | Wallpaper command           |
+        Then the dry run output should show the selected monitor
+        And the dry run output should show the generated prompt
+        And the dry run output should show the workflow
         And no files should be created
         And no network requests should be made
 

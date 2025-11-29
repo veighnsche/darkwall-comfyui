@@ -11,19 +11,19 @@
 ### 1.1 ✅ All Behavior Questions Answered
 See `docs/requirements/QUESTIONNAIRE.md` — all 18 BDD questions now have decisions.
 
-### 1.2 Complete Step Definitions
-Write step definitions for existing feature files:
+### 1.2 ✅ Step Definitions Complete
+All step definitions written and passing (36 tests, 2 skipped for planned features):
 
 | Feature File | Status | Requirements |
 |--------------|--------|--------------|
-| `monitor_detection.feature` | 🔧 Started | REQ-MONITOR-001, 002 |
-| `monitor_config.feature` | ⏳ Pending | REQ-MONITOR-003, 004, 007 |
-| `workflow_system.feature` | ⏳ Pending | REQ-WORKFLOW-001, 002, 003 |
-| `theme_system.feature` | ⏳ Pending | REQ-THEME-001, 004, 005 |
-| `scheduling.feature` | ⏳ Pending | REQ-SCHED-002, 003, 004 |
-| `config_breaking_changes.feature` | ⏳ Pending | REQ-CONFIG-005 |
-| `generation.feature` | ⏳ Pending | REQ-CORE-002, REQ-MONITOR-008 |
-| `cli_status.feature` | ⏳ Pending | REQ-COMFY-005, SCHED-004, MISC-003 |
+| `monitor_detection.feature` | ✅ Done | REQ-MONITOR-001, 002 |
+| `monitor_config.feature` | ✅ Done | REQ-MONITOR-003, 004, 007 |
+| `workflow_system.feature` | ✅ Done | REQ-WORKFLOW-001, 002, 003 |
+| `theme_system.feature` | ✅ Done | REQ-THEME-001, 004, 005 |
+| `scheduling.feature` | ✅ Done | REQ-SCHED-002, 003, 004 |
+| `config_breaking_changes.feature` | ✅ Done | REQ-CONFIG-005 |
+| `generation.feature` | ✅ Done | REQ-CORE-002, REQ-MONITOR-008 |
+| `cli_status.feature` | ✅ Done | REQ-COMFY-005, SCHED-004, MISC-003 |
 
 ### 1.3 Run BDD Tests
 ```bash

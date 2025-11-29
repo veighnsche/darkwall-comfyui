@@ -79,29 +79,23 @@ def when_run_detection(compositor_context):
 # Then Steps
 # ============================================================================
 
-@then("I should see monitors:")
-def then_see_monitors(compositor_context, datatable):
-    """Verify detected monitors match expected."""
+@then(parsers.parse("I should detect {count:d} monitors"))
+def then_detect_n_monitors(compositor_context, count):
+    """Verify number of detected monitors."""
+    detected = compositor_context["detected_monitors"]
+    assert len(detected) == count, f"Expected {count} monitors, got {len(detected)}"
+
+
+@then(parsers.parse('monitor "{name}" should be detected with resolution "{resolution}"'))
+def then_monitor_detected_with_resolution(compositor_context, name, resolution):
+    """Verify specific monitor was detected with resolution."""
     detected = compositor_context["detected_monitors"]
     
-    # Parse datatable (pytest-bdd datatable format)
-    # Expected format: | name | resolution |
-    expected_monitors = []
-    for row in datatable:
-        expected_monitors.append({
-            "name": row["name"],
-            "resolution": row["resolution"],
-        })
-    
-    assert len(detected) == len(expected_monitors), \
-        f"Expected {len(expected_monitors)} monitors, got {len(detected)}"
-    
-    for expected in expected_monitors:
-        found = any(
-            m["name"] == expected["name"] and m["resolution"] == expected["resolution"]
-            for m in detected
-        )
-        assert found, f"Monitor {expected} not found in {detected}"
+    found = any(
+        m["name"] == name and m["resolution"] == resolution
+        for m in detected
+    )
+    assert found, f"Monitor {name} with resolution {resolution} not found in {detected}"
 
 
 @then(parsers.parse('monitor "{name}" should be identified by name not index'))

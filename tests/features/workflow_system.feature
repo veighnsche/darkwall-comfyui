@@ -6,39 +6,27 @@ Feature: Workflow System
 
     @REQ-WORKFLOW-001
     Scenario: Workflow ID equals filename
-        Given a workflow file "workflows/2327x1309.json"
-        When I reference workflow "2327x1309" in config
+        Given a workflow file exists at "workflows/2327x1309.json"
+        When I reference workflow "2327x1309"
         Then it should load "workflows/2327x1309.json"
 
     @REQ-WORKFLOW-001
     Scenario: Workflow ID without .json extension
-        Given a workflow file "workflows/ultrawide.json"
-        When I configure monitor with workflow = "ultrawide"
+        Given a workflow file exists at "workflows/ultrawide.json"
+        When I reference workflow "ultrawide"
         Then it should resolve to "workflows/ultrawide.json"
 
     @REQ-WORKFLOW-002
     Scenario: Default - all prompts available to workflow
-        Given a theme with prompts:
-            | name             |
-            | default.prompt   |
-            | cinematic.prompt |
-            | minimal.prompt   |
+        Given a theme with 3 prompts available
         And no explicit workflow prompts config
         When I generate for workflow "2327x1309"
         Then any of the 3 prompts may be selected
 
     @REQ-WORKFLOW-002
     Scenario: Explicit prompts restrict selection
-        Given a config with:
-            """
-            [workflows.2327x1309]
-            prompts = ["cinematic.prompt", "minimal.prompt"]
-            """
-        And a theme with prompts:
-            | name             |
-            | default.prompt   |
-            | cinematic.prompt |
-            | minimal.prompt   |
+        Given workflow "2327x1309" is configured with prompts "cinematic.prompt" and "minimal.prompt"
+        And a theme with 3 prompts including "default.prompt"
         When I generate for workflow "2327x1309"
         Then only "cinematic.prompt" or "minimal.prompt" may be selected
         And "default.prompt" should never be selected

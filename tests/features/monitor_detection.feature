@@ -9,11 +9,10 @@ Feature: Monitor Detection
 
     Scenario: Detect monitors from niri
         When I run monitor detection
-        Then I should see monitors:
-            | name     | resolution |
-            | DP-1     | 2560x1440  |
-            | HDMI-A-2 | 1920x1080  |
-            | HDMI-A-1 | 2560x1440  |
+        Then I should detect 3 monitors
+        And monitor "DP-1" should be detected with resolution "2560x1440"
+        And monitor "HDMI-A-2" should be detected with resolution "1920x1080"
+        And monitor "HDMI-A-1" should be detected with resolution "2560x1440"
 
     Scenario: Use compositor output names as identifiers
         When I run monitor detection

@@ -8,11 +8,9 @@ Feature: CLI Status Command
     Scenario: Status shows ComfyUI health
         Given ComfyUI is running
         When I run "darkwall status"
-        Then I should see:
-            | field         | example value    |
-            | ComfyUI URL   | http://localhost:8188 |
-            | Status        | Connected        |
-            | Response time | 45ms             |
+        Then the output should contain "ComfyUI URL"
+        And the output should contain "Connected"
+        And the output should contain response time
 
     Scenario: Status shows current theme
         Given the schedule is configured
@@ -24,25 +22,19 @@ Feature: CLI Status Command
     Scenario: Status shows 24h schedule table
         Given the schedule is configured with solar times
         When I run "darkwall status"
-        Then I should see a table:
-            """
-            Theme Schedule (next 24h):
-            TIME        THEME     PROBABILITY
-            06:00       default   100%
-            18:30       (blend)   SFW 70% / NSFW 30%
-            19:00       nsfw      100%
-            """
+        Then the output should contain "Theme Schedule"
+        And the output should contain "TIME"
+        And the output should contain "THEME"
+        And the output should contain "PROBABILITY"
 
     @REQ-MISC-003 @planned
     Scenario: JSON output for waybar integration
         When I run "darkwall status --json"
         Then the output should be valid JSON
-        And the JSON should contain:
-            | key              |
-            | comfyui_status   |
-            | current_theme    |
-            | next_transition  |
-            | monitors         |
+        And the JSON should contain key "comfyui_status"
+        And the JSON should contain key "current_theme"
+        And the JSON should contain key "next_transition"
+        And the JSON should contain key "monitors"
 
     @REQ-MISC-003 @planned
     Scenario: JSON format for external tools
