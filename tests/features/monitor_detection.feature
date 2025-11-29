@@ -19,18 +19,63 @@ Feature: Monitor Detection
         Then monitor "DP-1" should be identified by name not index
         And monitor "HDMI-A-1" should be identified by name not index
 
-    @planned
     Scenario: Detect monitors from sway
         Given the compositor is "sway"
         When I run monitor detection
         Then I should see the connected monitors
 
-    @planned
     Scenario: Detect monitors from hyprland
         Given the compositor is "hyprland"
         When I run monitor detection
         Then I should see the connected monitors
 
-    # REQ-MONITOR-010: Compositor not running → Error with clear message
-    # REQ-MONITOR-010: Detection command fails → Error with actual message
-    # REQ-MONITOR-011: Cache until monitor change detected
+    # =========================================================================
+    # Error Handling (REQ-MONITOR-010)
+    # =========================================================================
+
+    @REQ-MONITOR-010
+    Scenario: Error when no compositor is running
+        Given no compositor is running
+        When I attempt monitor detection
+        Then I should get an error containing "No supported compositor running"
+        And the error should list supported compositors
+
+    @REQ-MONITOR-010
+    Scenario: Error when compositor command fails
+        Given the compositor is "niri"
+        And the compositor command will fail with "Connection refused"
+        When I attempt monitor detection
+        Then I should get an error containing "Connection refused"
+
+    @REQ-MONITOR-010
+    Scenario: Error when compositor command times out
+        Given the compositor is "niri"
+        And the compositor command will timeout
+        When I attempt monitor detection
+        Then I should get an error containing "Timeout"
+
+    @REQ-MONITOR-010
+    Scenario: Error when no monitors detected
+        Given the compositor is "niri"
+        And the compositor returns empty output
+        When I attempt monitor detection
+        Then I should get an error containing "No monitors detected"
+
+    # =========================================================================
+    # Caching (REQ-MONITOR-011)
+    # =========================================================================
+
+    @REQ-MONITOR-011
+    Scenario: Detection results are cached
+        Given the compositor is "niri"
+        When I run monitor detection
+        And I run monitor detection again
+        Then the second detection should use cached results
+
+    @REQ-MONITOR-011
+    Scenario: Cache can be invalidated
+        Given the compositor is "niri"
+        When I run monitor detection
+        And I invalidate the cache
+        And I run monitor detection again
+        Then the second detection should re-query the compositor

@@ -19,7 +19,7 @@ try:
 except ImportError:
     raise ImportError("Required packages 'tomli' and 'tomli-w' not found. Install with: pip install tomli tomli-w")
 
-from .exceptions import ConfigError, StateError
+from .exceptions import ConfigError, ConfigValidationError, ConfigMigrationError, StateError
 
 
 @dataclass
@@ -168,7 +168,7 @@ def check_deprecated_keys(config_dict: Dict[str, Any], config_file: Path) -> Non
         config_file: Path to config file for error messages
         
     Raises:
-        ConfigError: If deprecated keys are found
+        ConfigMigrationError: If deprecated keys are found
     """
     errors = []
     
@@ -186,7 +186,7 @@ def check_deprecated_keys(config_dict: Dict[str, Any], config_file: Path) -> Non
             + "\n\n".join(errors)
             + "\n\nSee docs/requirements/REQUIREMENTS.md for full migration guide."
         )
-        raise ConfigError(error_msg)
+        raise ConfigMigrationError(error_msg)
 
 
 def validate_toml_structure(config_dict: Dict[str, Any], config_file: Path) -> None:
@@ -497,81 +497,117 @@ class Config:
         """Validate and post-process configuration."""
         # Validate ComfyUI settings
         if not URL_PATTERN.match(self.comfyui.base_url):
-            raise ConfigError(f"Invalid base URL format: {self.comfyui.base_url}")
+            raise ConfigValidationError(
+                f"Invalid base URL format: {self.comfyui.base_url}\n"
+                "Expected format: http://hostname:port or https://hostname"
+            )
         
         if self.comfyui.timeout <= 0 or self.comfyui.timeout > 3600:  # Max 1 hour
-            raise ConfigError("Generation timeout must be between 1 and 3600 seconds")
+            raise ConfigValidationError(
+                f"Generation timeout ({self.comfyui.timeout}s) out of range.\n"
+                "Must be between 1 and 3600 seconds."
+            )
         
         if self.comfyui.poll_interval <= 0 or self.comfyui.poll_interval > 60:  # Max 1 minute
-            raise ConfigError("Poll interval must be between 1 and 60 seconds")
+            raise ConfigValidationError(
+                f"Poll interval ({self.comfyui.poll_interval}s) out of range.\n"
+                "Must be between 1 and 60 seconds."
+            )
         
         # Validate workflow path format
         workflow_path = Path(self.comfyui.workflow_path)
         if workflow_path.suffix.lower() != '.json':
-            raise ConfigError(f"Workflow path must be a JSON file: {workflow_path}")
+            raise ConfigValidationError(
+                f"Workflow path must be a JSON file: {workflow_path}\n"
+                f"Got file extension: {workflow_path.suffix or '(none)'}"
+            )
         
         # Validate monitor settings
         if self.monitors.count <= 0 or self.monitors.count > 10:
-            raise ConfigError("Monitor count must be between 1 and 10")
+            raise ConfigValidationError(
+                f"Monitor count ({self.monitors.count}) out of range.\n"
+                "Must be between 1 and 10."
+            )
         
         # Validate wallpaper command
-        valid_commands = ['swaybg', 'swww', 'feh', 'nitrogen']
+        valid_commands = ['swaybg', 'swww', 'feh', 'nitrogen', 'hyprpaper']
         if not self.monitors.command.startswith('custom:'):
             if self.monitors.command not in valid_commands:
-                raise ConfigError(
-                    f"Invalid wallpaper command: {self.monitors.command}. "
-                    f"Valid commands: {valid_commands} or 'custom:<template>'"
+                raise ConfigValidationError(
+                    f"Invalid wallpaper command: {self.monitors.command}\n"
+                    f"Valid commands: {valid_commands}\n"
+                    "Or use 'custom:<template>' for custom commands."
                 )
         
         # Validate path patterns contain required placeholders
         if '{index}' not in self.monitors.pattern:
-            raise ConfigError("Monitor pattern must contain {index} placeholder")
+            raise ConfigValidationError(
+                f"Monitor pattern missing {{index}} placeholder: {self.monitors.pattern}\n"
+                "Example: ~/Pictures/wallpapers/monitor_{{index}}.png"
+            )
         
         if '{index}' not in self.monitors.backup_pattern:
-            raise ConfigError("Backup pattern must contain {index} placeholder")
+            raise ConfigValidationError(
+                f"Backup pattern missing {{index}} placeholder: {self.monitors.backup_pattern}"
+            )
         
         if '{timestamp}' not in self.monitors.backup_pattern:
-            raise ConfigError("Backup pattern must contain {timestamp} placeholder")
+            raise ConfigValidationError(
+                f"Backup pattern missing {{timestamp}} placeholder: {self.monitors.backup_pattern}"
+            )
         
         # Validate paths array if provided
         if self.monitors.paths is not None:
             if len(self.monitors.paths) != self.monitors.count:
-                raise ConfigError(
-                    f"Paths array length ({len(self.monitors.paths)}) must match monitor count ({self.monitors.count})"
+                raise ConfigValidationError(
+                    f"Paths array length ({len(self.monitors.paths)}) must match "
+                    f"monitor count ({self.monitors.count})"
                 )
         
         # Validate workflows array if provided
         if self.monitors.workflows is not None:
             if len(self.monitors.workflows) != self.monitors.count:
-                raise ConfigError(
-                    f"Workflows array length ({len(self.monitors.workflows)}) must match monitor count ({self.monitors.count})"
+                raise ConfigValidationError(
+                    f"Workflows array length ({len(self.monitors.workflows)}) must match "
+                    f"monitor count ({self.monitors.count})"
                 )
         
         # Validate names array if provided
         if getattr(self.monitors, 'names', None) is not None:
             if len(self.monitors.names) != self.monitors.count:
-                raise ConfigError(
-                    f"Names array length ({len(self.monitors.names)}) must match monitor count ({self.monitors.count})"
+                raise ConfigValidationError(
+                    f"Names array length ({len(self.monitors.names)}) must match "
+                    f"monitor count ({self.monitors.count})"
                 )
         
         # Validate prompt settings
         if self.prompt.time_slot_minutes <= 0 or self.prompt.time_slot_minutes > 1440:
-            raise ConfigError("Time slot minutes must be between 1 and 1440")
+            raise ConfigValidationError(
+                f"Time slot minutes ({self.prompt.time_slot_minutes}) out of range.\n"
+                "Must be between 1 and 1440 (24 hours)."
+            )
         
         if getattr(self.prompt, 'variations_per_monitor', 1) <= 0 or getattr(self.prompt, 'variations_per_monitor', 1) > 20:
-            raise ConfigError("variations_per_monitor must be between 1 and 20")
+            raise ConfigValidationError(
+                f"variations_per_monitor out of range.\n"
+                "Must be between 1 and 20."
+            )
         
         # TEAM_001: Ensure default theme exists if themes are configured
         if self.themes and self.prompt.theme not in self.themes:
             available = list(self.themes.keys())
-            raise ConfigError(
-                f"Theme '{self.prompt.theme}' not found. Available themes: {available}"
+            raise ConfigValidationError(
+                f"Theme '{self.prompt.theme}' not found.\n"
+                f"Available themes: {available}"
             )
         
         # Validate logging settings
         valid_levels = ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']
         if self.logging.level.upper() not in valid_levels:
-            raise ConfigError(f"Log level must be one of: {valid_levels}")
+            raise ConfigValidationError(
+                f"Invalid log level: {self.logging.level}\n"
+                f"Must be one of: {valid_levels}"
+            )
     
     def get_theme(self, theme_name: Optional[str] = None) -> ThemeConfig:
         """

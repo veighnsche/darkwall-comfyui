@@ -13,6 +13,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
+from .exceptions import NotificationError
+
 logger = logging.getLogger(__name__)
 
 
@@ -169,15 +171,27 @@ class NotificationSender:
             )
             
             if result.returncode != 0:
-                logger.warning(f"notify-send failed: {result.stderr.decode()}")
+                stderr = result.stderr.decode(errors='replace').strip()
+                logger.warning(f"notify-send failed with exit code {result.returncode}: {stderr}")
                 return False
             
             logger.debug(f"Notification sent: {title}")
             return True
             
-        except subprocess.TimeoutExpired:
-            logger.warning("notify-send timed out")
+        except subprocess.TimeoutExpired as e:
+            logger.warning(f"notify-send timed out after {e.timeout}s")
+            return False
+        except FileNotFoundError:
+            # This shouldn't happen since we check in __init__, but handle gracefully
+            logger.error("notify-send not found - notifications disabled")
+            self.config.enabled = False
+            return False
+        except PermissionError as e:
+            logger.warning(f"Permission denied executing notify-send: {e}")
+            return False
+        except OSError as e:
+            logger.warning(f"OS error sending notification: {e}")
             return False
         except Exception as e:
-            logger.warning(f"Failed to send notification: {e}")
+            logger.warning(f"Unexpected error sending notification: {type(e).__name__}: {e}")
             return False

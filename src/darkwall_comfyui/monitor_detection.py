@@ -14,7 +14,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional
 
-from .exceptions import ConfigError
+from .exceptions import (
+    MonitorDetectionError,
+    CompositorNotFoundError,
+    CompositorCommunicationError,
+    NoMonitorsDetectedError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -112,7 +117,7 @@ class MonitorDetector:
         if self._is_running("hyprland") or self._is_running("Hyprland"):
             return "hyprland"
         
-        raise ConfigError(
+        raise CompositorNotFoundError(
             "Could not detect monitors: No supported compositor running.\n"
             "Supported compositors: niri, sway, hyprland.\n"
             "Make sure your compositor is running before using darkwall."
@@ -148,23 +153,23 @@ class MonitorDetector:
             
             if result.returncode != 0:
                 error_msg = result.stderr.strip() or "Unknown error"
-                raise ConfigError(
+                raise CompositorCommunicationError(
                     f"Failed to detect monitors from niri: {error_msg}\n"
                     "Make sure niri is running and 'niri msg outputs' works."
                 )
             
             return self._parse_niri_output(result.stdout)
             
-        except subprocess.TimeoutExpired:
-            raise ConfigError(
-                "Timeout detecting monitors from niri.\n"
+        except subprocess.TimeoutExpired as e:
+            raise CompositorCommunicationError(
+                f"Timeout detecting monitors from niri after {e.timeout}s.\n"
                 "'niri msg outputs' took too long to respond."
-            )
-        except FileNotFoundError:
-            raise ConfigError(
+            ) from e
+        except FileNotFoundError as e:
+            raise CompositorNotFoundError(
                 "Could not find 'niri' command.\n"
                 "Make sure niri is installed and in PATH."
-            )
+            ) from e
     
     def _parse_niri_output(self, output: str) -> List[Monitor]:
         """
@@ -221,7 +226,7 @@ class MonitorDetector:
                 ))
         
         if not monitors:
-            raise ConfigError(
+            raise NoMonitorsDetectedError(
                 "No monitors detected from niri output.\n"
                 "Make sure at least one monitor is connected."
             )
@@ -244,23 +249,23 @@ class MonitorDetector:
             
             if result.returncode != 0:
                 error_msg = result.stderr.strip() or "Unknown error"
-                raise ConfigError(
+                raise CompositorCommunicationError(
                     f"Failed to detect monitors from sway: {error_msg}\n"
                     "Make sure sway is running and 'swaymsg -t get_outputs' works."
                 )
             
             return self._parse_sway_output(result.stdout)
             
-        except subprocess.TimeoutExpired:
-            raise ConfigError(
-                "Timeout detecting monitors from sway.\n"
+        except subprocess.TimeoutExpired as e:
+            raise CompositorCommunicationError(
+                f"Timeout detecting monitors from sway after {e.timeout}s.\n"
                 "'swaymsg -t get_outputs' took too long to respond."
-            )
-        except FileNotFoundError:
-            raise ConfigError(
+            ) from e
+        except FileNotFoundError as e:
+            raise CompositorNotFoundError(
                 "Could not find 'swaymsg' command.\n"
                 "Make sure sway is installed and in PATH."
-            )
+            ) from e
     
     def _parse_sway_output(self, output: str) -> List[Monitor]:
         """
@@ -286,7 +291,10 @@ class MonitorDetector:
         try:
             outputs = json.loads(output)
         except json.JSONDecodeError as e:
-            raise ConfigError(f"Failed to parse sway output: {e}")
+            raise CompositorCommunicationError(
+                f"Failed to parse sway JSON output: {e}\n"
+                "The compositor returned invalid JSON. This may indicate a version mismatch."
+            ) from e
         
         monitors = []
         for output_info in outputs:
@@ -313,7 +321,7 @@ class MonitorDetector:
             ))
         
         if not monitors:
-            raise ConfigError(
+            raise NoMonitorsDetectedError(
                 "No monitors detected from sway output.\n"
                 "Make sure at least one monitor is connected."
             )
@@ -336,23 +344,23 @@ class MonitorDetector:
             
             if result.returncode != 0:
                 error_msg = result.stderr.strip() or "Unknown error"
-                raise ConfigError(
+                raise CompositorCommunicationError(
                     f"Failed to detect monitors from hyprland: {error_msg}\n"
                     "Make sure hyprland is running and 'hyprctl monitors -j' works."
                 )
             
             return self._parse_hyprland_output(result.stdout)
             
-        except subprocess.TimeoutExpired:
-            raise ConfigError(
-                "Timeout detecting monitors from hyprland.\n"
+        except subprocess.TimeoutExpired as e:
+            raise CompositorCommunicationError(
+                f"Timeout detecting monitors from hyprland after {e.timeout}s.\n"
                 "'hyprctl monitors -j' took too long to respond."
-            )
-        except FileNotFoundError:
-            raise ConfigError(
+            ) from e
+        except FileNotFoundError as e:
+            raise CompositorNotFoundError(
                 "Could not find 'hyprctl' command.\n"
                 "Make sure hyprland is installed and in PATH."
-            )
+            ) from e
     
     def _parse_hyprland_output(self, output: str) -> List[Monitor]:
         """
@@ -374,7 +382,10 @@ class MonitorDetector:
         try:
             monitors_data = json.loads(output)
         except json.JSONDecodeError as e:
-            raise ConfigError(f"Failed to parse hyprland output: {e}")
+            raise CompositorCommunicationError(
+                f"Failed to parse hyprland JSON output: {e}\n"
+                "The compositor returned invalid JSON. This may indicate a version mismatch."
+            ) from e
         
         monitors = []
         for monitor_info in monitors_data:
@@ -395,7 +406,7 @@ class MonitorDetector:
             ))
         
         if not monitors:
-            raise ConfigError(
+            raise NoMonitorsDetectedError(
                 "No monitors detected from hyprland output.\n"
                 "Make sure at least one monitor is connected."
             )

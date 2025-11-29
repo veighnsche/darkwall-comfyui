@@ -21,7 +21,7 @@ from typing import List, Dict, Tuple, Optional
 from dataclasses import dataclass
 
 from .config import PromptConfig, Config, ThemeConfig
-from .exceptions import PromptError
+from .exceptions import PromptError, TemplateNotFoundError, AtomFileError, TemplateParseError
 
 
 @dataclass
@@ -124,10 +124,23 @@ class PromptGenerator:
                             continue
                 
                 self.logger.debug(f"Loaded {len(atoms)} atoms from {atom_file}")
-            except (OSError, UnicodeDecodeError) as e:
-                raise PromptError(f"Failed to load atom file {atom_file}: {e}")
+            except UnicodeDecodeError as e:
+                raise AtomFileError(
+                    f"Invalid encoding in atom file {atom_file}: {e}\n"
+                    "Atom files must be UTF-8 encoded."
+                ) from e
+            except PermissionError as e:
+                raise AtomFileError(
+                    f"Permission denied reading atom file {atom_file}: {e}"
+                ) from e
+            except OSError as e:
+                raise AtomFileError(
+                    f"Failed to read atom file {atom_file}: {e}"
+                ) from e
             except Exception as e:
-                raise PromptError(f"Unexpected error loading atom file {atom_file}: {e}")
+                raise AtomFileError(
+                    f"Unexpected error loading atom file {atom_file}: {type(e).__name__}: {e}"
+                ) from e
         else:
             self.logger.warning(f"Atom file not found: {atom_file}")
         
@@ -293,24 +306,46 @@ class PromptGenerator:
         template_file = self._prompts_dir / template_path
         
         if not template_file.exists():
-            raise PromptError(
+            raise TemplateNotFoundError(
                 f"Template not found: {template_file}\n"
-                f"Create a .prompt file in {self._prompts_dir}/ or run 'darkwall init'"
+                f"Create a .prompt file in {self._prompts_dir}/ or run 'darkwall init'\n"
+                f"Available templates can be listed with 'darkwall prompt list'"
             )
         
         if not template_file.is_file():
-            raise PromptError(f"Template path is not a file: {template_file}")
+            raise TemplateNotFoundError(
+                f"Template path is not a file: {template_file}\n"
+                "Check that the path points to a .prompt file, not a directory."
+            )
         
         try:
             content = template_file.read_text(encoding='utf-8')
             if not content.strip():
-                raise PromptError(f"Template file is empty: {template_file}")
+                raise TemplateParseError(
+                    f"Template file is empty: {template_file}\n"
+                    "Templates must contain at least a positive prompt section."
+                )
             self.logger.debug(f"Loaded template: {template_file}")
             return content
-        except (OSError, UnicodeDecodeError) as e:
-            raise PromptError(f"Failed to load template {template_file}: {e}")
+        except UnicodeDecodeError as e:
+            raise TemplateParseError(
+                f"Invalid encoding in template {template_file}: {e}\n"
+                "Template files must be UTF-8 encoded."
+            ) from e
+        except PermissionError as e:
+            raise TemplateNotFoundError(
+                f"Permission denied reading template {template_file}: {e}"
+            ) from e
+        except OSError as e:
+            raise TemplateNotFoundError(
+                f"Failed to read template {template_file}: {e}"
+            ) from e
+        except PromptError:
+            raise
         except Exception as e:
-            raise PromptError(f"Unexpected error loading template {template_file}: {e}")
+            raise PromptError(
+                f"Unexpected error loading template {template_file}: {type(e).__name__}: {e}"
+            ) from e
     
     
     def _parse_template_sections(self, template: str) -> Tuple[str, str]:
@@ -395,7 +430,10 @@ class PromptGenerator:
             
             # Validate
             if not positive or len(positive.strip()) < 10:
-                raise PromptError(f"Generated prompt too short: {len(positive)} chars")
+                raise TemplateParseError(
+                    f"Generated prompt too short ({len(positive)} chars).\n"
+                    "Check that your template contains valid content and wildcards resolve correctly."
+                )
             
             self.logger.info(f"Generated prompt: {positive[:80]}...")
             if negative:

@@ -17,7 +17,7 @@ from typing import Optional, List, Tuple
 from astral import LocationInfo
 from astral.sun import sun
 
-from .exceptions import ConfigError
+from .exceptions import ScheduleError, SolarCalculationError
 
 logger = logging.getLogger(__name__)
 
@@ -134,9 +134,22 @@ class ThemeScheduler:
             sunset = s["sunset"].time()
             logger.debug(f"Solar times for {for_date}: sunrise={sunrise}, sunset={sunset}")
             return sunrise, sunset
+        except ValueError as e:
+            # Astral raises ValueError for polar regions where sun doesn't rise/set
+            raise SolarCalculationError(
+                f"Cannot calculate solar times for {for_date} at coordinates "
+                f"({self._location.latitude}, {self._location.longitude}): {e}\n"
+                "This may occur at extreme latitudes during polar day/night."
+            ) from e
+        except KeyError as e:
+            raise SolarCalculationError(
+                f"Solar calculation returned incomplete data for {for_date}: missing {e}"
+            ) from e
         except Exception as e:
             logger.error(f"Failed to calculate solar times: {e}")
-            raise ConfigError(f"Solar calculation failed: {e}")
+            raise SolarCalculationError(
+                f"Unexpected error calculating solar times for {for_date}: {e}"
+            ) from e
     
     def _is_night_time(self, current: time, night_start: time, night_end: time) -> bool:
         """

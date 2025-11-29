@@ -19,8 +19,15 @@ from urllib3.util.retry import Retry
 import websocket
 
 from ..config import Config, ComfyUIConfig
-from ..exceptions import GenerationError, WorkflowError
+from ..exceptions import (
+    WorkflowError,
+    ComfyClientError,
+    ComfyConnectionError,
+    ComfyTimeoutError,
+    ComfyGenerationError,
+)
 from ..prompt_generator import PromptResult
+
 
 @dataclass
 class GenerationResult:
@@ -28,26 +35,6 @@ class GenerationResult:
     prompt_id: str
     filename: str
     image_data: bytes
-
-
-class ComfyClientError(GenerationError):
-    """Base exception for ComfyUI client errors."""
-    pass
-
-
-class ComfyConnectionError(ComfyClientError):
-    """Failed to connect to ComfyUI."""
-    pass
-
-
-class ComfyTimeoutError(ComfyClientError):
-    """Generation timed out."""
-    pass
-
-
-class ComfyGenerationError(ComfyClientError):
-    """Generation failed."""
-    pass
 
 
 class ComfyClient:

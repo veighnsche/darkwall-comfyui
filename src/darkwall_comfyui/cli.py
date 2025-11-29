@@ -19,6 +19,20 @@ import sys
 from pathlib import Path
 
 from .config import Config
+from .exceptions import (
+    DarkWallError,
+    ConfigError,
+    ConfigValidationError,
+    ConfigMigrationError,
+    WorkflowError,
+    GenerationError,
+    ComfyConnectionError,
+    ComfyTimeoutError,
+    PromptError,
+    MonitorDetectionError,
+    CompositorNotFoundError,
+    ScheduleError,
+)
 from .commands import (
     generate_once,
     generate_all,
@@ -166,6 +180,8 @@ def main() -> int:
     
     args = parser.parse_args()
     
+    logger = logging.getLogger(__name__)
+    
     try:
         # Load config
         config = Config.load(
@@ -224,14 +240,79 @@ def main() -> int:
             return 1
         
         return 0
-        
+    
+    # Handle specific error types with appropriate exit codes and messages
     except KeyboardInterrupt:
-        print("\nCancelled", file=sys.stderr)
+        print("\nCancelled by user", file=sys.stderr)
         return 130
-    except Exception as e:
-        logging.getLogger(__name__).error(str(e))
+    
+    except ConfigMigrationError as e:
+        # Config needs migration - show clear instructions
+        print(f"\n❌ Configuration Migration Required\n", file=sys.stderr)
+        print(str(e), file=sys.stderr)
+        return 78  # EX_CONFIG
+    
+    except ConfigValidationError as e:
+        print(f"\n❌ Configuration Validation Error: {e}", file=sys.stderr)
+        print("\nRun 'darkwall validate' for detailed diagnostics.", file=sys.stderr)
+        return 78  # EX_CONFIG
+    
+    except ConfigError as e:
+        print(f"\n❌ Configuration Error: {e}", file=sys.stderr)
+        return 78  # EX_CONFIG
+    
+    except CompositorNotFoundError as e:
+        print(f"\n❌ Compositor Not Found\n", file=sys.stderr)
+        print(str(e), file=sys.stderr)
+        print("\nMake sure your Wayland compositor is running.", file=sys.stderr)
+        return 69  # EX_UNAVAILABLE
+    
+    except MonitorDetectionError as e:
+        print(f"\n❌ Monitor Detection Failed: {e}", file=sys.stderr)
+        return 69  # EX_UNAVAILABLE
+    
+    except ComfyConnectionError as e:
+        print(f"\n❌ Cannot Connect to ComfyUI\n", file=sys.stderr)
+        print(str(e), file=sys.stderr)
+        print("\nCheck that ComfyUI is running and the URL in config.toml is correct.", file=sys.stderr)
+        return 69  # EX_UNAVAILABLE
+    
+    except ComfyTimeoutError as e:
+        print(f"\n❌ ComfyUI Timeout: {e}", file=sys.stderr)
+        print("\nGeneration took too long. Try increasing timeout in config.toml.", file=sys.stderr)
+        return 75  # EX_TEMPFAIL
+    
+    except WorkflowError as e:
+        print(f"\n❌ Workflow Error: {e}", file=sys.stderr)
+        return 66  # EX_NOINPUT
+    
+    except PromptError as e:
+        print(f"\n❌ Prompt Error: {e}", file=sys.stderr)
+        return 66  # EX_NOINPUT
+    
+    except GenerationError as e:
+        print(f"\n❌ Generation Failed: {e}", file=sys.stderr)
+        return 70  # EX_SOFTWARE
+    
+    except ScheduleError as e:
+        print(f"\n❌ Schedule Error: {e}", file=sys.stderr)
+        return 78  # EX_CONFIG
+    
+    except DarkWallError as e:
+        # Catch-all for any other DarkWall errors
+        print(f"\n❌ Error: {e}", file=sys.stderr)
+        logger.error(str(e))
         if args.verbose:
             raise
+        return 1
+    
+    except Exception as e:
+        # Unexpected errors - show full traceback in verbose mode
+        print(f"\n❌ Unexpected Error: {type(e).__name__}: {e}", file=sys.stderr)
+        logger.error(f"Unexpected error: {type(e).__name__}: {e}")
+        if args.verbose:
+            raise
+        print("\nRun with -v/--verbose for full traceback.", file=sys.stderr)
         return 1
 
 
