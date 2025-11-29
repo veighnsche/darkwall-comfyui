@@ -1,0 +1,50 @@
+# Light Theme Compositions
+# ========================
+
+# Landscape Orientations
+16:9 widescreen panorama
+ultrawide cinematic ratio
+standard landscape format
+golden ratio rectangle
+square crop centered
+vertical portrait tall
+2:1 panoramic sweep
+3:2 classic photo ratio
+4:3 traditional frame
+21:9 ultrawide cinema
+
+# Framing Techniques
+lots of negative space for icons
+clean uncluttered composition
+subject in lower third
+horizon on upper third
+centered symmetrical balance
+off-center dynamic placement
+frame within natural frame
+leading lines to subject
+foreground interest depth
+background blur separation
+
+# Spatial Arrangements
+open sky dominant
+expansive landscape view
+intimate detail focus
+environmental wide shot
+establishing scene setter
+medium distance balance
+close-up texture detail
+aerial bird's eye view
+ground level perspective
+eye level natural view
+
+# Desktop Optimization
+icon-friendly left side
+clean right edge space
+balanced visual weight
+non-distracting background
+subtle texture interest
+gradient sky area
+solid color regions
+natural vignette edges
+soft corner transitions
+harmonious overall balance

@@ -120,8 +120,51 @@ def main() -> int:
     prompt_parser = subparsers.add_parser("prompt", help="Manage prompt templates")
     prompt_subparsers = prompt_parser.add_subparsers(dest="prompt_command", help="Prompt commands")
     
-    # Prompt preview
-    preview_parser = prompt_subparsers.add_parser("preview", help="Preview prompt template")
+    # Prompt generate - clean output for copy-paste
+    generate_prompt_parser = prompt_subparsers.add_parser(
+        "generate",
+        help="Generate a prompt ready to copy-paste into ComfyUI"
+    )
+    generate_prompt_parser.add_argument(
+        "-t", "--template",
+        help="Template file to use (default: default.prompt)",
+        default=None
+    )
+    generate_prompt_parser.add_argument(
+        "-T", "--theme",
+        help="Theme to use (light/dark, default: from schedule)",
+        default=None
+    )
+    generate_prompt_parser.add_argument(
+        "-s", "--seed",
+        type=int,
+        help="Specific seed (default: time-based)",
+        default=None
+    )
+    generate_prompt_parser.add_argument(
+        "-m", "--monitor",
+        type=int,
+        help="Monitor index for seed variation (default: 0)",
+        default=0
+    )
+    generate_prompt_parser.add_argument(
+        "--raw",
+        action="store_true",
+        help="Output raw prompts only (no formatting)"
+    )
+    generate_prompt_parser.add_argument(
+        "--positive-only",
+        action="store_true",
+        help="Output only the positive prompt"
+    )
+    generate_prompt_parser.add_argument(
+        "--negative-only",
+        action="store_true",
+        help="Output only the negative prompt"
+    )
+    
+    # Prompt preview (legacy)
+    preview_parser = prompt_subparsers.add_parser("preview", help="Preview prompt with metadata")
     preview_parser.add_argument(
         "--template",
         help="Template file to preview (default: default.prompt)",
@@ -146,6 +189,11 @@ def main() -> int:
         "--atoms",
         action="store_true",
         help="List atom files instead of templates"
+    )
+    list_parser.add_argument(
+        "-T", "--theme",
+        help="Theme to list templates/atoms for",
+        default=None
     )
     
     # Add gallery subcommand with its own subparsers
@@ -183,23 +231,41 @@ def main() -> int:
     logger = logging.getLogger(__name__)
     
     try:
-        # Load config
-        config = Config.load(
-            config_file=args.config,
-            initialize=not args.no_init
-        )
+        # Dispatch command
+        command = args.command or "generate"
+        
+        # For prompt generate, try to load config but don't fail if it errors
+        # This allows generating prompts even with broken/migrating config
+        config = None
+        config_error = None
+        
+        try:
+            config = Config.load(
+                config_file=args.config,
+                initialize=not args.no_init
+            )
+        except (ConfigError, ConfigMigrationError, ConfigValidationError, TypeError) as e:
+            config_error = e
+            # For prompt generate, we can continue without config
+            if command == "prompt" and getattr(args, 'prompt_command', None) == "generate":
+                logger.warning(f"Config load failed, using defaults: {e}")
+            else:
+                raise  # Re-raise for other commands
         
         # Setup logging
-        level = "DEBUG" if args.verbose else config.logging.level
+        if config:
+            level = "DEBUG" if args.verbose else config.logging.level
+        else:
+            level = "DEBUG" if args.verbose else "INFO"
         setup_logging(level)
         
         # Handle config validation flag
         if args.validate_config:
+            if config is None:
+                print(f"❌ Cannot validate - config failed to load: {config_error}", file=sys.stderr)
+                return 78
             validate_config(config)
             return 0
-        
-        # Dispatch command
-        command = args.command or "generate"
         
         if command == "generate":
             generate_once(config, dry_run=args.dry_run, workflow_path=args.workflow, template_path=args.template)

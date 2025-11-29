@@ -1,0 +1,50 @@
+# Light Theme Color Palettes
+# ==========================
+
+# Warm Palettes
+golden yellow and cream
+sunset orange and peach
+coral pink and salmon
+terracotta and sand
+amber and honey gold
+apricot and cantaloupe
+warm beige and ivory
+champagne and gold
+rose gold and blush
+burnt sienna and ochre
+
+# Cool Palettes
+sky blue and white
+turquoise and aqua
+mint green and seafoam
+lavender and periwinkle
+powder blue and silver
+teal and cyan
+sage green and eucalyptus
+ice blue and pearl
+lilac and wisteria
+cerulean and cloud white
+
+# Nature Palettes
+forest green and moss
+ocean blue and sand
+sunset gradient warm
+spring meadow greens
+autumn harvest oranges
+tropical vibrant mix
+desert earth tones
+mountain grey and blue
+coastal aqua and coral
+garden flower rainbow
+
+# Pastel Palettes
+soft pastel rainbow
+muted earth pastels
+dusty rose and sage
+butter yellow and cream
+baby blue and white
+blush pink and grey
+mint and coral combo
+peach and lavender
+soft yellow and green
+pale pink and gold

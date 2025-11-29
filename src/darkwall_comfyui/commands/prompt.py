@@ -20,10 +20,53 @@ def add_parser(subparsers) -> argparse.ArgumentParser:
     
     prompt_subparsers = parser.add_subparsers(dest="prompt_command", help="Prompt commands")
     
-    # Preview command
+    # Generate command - clean output for copy-paste
+    generate_parser = prompt_subparsers.add_parser(
+        "generate",
+        help="Generate a prompt ready to copy-paste into ComfyUI"
+    )
+    generate_parser.add_argument(
+        "-t", "--template",
+        help="Template file to use (default: default.prompt)",
+        default=None
+    )
+    generate_parser.add_argument(
+        "-T", "--theme",
+        help="Theme to use (light/dark, default: from schedule or config)",
+        default=None
+    )
+    generate_parser.add_argument(
+        "-s", "--seed",
+        type=int,
+        help="Specific seed (default: time-based)",
+        default=None
+    )
+    generate_parser.add_argument(
+        "-m", "--monitor",
+        type=int,
+        help="Monitor index for seed variation (default: 0)",
+        default=0
+    )
+    generate_parser.add_argument(
+        "--raw",
+        action="store_true",
+        help="Output raw prompts only (no formatting, for scripting)"
+    )
+    generate_parser.add_argument(
+        "--positive-only",
+        action="store_true",
+        help="Output only the positive prompt"
+    )
+    generate_parser.add_argument(
+        "--negative-only",
+        action="store_true",
+        help="Output only the negative prompt"
+    )
+    
+    # Preview command (legacy, same as generate but with more info)
     preview_parser = prompt_subparsers.add_parser(
         "preview",
-        help="Preview prompt template without generating wallpaper"
+        help="Preview prompt template with metadata"
     )
     preview_parser.add_argument(
         "--template",
@@ -53,12 +96,136 @@ def add_parser(subparsers) -> argparse.ArgumentParser:
         action="store_true",
         help="List atom files instead of templates"
     )
+    list_parser.add_argument(
+        "-T", "--theme",
+        help="Theme to list templates/atoms for (default: current)",
+        default=None
+    )
     
     return parser
 
 
+def handle_generate_command(args, config: Optional[Config]) -> None:
+    """
+    Handle prompt generate command.
+    
+    Outputs clean, copy-paste ready prompts for ComfyUI.
+    Works even without a full config - just needs theme files.
+    """
+    logger = logging.getLogger(__name__)
+    
+    try:
+        from ..config import ThemeConfig, PromptConfig, Config as ConfigClass
+        
+        # Get config directory
+        config_dir = ConfigClass.get_config_dir()
+        
+        # Determine theme
+        theme_name = args.theme
+        if theme_name is None:
+            # Try to get from schedule if config available
+            if config and hasattr(config, 'schedule') and config.schedule:
+                try:
+                    from ..schedule import ThemeScheduler
+                    scheduler = ThemeScheduler(config.schedule)
+                    theme_result = scheduler.get_current_theme()
+                    theme_name = theme_result.theme
+                except Exception:
+                    pass
+            
+            # Fall back to config default or 'dark'
+            if theme_name is None:
+                if config and hasattr(config, 'prompt'):
+                    theme_name = getattr(config.prompt, 'theme', 'dark')
+                else:
+                    theme_name = 'dark'
+        
+        # Get theme config - try config.themes first, then create default
+        theme_config = None
+        if config and hasattr(config, 'themes') and config.themes and theme_name in config.themes:
+            theme_config = config.themes[theme_name]
+        else:
+            # Create theme config directly from theme name
+            theme_config = ThemeConfig(
+                name=theme_name,
+                atoms_dir="atoms",
+                prompts_dir="prompts",
+                default_template="default.prompt"
+            )
+        
+        # Get template name
+        template_name = args.template or theme_config.default_template
+        
+        # Create prompt config (use from config if available, else defaults)
+        prompt_config = config.prompt if config else PromptConfig()
+        
+        # Get theme paths
+        atoms_dir = theme_config.get_atoms_path(config_dir)
+        prompts_dir = theme_config.get_prompts_path(config_dir)
+        
+        # Create prompt generator with theme paths
+        prompt_gen = PromptGenerator(prompt_config, config_dir, atoms_dir=atoms_dir, prompts_dir=prompts_dir)
+        
+        # Generate seed
+        if args.seed is not None:
+            seed = args.seed
+        else:
+            seed = prompt_gen.get_time_slot_seed(monitor_index=args.monitor)
+        
+        # Generate prompt pair
+        result = prompt_gen.generate_prompt_pair(
+            monitor_index=args.monitor,
+            template_path=template_name,
+            seed=seed
+        )
+        
+        # Output based on flags
+        if args.raw:
+            # Raw output for scripting
+            if args.positive_only:
+                print(result.positive)
+            elif args.negative_only:
+                print(result.negative)
+            else:
+                print(result.positive)
+                print("---")
+                print(result.negative)
+        else:
+            # Formatted output for humans
+            if args.positive_only:
+                print(result.positive)
+            elif args.negative_only:
+                print(result.negative)
+            else:
+                print()
+                print("=" * 60)
+                print("POSITIVE PROMPT (copy this):")
+                print("=" * 60)
+                print()
+                print(result.positive)
+                print()
+                print("=" * 60)
+                print("NEGATIVE PROMPT (copy this):")
+                print("=" * 60)
+                print()
+                print(result.negative)
+                print()
+                print("-" * 60)
+                print(f"Theme: {theme_name} | Template: {template_name} | Seed: {seed}")
+                print("-" * 60)
+        
+    except PromptError as e:
+        logger.error(f"Prompt error: {e}")
+        print(f"❌ Error: {e}", file=__import__('sys').stderr)
+        raise SystemExit(1)
+    except Exception as e:
+        logger.error(f"Unexpected error: {e}")
+        print(f"❌ Unexpected error: {e}", file=__import__('sys').stderr)
+        raise SystemExit(1)
+
+
 def handle_preview_command(args, config: Config) -> None:
-    """Handle prompt preview command."""
+    """Handle prompt preview command (legacy, with metadata)."""
     logger = logging.getLogger(__name__)
     
     try:
@@ -134,9 +301,19 @@ def handle_list_command(args, config: Config) -> None:
 
 def execute(args, config: Config) -> None:
     """Execute prompt command."""
-    if args.prompt_command == "preview":
+    if args.prompt_command == "generate":
+        handle_generate_command(args, config)
+    elif args.prompt_command == "preview":
         handle_preview_command(args, config)
     elif args.prompt_command == "list":
         handle_list_command(args, config)
     else:
-        print("❌ No prompt command specified. Use 'darkwall prompt --help' for usage.")
+        # Default to generate if no subcommand specified
+        print("Usage: darkwall prompt <command>")
+        print()
+        print("Commands:")
+        print("  generate  Generate a prompt ready to copy-paste into ComfyUI")
+        print("  preview   Preview prompt template with metadata")
+        print("  list      List available templates and atom files")
+        print()
+        print("Run 'darkwall prompt generate --help' for more options.")

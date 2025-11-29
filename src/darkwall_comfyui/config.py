@@ -670,7 +670,14 @@ class Config:
     
     @classmethod
     def get_config_dir(cls) -> Path:
-        """Get user configuration directory."""
+        """
+        Get user configuration directory.
+        
+        Uses XDG_CONFIG_HOME if set, otherwise defaults to ~/.config.
+        """
+        xdg_config = os.environ.get("XDG_CONFIG_HOME")
+        if xdg_config:
+            return Path(xdg_config) / "darkwall-comfyui"
         return Path.home() / ".config" / "darkwall-comfyui"
     
     @classmethod

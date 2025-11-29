@@ -1,0 +1,50 @@
+# Light Theme Moods
+# =================
+
+# Positive Emotions
+joyful and uplifting
+peaceful and serene
+hopeful and optimistic
+refreshing and invigorating
+calming and tranquil
+inspiring and motivating
+cheerful and bright
+content and satisfied
+blissful and happy
+harmonious and balanced
+
+# Nature Feelings
+fresh and natural
+organic and earthy
+wild and free
+pristine and untouched
+lush and verdant
+blooming and flourishing
+vibrant and alive
+seasonal and cyclical
+timeless and eternal
+majestic and grand
+
+# Atmospheric Moods
+airy and light
+warm and inviting
+crisp and clear
+soft and gentle
+breezy and carefree
+sunny and radiant
+glowing and luminous
+sparkling and shimmering
+misty and dreamy
+ethereal and magical
+
+# Experiential Feelings
+wanderlust adventure
+vacation relaxation
+meditation stillness
+celebration joy
+discovery wonder
+nostalgia warmth
+gratitude appreciation
+mindfulness presence
+freedom liberation
+connection unity

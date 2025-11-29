@@ -1,0 +1,50 @@
+# Light Theme Lighting
+# ====================
+
+# Natural Light
+warm golden sunlight
+soft diffused daylight
+bright natural illumination
+gentle morning glow
+rich afternoon warmth
+crisp clear lighting
+sun-dappled shadows
+backlit silhouettes
+rim lighting from sun
+reflected light from water
+
+# Color Temperature
+warm amber tones
+golden hour warmth
+soft peachy highlights
+honey-colored light
+champagne gold glow
+rose gold accents
+warm white balance
+sunny yellow cast
+apricot sunset tones
+coral pink highlights
+
+# Quality & Direction
+soft overhead light
+side lighting with shadows
+three-point natural lighting
+bounced fill light
+key light from sun
+ambient daylight fill
+directional sunbeams
+scattered cloud light
+window light quality
+open shade softness
+
+# Special Effects
+lens flare accents
+light rays through clouds
+prismatic rainbow effects
+bokeh from bright spots
+sun stars from aperture
+light painting natural
+caustics on water
+god rays through trees
+halo around sun
+aureole lighting

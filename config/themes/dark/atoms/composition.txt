@@ -1,0 +1,50 @@
+# Dark Theme Compositions
+# =======================
+
+# Cinematic Ratios
+2.39:1 anamorphic widescreen
+16:9 cinematic standard
+21:9 ultrawide noir
+1.85:1 theatrical ratio
+2:1 univisium format
+cinemascope letterbox
+IMAX tall format
+vertical poster composition
+square album art
+panoramic night vista
+
+# Dramatic Framing
+deep shadows framing subject
+silhouette against light source
+dutch angle tension
+extreme low angle power
+high angle vulnerability
+over shoulder mystery
+point of view immersive
+reflection composition
+split lighting half face
+negative space isolation
+
+# Dark Aesthetics
+vignette dark edges
+spotlight center focus
+gradient dark to light
+layered shadow depth
+foreground shadow frame
+background glow contrast
+rim light separation
+pool of light island
+scattered light points
+beam cutting darkness
+
+# Desktop Optimization
+dark icon-friendly areas
+high contrast focal point
+balanced dark composition
+subtle texture in shadows
+gradient sky for icons
+clean dark regions
+atmospheric depth layers
+non-distracting darkness
+elegant shadow play
+sophisticated dark balance

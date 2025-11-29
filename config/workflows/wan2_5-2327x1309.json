@@ -1,0 +1,89 @@
+{
+  "_comment": "TODO: Configure Wan 2.5 model - optimized for light/bright scenes",
+  "60": {
+    "inputs": {
+      "filename_prefix": "wan2_5-2327x1309",
+      "images": ["75:8", 0]
+    },
+    "class_type": "SaveImage",
+    "_meta": { "title": "Save Image" }
+  },
+  "83": {
+    "inputs": { "seed": -1 },
+    "class_type": "Seed (rgthree)",
+    "_meta": { "title": "Seed (rgthree)" }
+  },
+  "75:58": {
+    "inputs": {
+      "width": 2327,
+      "height": 1309,
+      "batch_size": 1
+    },
+    "class_type": "EmptySD3LatentImage",
+    "_meta": { "title": "EmptySD3LatentImage" }
+  },
+  "75:7": {
+    "inputs": {
+      "text": "__NEGATIVE_PROMPT__",
+      "clip": ["75:38", 0]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": { "title": "CLIP Text Encode (Negative Prompt)" }
+  },
+  "75:8": {
+    "inputs": {
+      "samples": ["75:3", 0],
+      "vae": ["75:39", 0]
+    },
+    "class_type": "VAEDecode",
+    "_meta": { "title": "VAE Decode" }
+  },
+  "75:37": {
+    "inputs": {
+      "unet_name": "wan2.5_TODO.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": { "title": "Load Diffusion Model - TODO: Update model name" }
+  },
+  "75:6": {
+    "inputs": {
+      "text": "__POSITIVE_PROMPT__",
+      "clip": ["75:38", 0]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": { "title": "CLIP Text Encode (Positive Prompt)" }
+  },
+  "75:38": {
+    "inputs": {
+      "clip_name": "wan2.5_clip_TODO.safetensors",
+      "type": "sd3",
+      "device": "default"
+    },
+    "class_type": "CLIPLoader",
+    "_meta": { "title": "Load CLIP - TODO: Update clip name" }
+  },
+  "75:39": {
+    "inputs": {
+      "vae_name": "wan2.5_vae_TODO.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": { "title": "Load VAE - TODO: Update vae name" }
+  },
+  "75:3": {
+    "inputs": {
+      "seed": ["83", 0],
+      "steps": 20,
+      "cfg": 7,
+      "sampler_name": "euler",
+      "scheduler": "normal",
+      "denoise": 1,
+      "model": ["75:37", 0],
+      "positive": ["75:6", 0],
+      "negative": ["75:7", 0],
+      "latent_image": ["75:58", 0]
+    },
+    "class_type": "KSampler",
+    "_meta": { "title": "KSampler" }
+  }
+}

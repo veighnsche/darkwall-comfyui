@@ -1,0 +1,50 @@
+# Dark Theme Color Palettes
+# =========================
+
+# Cyberpunk Neons
+neon pink and cyan
+electric blue and magenta
+hot pink and purple
+lime green and black
+orange and teal neon
+red and blue police
+yellow caution and black
+white and UV purple
+rainbow neon spectrum
+holographic iridescent
+
+# Dark Natural
+deep ocean blue black
+midnight purple blue
+forest shadow green
+volcanic red orange
+storm grey charcoal
+blood moon crimson
+aurora green purple
+starfield blue white
+eclipse gold black
+bioluminescent cyan
+
+# Gothic & Dark
+blood red and black
+purple and silver
+emerald and onyx
+gold and obsidian
+crimson and charcoal
+violet and grey
+burgundy and black
+bronze and shadow
+copper and darkness
+pearl and void
+
+# Moody Atmospherics
+smoky grey gradient
+foggy blue grey
+dusty purple haze
+murky green depths
+ashen grey tones
+bruised purple blue
+rust and decay
+tarnished metal
+weathered dark
+aged patina

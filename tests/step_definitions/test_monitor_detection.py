@@ -13,7 +13,12 @@ from unittest.mock import patch, MagicMock
 import subprocess
 
 from darkwall_comfyui.monitor_detection import MonitorDetector
-from darkwall_comfyui.exceptions import ConfigError
+from darkwall_comfyui.exceptions import (
+    MonitorDetectionError,
+    CompositorNotFoundError,
+    CompositorCommunicationError,
+    NoMonitorsDetectedError,
+)
 
 # Load all scenarios from the feature file
 scenarios("../features/monitor_detection.feature")
@@ -270,7 +275,7 @@ def when_attempt_detection(compositor_context):
         else:
             detector.detect()
             
-    except ConfigError as e:
+    except MonitorDetectionError as e:
         compositor_context["error"] = e
 
 

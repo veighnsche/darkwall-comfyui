@@ -1,62 +1,123 @@
 # DarkWall ComfyUI Configuration
+# ================================
+# Light mode during day, dark mode at night with solar-based scheduling
 
 [comfyui]
-# Base URL of your ComfyUI instance
 base_url = "http://192.168.178.29:8188"
-
-# Path to your ComfyUI workflow exported in API format
-workflow_path = "workflows/qwen_t2i.json"
-
-# Generation timeout in seconds
 timeout = 300
-
-# Polling interval in seconds for checking generation status
 poll_interval = 5
 
-# Optional custom headers (e.g., for authentication)
-# headers = { "Authorization" = "Bearer your-token" }
+# ============================================================================
+# Per-Monitor Configuration (REQ-MONITOR-003)
+# ============================================================================
+# Each monitor uses compositor output name as identifier
 
-[monitors]
-# Number of monitors to manage wallpapers for
-count = 3
-
-# Output paths for each monitor (0-indexed)
-# Use {index} placeholder for monitor number, or specify explicit paths
-# Examples:
-# pattern = "~/Pictures/wallpapers/monitor_{index}.png"
-# or explicit:
-# paths = ["~/Pictures/wallpapers/monitor_0.png", "~/Pictures/wallpapers/monitor_1.png", "~/Pictures/wallpapers/monitor_2.png"]
-pattern = "~/Pictures/wallpapers/monitor_{index}.png"
-
-# Wallpaper setting command for your desktop environment
-# Supported: swaybg, swww, feh, nitrogen, or custom
-# For custom: command = "custom:/path/to/script --monitor {index} --image {path}"
+[monitors.DP-1]
+# Primary monitor - 2560x1440 scaled to 2327x1309
+workflow = "z-image-turbo-2327x1309"
+output = "~/Pictures/wallpapers/monitor_DP-1.png"
 command = "swaybg"
 
-# Backup directory pattern
-backup_pattern = "~/Pictures/wallpapers/backups/monitor_{index}_{timestamp}.png"
+[monitors.HDMI-A-1]
+# Secondary monitor - 2560x1440 scaled to 2327x1309
+workflow = "z-image-turbo-2327x1309"
+output = "~/Pictures/wallpapers/monitor_HDMI-A-1.png"
+command = "swaybg"
+
+[monitors.HDMI-A-2]
+# Third monitor - 1920x1080
+workflow = "z-image-turbo-1920x1080"
+output = "~/Pictures/wallpapers/monitor_HDMI-A-2.png"
+command = "swaybg"
+
+# ============================================================================
+# Workflow Definitions (REQ-WORKFLOW-002)
+# ============================================================================
+# Each workflow can restrict which prompts it uses
+
+[workflows.z-image-turbo-2327x1309]
+# Fast turbo model - works with both light and dark themes
+prompts = ["*"]  # All prompts
+
+[workflows.z-image-turbo-1920x1080]
+prompts = ["*"]
+
+[workflows.wan2_5-2327x1309]
+# Wan 2.5 model - light theme only (better for bright scenes)
+prompts = ["landscape", "nature", "abstract", "minimal"]
+
+[workflows.wan2_5-1920x1080]
+prompts = ["landscape", "nature", "abstract", "minimal"]
+
+[workflows.uncannyvalley-2327x1309]
+# Uncanny Valley model - dark theme only (better for moody scenes)
+prompts = ["cinematic", "cyberpunk", "noir", "artistic_*"]
+
+[workflows.uncannyvalley-1920x1080]
+prompts = ["cinematic", "cyberpunk", "noir", "artistic_*"]
+
+# ============================================================================
+# Theme Definitions
+# ============================================================================
+
+[themes.light]
+# Daytime theme - bright, cheerful wallpapers
+atoms_dir = "atoms"
+prompts_dir = "prompts"
+default_template = "default.prompt"
+
+[themes.dark]
+# Nighttime theme - dark, moody wallpapers
+atoms_dir = "atoms"
+prompts_dir = "prompts"
+default_template = "default.prompt"
+
+# ============================================================================
+# Solar-Based Schedule (REQ-SCHED-002)
+# ============================================================================
+
+[schedule]
+# Location for solar calculations (Netherlands)
+latitude = 52.3676
+longitude = 4.9041
+timezone = "Europe/Amsterdam"
+
+# Theme assignments
+day_theme = "light"
+night_theme = "dark"
+
+# Blend duration for smooth transitions (minutes)
+blend_duration_minutes = 30
+
+# ============================================================================
+# Output Settings
+# ============================================================================
 
 [output]
-# Create backup of previous wallpaper before overwriting
 create_backup = true
 
 [prompt]
-# Time slot duration in minutes for deterministic prompt generation
-# 30 = 48 unique prompts per day, 60 = 24 prompts per day
 time_slot_minutes = 30
-
-# Theme name (corresponds to directory in config/themes/)
-theme = "default"
-
-# Directory containing prompt atom files
-atoms_dir = "atoms"
-
-# Use monitor index in seed generation for variety per monitor
 use_monitor_seed = true
 
 [logging]
-# Log level: DEBUG, INFO, WARNING, ERROR, CRITICAL
 level = "INFO"
-
-# Enable verbose output
 verbose = false
+
+# ============================================================================
+# Notifications (optional)
+# ============================================================================
+
+[notifications]
+enabled = true
+show_preview = true
+timeout_ms = 5000
+urgency = "normal"
+
+# ============================================================================
+# History (optional)
+# ============================================================================
+
+[history]
+enabled = true
+max_entries = 500

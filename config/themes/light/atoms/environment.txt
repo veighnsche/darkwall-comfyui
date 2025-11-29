@@ -1,0 +1,50 @@
+# Light Theme Environments
+# ========================
+
+# Natural Settings
+bathed in warm sunlight
+under clear blue skies
+in morning golden hour
+surrounded by fresh greenery
+beside sparkling water
+in gentle spring breeze
+under fluffy white clouds
+in Mediterranean warmth
+through dappled sunlight
+in pristine wilderness
+
+# Atmospheric Conditions
+in soft diffused daylight
+with gentle lens flare
+in crisp mountain air
+with morning dew glistening
+in summer afternoon haze
+with rainbow prisms
+in autumn golden light
+with cherry petals falling
+in spring bloom season
+with butterflies dancing
+
+# Location Contexts
+on peaceful countryside
+along scenic coastline
+in serene valley
+atop gentle hillside
+beside tranquil pond
+through flowering meadow
+in sun-drenched plaza
+along tree-lined avenue
+in botanical paradise
+on pristine beach
+
+# Time of Day
+at golden sunrise
+in bright midday sun
+during magic hour
+at warm sunset glow
+in early morning light
+during afternoon warmth
+at dawn's first light
+in late afternoon sun
+during blue hour transition
+at peak daylight

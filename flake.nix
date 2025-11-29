@@ -48,12 +48,14 @@
           ];
           
           postInstall = ''
-            # Wrap the binary to include wallpaper setters in PATH
-            wrapProgram $out/bin/generate-wallpaper-once \
-              --prefix PATH : ${pkgs.lib.makeBinPath runtimeDependencies}
-            
-            # Copy default configuration files to share directory
+            # Copy default configuration files to share directory FIRST
             mkdir -p $out/share/darkwall-comfyui
+            
+            # Wrap the binary to include wallpaper setters in PATH
+            # and set DARKWALL_CONFIG_TEMPLATES for config initialization
+            wrapProgram $out/bin/generate-wallpaper-once \
+              --prefix PATH : ${pkgs.lib.makeBinPath runtimeDependencies} \
+              --set DARKWALL_CONFIG_TEMPLATES "$out/share/darkwall-comfyui"
             
             # Check if config directory exists and copy files
             if [ -d "$src/config" ]; then
