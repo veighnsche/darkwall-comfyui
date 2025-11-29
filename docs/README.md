@@ -12,8 +12,12 @@ This directory contains comprehensive documentation for DarkWall ComfyUI, a mult
 
 ### Developer Documentation
 - `api/` - Internal API documentation
-- `architecture.md` - System architecture overview
 - `contributing.md` - Development guidelines
+
+### Requirements & TDD
+- `requirements/REQUIREMENTS.md` - Frozen behavior specifications with IDs
+- `requirements/QUESTIONNAIRE.md` - Open design questions
+- `requirements/TRACEABILITY.md` - Requirement → code → test mapping
 
 ## Building Documentation
 

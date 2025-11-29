@@ -196,7 +196,17 @@ class SwaybgSetter(WallpaperSetter):
             monitor_name: Monitor output name (e.g., "DP-1")
         """
         try:
-            # Kill swaybg processes for this monitor using exact pattern match
+            # TEAM_565: Kill swaybg processes for this monitor
+            # Try both short (-o) and long (--output) forms since different launchers use different forms
+            for pattern in [f"swaybg.*-o {monitor_name}", f"swaybg.*--output {monitor_name}"]:
+                result = subprocess.run(
+                    ["pkill", "-f", pattern],
+                    capture_output=True, text=True, timeout=5
+                )
+                if result.returncode == 0:
+                    self.logger.debug(f"Killed swaybg matching pattern: {pattern}")
+            
+            # Also use the original simple pattern for backwards compat
             result = subprocess.run(
                 ["pkill", "-f", f"swaybg -o {monitor_name}"],
                 capture_output=True, text=True, timeout=5

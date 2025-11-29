@@ -48,6 +48,74 @@ Multi-monitor wallpaper generator using ComfyUI with deterministic prompts and r
   - [ ] **plasma-workspace**: KDE Plasma integration
 - [ ] **Local Testing**: Verify build works immediately and systemd integration functions
 
+### 🎯 HIGH PRIORITY - Theme System & Time-Based Content
+
+#### Theme-Based Hierarchy (TEAM_001 - COMPLETE ✅)
+Restructure config to support multiple content themes with clean separation:
+
+**Directory Structure:**
+```
+~/.config/darkwall-comfyui/
+├── config.toml
+├── themes/
+│   ├── default/           # ✅ Migrated from flat structure
+│   │   ├── atoms/
+│   │   │   ├── subject.txt
+│   │   │   ├── environment.txt
+│   │   │   └── ...
+│   │   └── prompts/
+│   │       ├── default.prompt
+│   │       └── cinematic.prompt
+│   └── nsfw/              # TODO: Create when sundown/sunrise is ready
+│       ├── atoms/
+│       └── prompts/
+└── workflows/
+    ├── sfw.json
+    └── nsfw.json
+```
+
+**Implementation Tasks:**
+- [x] **ThemeConfig Dataclass**: New config type for theme definitions (atoms_dir, prompts_dir)
+- [x] **Config: themes table**: `[themes.sfw]`, `[themes.nsfw]` sections in config.toml
+- [x] **PromptGenerator: theme-aware loading**: Load atoms/prompts from theme directory
+- [x] **PromptGenerator.from_config()**: Factory method for theme-aware creation
+- [x] **Legacy fallback**: Existing configs with flat atoms/ still work
+- [x] **Migration**: Migrated config/atoms/ and config/prompts/ to config/themes/default/
+- [ ] **Per-monitor theme selection**: Each monitor can use a different theme (future)
+
+#### Sundown/Sunrise NSFW Scheduling (TEAM_001 - PLANNED)
+Automatically switch between SFW and NSFW themes based on time of day:
+
+**Feature Requirements:**
+- [ ] **Solar calculation**: Calculate sundown/sunrise times based on latitude/longitude
+- [ ] **Config: location settings**: `[schedule]` section with lat/lon or timezone-based defaults
+- [ ] **Config: time overrides**: Manual override with `nsfw_start = "22:00"` and `nsfw_end = "06:00"`
+- [ ] **Theme scheduler**: Select theme based on current time vs sun position
+- [ ] **Fallback behavior**: Default to SFW if location not configured
+- [ ] **Status command**: Show current theme and next transition time
+
+**Config Example:**
+```toml
+[schedule]
+# Option 1: Solar-based (recommended)
+latitude = 52.52    # Berlin
+longitude = 13.405
+
+# Option 2: Manual time-based
+# nsfw_start = "22:00"
+# nsfw_end = "06:00"
+
+# Theme mapping
+day_theme = "sfw"
+night_theme = "nsfw"
+```
+
+**Dependencies:**
+- `astral` or `ephem` Python library for solar calculations
+- Or simple manual time ranges if user prefers
+
+---
+
 ### 🎯 HIGH PRIORITY - Refactoring & Architecture
 
 #### Code Quality Refactoring (COMPLETED)

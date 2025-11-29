@@ -31,6 +31,33 @@ class CleanupPolicy:
     max_size_mb: Optional[int] = None  # Keep history under X MB
 
 
+@dataclass
+class ThemeConfig:
+    """
+    Configuration for a content theme.
+    
+    Themes contain atoms (phrase fragments) and prompts (templates).
+    Each theme is a self-contained content set that can be switched.
+    """
+    name: str
+    atoms_dir: str = "atoms"      # Relative to theme directory
+    prompts_dir: str = "prompts"  # Relative to theme directory
+    default_template: str = "default.prompt"
+    
+    def get_atoms_path(self, config_dir: Path) -> Path:
+        """Get absolute path to atoms directory for this theme."""
+        return config_dir / "themes" / self.name / self.atoms_dir
+    
+    def get_prompts_path(self, config_dir: Path) -> Path:
+        """Get absolute path to prompts directory for this theme."""
+        return config_dir / "themes" / self.name / self.prompts_dir
+    
+    def get_template_path(self, config_dir: Path, template_name: Optional[str] = None) -> Path:
+        """Get absolute path to a template file."""
+        template = template_name or self.default_template
+        return self.get_prompts_path(config_dir) / template
+
+
 # URL validation regex
 URL_PATTERN = re.compile(
     r'^https?://'  # http:// or https://
@@ -94,6 +121,8 @@ def validate_toml_structure(config_dict: Dict[str, Any], config_file: Path) -> N
             'max_entries': int,
             'cleanup_policy': dict,  # Optional
         },
+        # TEAM_001: Theme definitions
+        'themes': dict,  # Dynamic keys: theme names -> theme config
     }
     
     # Check for unknown sections
@@ -193,11 +222,12 @@ class OutputConfig:
 class PromptConfig:
     """Prompt generation settings."""
     time_slot_minutes: int = 30
-    theme: str = "default"
-    atoms_dir: str = "atoms"
+    theme: str = "default"  # TEAM_001: Now references themes/<name>/ directory
     use_monitor_seed: bool = True
     default_template: str = "default.prompt"  # Default prompt template
     variations_per_monitor: int = 1
+    # TEAM_001: Deprecated - kept for backwards compatibility, ignored if themes/ exists
+    atoms_dir: str = "atoms"
 
 
 @dataclass
@@ -234,6 +264,8 @@ class Config:
     prompt: PromptConfig = field(default_factory=PromptConfig)
     logging: LoggingConfig = field(default_factory=LoggingConfig)
     history: HistoryConfig = field(default_factory=HistoryConfig)
+    # TEAM_001: Theme definitions - maps theme name to ThemeConfig
+    themes: Dict[str, ThemeConfig] = field(default_factory=dict)
     
     def __post_init__(self) -> None:
         """Validate and post-process configuration."""
@@ -303,14 +335,76 @@ class Config:
         if getattr(self.prompt, 'variations_per_monitor', 1) <= 0 or getattr(self.prompt, 'variations_per_monitor', 1) > 20:
             raise ConfigError("variations_per_monitor must be between 1 and 20")
         
-        # Validate atoms directory name
-        if not self.prompt.atoms_dir.isidentifier() and self.prompt.atoms_dir != 'atoms':
-            raise ConfigError(f"Invalid atoms directory name: {self.prompt.atoms_dir}")
+        # TEAM_001: Ensure default theme exists if themes are configured
+        if self.themes and self.prompt.theme not in self.themes:
+            available = list(self.themes.keys())
+            raise ConfigError(
+                f"Theme '{self.prompt.theme}' not found. Available themes: {available}"
+            )
         
         # Validate logging settings
         valid_levels = ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']
         if self.logging.level.upper() not in valid_levels:
             raise ConfigError(f"Log level must be one of: {valid_levels}")
+    
+    def get_theme(self, theme_name: Optional[str] = None) -> ThemeConfig:
+        """
+        Get theme configuration by name.
+        
+        TEAM_001: Returns ThemeConfig for the specified theme, or creates
+        a default one based on legacy atoms_dir if no themes are configured.
+        
+        Args:
+            theme_name: Theme name to look up (defaults to prompt.theme)
+            
+        Returns:
+            ThemeConfig for the requested theme
+        """
+        name = theme_name or self.prompt.theme
+        
+        # If themes are explicitly configured, use them
+        if self.themes:
+            if name in self.themes:
+                return self.themes[name]
+            # Fallback to first available theme
+            return next(iter(self.themes.values()))
+        
+        # TEAM_001: Legacy mode - create ThemeConfig from flat structure
+        # This supports existing configs with atoms/ and prompts/ at root level
+        return ThemeConfig(
+            name=name,
+            atoms_dir=self.prompt.atoms_dir,
+            prompts_dir="prompts",
+            default_template=self.prompt.default_template,
+        )
+    
+    def get_theme_atoms_path(self, theme_name: Optional[str] = None) -> Path:
+        """Get atoms directory path for a theme."""
+        theme = self.get_theme(theme_name)
+        config_dir = self.get_config_dir()
+        
+        # TEAM_001: Check if themes/ structure exists, otherwise use legacy flat structure
+        theme_path = theme.get_atoms_path(config_dir)
+        if theme_path.exists():
+            return theme_path
+        
+        # Legacy fallback: atoms/ at config root
+        legacy_path = config_dir / self.prompt.atoms_dir
+        return legacy_path
+    
+    def get_theme_prompts_path(self, theme_name: Optional[str] = None) -> Path:
+        """Get prompts directory path for a theme."""
+        theme = self.get_theme(theme_name)
+        config_dir = self.get_config_dir()
+        
+        # TEAM_001: Check if themes/ structure exists, otherwise use legacy flat structure
+        theme_path = theme.get_prompts_path(config_dir)
+        if theme_path.exists():
+            return theme_path
+        
+        # Legacy fallback: prompts/ at config root
+        legacy_path = config_dir / "prompts"
+        return legacy_path
     
     @classmethod
     def get_config_dir(cls) -> Path:
@@ -414,7 +508,8 @@ class Config:
         
         # Files that should always be present
         required_files = ["config.toml"]
-        required_dirs = ["atoms", "workflows", "prompts"]
+        # TEAM_001: Changed from flat atoms/prompts to themes/ structure
+        required_dirs = ["workflows", "themes"]
         
         # Copy missing files
         for required_file in required_files:
@@ -425,63 +520,62 @@ class Config:
                 cls._copy_file_mutable(src, dst)
                 logger.info(f"Copied default config: {required_file}")
         
-        # Copy missing directories
+        # Copy missing directories (TEAM_001: now handles nested directories like themes/)
         for required_dir in required_dirs:
             src_dir = source_dir / required_dir
             dst_dir = target_dir / required_dir
             
             if src_dir.exists():
-                # Create directory if needed
-                dst_dir.mkdir(parents=True, exist_ok=True)
-                os.chmod(dst_dir, 0o755)  # rwxr-xr-x
-                
-                # Copy all files from source (overwrite if source is newer or dest is read-only)
-                for src_file in src_dir.iterdir():
-                    if src_file.is_file():
-                        dst_file = dst_dir / src_file.name
-                        
-                        should_copy = False
-                        if not dst_file.exists():
-                            should_copy = True
-                            reason = "missing"
-                        elif not os.access(dst_file, os.W_OK):
-                            # Destination exists but is read-only (Nix store leftover)
-                            should_copy = True
-                            reason = "read-only, fixing"
-                            # Remove the read-only file first
-                            try:
-                                dst_file.unlink()
-                            except OSError as e:
-                                logger.warning(f"Failed to remove read-only file {dst_file}: {e}")
-                        
-                        if should_copy:
-                            try:
-                                cls._copy_file_mutable(src_file, dst_file)
-                                logger.debug(f"Copied {src_file.name} ({reason})")
-                            except ConfigError as e:
-                                logger.error(f"Failed to copy {src_file.name}: {e}")
-                                # Continue with other files but don't fail completely
-                
-                # Final permission fix for any remaining read-only files
-                for file_path in dst_dir.rglob('*'):
-                    if file_path.is_file() and not os.access(file_path, os.W_OK):
-                        try:
-                            # Try to fix permissions in place
-                            os.chmod(file_path, 0o644)
-                        except PermissionError:
-                            try:
-                                # If that fails, replace the file
-                                content = file_path.read_bytes()
-                                file_path.unlink()
-                                file_path.write_bytes(content)
-                                os.chmod(file_path, 0o644)
-                                logger.debug(f"Replaced read-only file: {file_path.name}")
-                            except OSError as e:
-                                logger.warning(f"Failed to fix permissions for {file_path.name}: {e}")
-                        except OSError as e:
-                            logger.warning(f"Failed to fix permissions for {file_path.name}: {e}")
-                
+                cls._copy_directory_recursive(src_dir, dst_dir, logger)
                 logger.info(f"Initialized directory: {required_dir}")
+    
+    @classmethod
+    def _copy_directory_recursive(cls, src_dir: Path, dst_dir: Path, log: 'logging.Logger') -> None:
+        """
+        Recursively copy a directory, handling Nix store read-only files.
+        
+        TEAM_001: Added to support nested theme directories.
+        
+        Args:
+            src_dir: Source directory
+            dst_dir: Destination directory
+            log: Logger instance
+        """
+        # Create directory if needed
+        dst_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            os.chmod(dst_dir, 0o755)  # rwxr-xr-x
+        except OSError:
+            pass  # May fail on some systems, continue anyway
+        
+        for src_item in src_dir.iterdir():
+            dst_item = dst_dir / src_item.name
+            
+            if src_item.is_dir():
+                # Recurse into subdirectories
+                cls._copy_directory_recursive(src_item, dst_item, log)
+            elif src_item.is_file():
+                should_copy = False
+                reason = ""
+                
+                if not dst_item.exists():
+                    should_copy = True
+                    reason = "missing"
+                elif not os.access(dst_item, os.W_OK):
+                    # Destination exists but is read-only (Nix store leftover)
+                    should_copy = True
+                    reason = "read-only, fixing"
+                    try:
+                        dst_item.unlink()
+                    except OSError as e:
+                        log.warning(f"Failed to remove read-only file {dst_item}: {e}")
+                
+                if should_copy:
+                    try:
+                        cls._copy_file_mutable(src_item, dst_item)
+                        log.debug(f"Copied {src_item.relative_to(src_dir.parent)} ({reason})")
+                    except ConfigError as e:
+                        log.error(f"Failed to copy {src_item.name}: {e}")
     
     @classmethod
     def load(cls, config_file: Optional[Path] = None, initialize: bool = True) -> 'Config':
@@ -537,13 +631,29 @@ class Config:
         prompt_config = PromptConfig(**merged_config.get('prompt', {}))
         logging_config = LoggingConfig(**merged_config.get('logging', {}))
         
+        # TEAM_001: Parse themes section into ThemeConfig instances
+        themes_dict: Dict[str, ThemeConfig] = {}
+        if 'themes' in merged_config:
+            for theme_name, theme_data in merged_config['themes'].items():
+                if isinstance(theme_data, dict):
+                    themes_dict[theme_name] = ThemeConfig(
+                        name=theme_name,
+                        atoms_dir=theme_data.get('atoms_dir', 'atoms'),
+                        prompts_dir=theme_data.get('prompts_dir', 'prompts'),
+                        default_template=theme_data.get('default_template', 'default.prompt'),
+                    )
+                else:
+                    # Simple theme reference (just the name, use defaults)
+                    themes_dict[theme_name] = ThemeConfig(name=theme_name)
+        
         # Create Config instance with dataclass fields
         config = cls(
             comfyui=comfyui_config,
             monitors=monitors_config,
             output=output_config,
             prompt=prompt_config,
-            logging=logging_config
+            logging=logging_config,
+            themes=themes_dict,
         )
         
         return config

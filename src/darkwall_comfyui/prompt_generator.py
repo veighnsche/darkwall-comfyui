@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import List, Dict, Tuple, Optional
 from dataclasses import dataclass
 
-from .config import PromptConfig
+from .config import PromptConfig, Config, ThemeConfig
 from .exceptions import PromptError
 
 
@@ -44,11 +44,27 @@ class PromptGenerator:
     VARIANT_PATTERN = re.compile(r'\{([^{}]+)\}')
     WEIGHTED_OPTION = re.compile(r'^(\d+(?:\.\d+)?)::(.*)')
     
-    def __init__(self, prompt_config: PromptConfig, config_dir: Path) -> None:
-        """Initialize prompt generator with configuration."""
+    def __init__(self, prompt_config: PromptConfig, config_dir: Path, 
+                 atoms_dir: Optional[Path] = None, prompts_dir: Optional[Path] = None) -> None:
+        """
+        Initialize prompt generator with configuration.
+        
+        TEAM_001: Now accepts explicit atoms_dir and prompts_dir paths
+        to support theme-based directory structures.
+        
+        Args:
+            prompt_config: Prompt generation settings
+            config_dir: Base config directory
+            atoms_dir: Override path for atoms (for theme support)
+            prompts_dir: Override path for prompts (for theme support)
+        """
         self.config = prompt_config
         self.config_dir = config_dir
         self.logger = logging.getLogger(__name__)
+        
+        # TEAM_001: Theme-aware paths (fall back to legacy if not provided)
+        self._atoms_dir = atoms_dir or (config_dir / prompt_config.atoms_dir)
+        self._prompts_dir = prompts_dir or (config_dir / "prompts")
         
         # Cache for loaded atom files
         self._atom_cache: Dict[str, List[str]] = {}
@@ -92,8 +108,8 @@ class PromptGenerator:
         if path in self._atom_cache:
             return self._atom_cache[path]
         
-        atoms_dir = self.config_dir / self.config.atoms_dir
-        atom_file = atoms_dir / f"{path}.txt"
+        # TEAM_001: Use theme-aware atoms directory
+        atom_file = self._atoms_dir / f"{path}.txt"
         
         atoms = []
         
@@ -273,13 +289,13 @@ class PromptGenerator:
         if template_path is None:
             template_path = getattr(self.config, 'default_template', 'default.prompt')
         
-        prompts_dir = self.config_dir / "prompts"
-        template_file = prompts_dir / template_path
+        # TEAM_001: Use theme-aware prompts directory
+        template_file = self._prompts_dir / template_path
         
         if not template_file.exists():
             raise PromptError(
                 f"Template not found: {template_file}\n"
-                f"Create a .prompt file in {prompts_dir}/ or run 'darkwall init'"
+                f"Create a .prompt file in {self._prompts_dir}/ or run 'darkwall init'"
             )
         
         if not template_file.is_file():
@@ -392,4 +408,29 @@ class PromptGenerator:
         except Exception as e:
             self.logger.error(f"Prompt generation failed: {e}")
             raise PromptError(f"Prompt generation failed: {e}")
+    
+    @classmethod
+    def from_config(cls, config: Config, theme_name: Optional[str] = None) -> 'PromptGenerator':
+        """
+        Create a PromptGenerator from a full Config object.
+        
+        TEAM_001: Factory method that handles theme-aware path resolution.
+        
+        Args:
+            config: Full configuration object
+            theme_name: Optional theme override (defaults to config.prompt.theme)
+            
+        Returns:
+            PromptGenerator configured for the specified theme
+        """
+        config_dir = config.get_config_dir()
+        atoms_dir = config.get_theme_atoms_path(theme_name)
+        prompts_dir = config.get_theme_prompts_path(theme_name)
+        
+        return cls(
+            prompt_config=config.prompt,
+            config_dir=config_dir,
+            atoms_dir=atoms_dir,
+            prompts_dir=prompts_dir,
+        )
     
