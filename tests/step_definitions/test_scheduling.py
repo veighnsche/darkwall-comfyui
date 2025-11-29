@@ -4,6 +4,8 @@ Step definitions for scheduling feature.
 REQ-SCHED-002: Sundown/Sunrise Theme Switching
 REQ-SCHED-003: Probability Blend Transitions
 REQ-SCHED-004: 24-Hour Schedule Status
+
+TEAM_003: Updated to use real ThemeScheduler implementation.
 """
 
 from datetime import datetime, time, timedelta
@@ -11,6 +13,8 @@ from typing import Optional
 
 import pytest
 from pytest_bdd import scenarios, given, when, then, parsers
+
+from darkwall_comfyui.schedule import ScheduleConfig, ThemeScheduler
 
 # Load all scenarios from the feature file
 scenarios("../features/scheduling.feature")
@@ -165,57 +169,53 @@ def given_schedule_with_solar(schedule_context):
 
 @when("I determine the current theme")
 def when_determine_theme(schedule_context):
-    """Determine current theme based on time."""
-    current = schedule_context["current_time"]
+    """Determine current theme based on time using ThemeScheduler."""
+    # TEAM_003: Use real ThemeScheduler implementation
+    config = ScheduleConfig(
+        latitude=schedule_context.get("latitude"),
+        longitude=schedule_context.get("longitude"),
+        day_theme=schedule_context["day_theme"],
+        night_theme=schedule_context["night_theme"],
+        nsfw_start=schedule_context["manual_nsfw_start"].strftime("%H:%M") if schedule_context.get("manual_nsfw_start") else None,
+        nsfw_end=schedule_context["manual_nsfw_end"].strftime("%H:%M") if schedule_context.get("manual_nsfw_end") else None,
+        blend_duration_minutes=schedule_context.get("blend_duration", 30),
+    )
     
-    # Manual times take priority
-    if schedule_context["manual_nsfw_start"] and schedule_context["manual_nsfw_end"]:
-        nsfw_start = schedule_context["manual_nsfw_start"]
-        nsfw_end = schedule_context["manual_nsfw_end"]
-        
-        if is_night_time(current, nsfw_start, nsfw_end):
-            schedule_context["determined_theme"] = schedule_context["night_theme"]
-        else:
-            schedule_context["determined_theme"] = schedule_context["day_theme"]
-    else:
-        # Solar-based (simplified: assume sunset at 18:00 if not set)
-        sunset = schedule_context.get("sunset_time") or time(18, 0)
-        sunrise = schedule_context.get("sunrise_time") or time(6, 0)
-        
-        if is_night_time(current, sunset, sunrise):
-            schedule_context["determined_theme"] = schedule_context["night_theme"]
-        else:
-            schedule_context["determined_theme"] = schedule_context["day_theme"]
+    scheduler = ThemeScheduler(config)
+    
+    # Build datetime from current time
+    current_time = schedule_context["current_time"]
+    current_dt = datetime.combine(datetime.today(), current_time)
+    
+    result = scheduler.get_current_theme(current_dt, include_probability=False)
+    schedule_context["determined_theme"] = result.theme
 
 
 @when("I determine theme probability")
 def when_determine_probability(schedule_context):
-    """Determine theme probability during blend period."""
-    current = schedule_context["current_time"]
+    """Determine theme probability during blend period using ThemeScheduler."""
+    # TEAM_003: Use real ThemeScheduler implementation
     sunset = schedule_context["sunset_time"]
-    blend_minutes = schedule_context["blend_duration"]
+    sunrise = schedule_context.get("sunrise_time") or time(6, 0)
     
-    # Convert to minutes from midnight for calculation
-    current_mins = current.hour * 60 + current.minute
-    sunset_mins = sunset.hour * 60 + sunset.minute
+    config = ScheduleConfig(
+        day_theme=schedule_context["day_theme"],
+        night_theme=schedule_context["night_theme"],
+        # Use manual times based on sunset/sunrise for test control
+        nsfw_start=sunset.strftime("%H:%M"),
+        nsfw_end=sunrise.strftime("%H:%M"),
+        blend_duration_minutes=schedule_context["blend_duration"],
+    )
     
-    # Distance from sunset in minutes
-    distance = current_mins - sunset_mins
+    scheduler = ThemeScheduler(config)
     
-    # Calculate probability (linear interpolation)
-    if distance <= -blend_minutes:
-        # Before blend period - 100% SFW
-        sfw_prob = 100
-    elif distance >= blend_minutes:
-        # After blend period - 0% SFW
-        sfw_prob = 0
-    else:
-        # In blend period - linear interpolation
-        # At -30 min: 100% SFW, at 0: 50%, at +30 min: 0%
-        sfw_prob = 50 - (distance / blend_minutes) * 50
+    # Build datetime from current time
+    current_time = schedule_context["current_time"]
+    current_dt = datetime.combine(datetime.today(), current_time)
     
+    sfw_prob, nsfw_prob = scheduler.get_theme_probability(current_dt)
     schedule_context["sfw_probability"] = sfw_prob
-    schedule_context["nsfw_probability"] = 100 - sfw_prob
+    schedule_context["nsfw_probability"] = nsfw_prob
 
 
 @when(parsers.parse('I run "{command}"'))

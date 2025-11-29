@@ -115,7 +115,9 @@ class TestSwaybgSetterBackgroundHandling:
         """Test that SwaybgSetter calls _run_command with background=True."""
         setter = SwaybgSetter()
         
-        with patch.object(setter, '_run_command', return_value=True) as mock_run:
+        # TEAM_003: Mock Path.exists() to allow fake image path
+        with patch.object(setter, '_run_command', return_value=True) as mock_run, \
+             patch('pathlib.Path.exists', return_value=True):
             result = setter.set(Path("/fake/image.png"), 0, "eDP-1")
             
             assert result is True
@@ -128,8 +130,10 @@ class TestSwaybgSetterBackgroundHandling:
         """Test that SwaybgSetter kills existing swaybg processes."""
         setter = SwaybgSetter()
         
+        # TEAM_003: Mock Path.exists() to allow fake image path
         with patch.object(setter, '_kill_existing_swaybg') as mock_kill, \
-             patch.object(setter, '_run_command', return_value=True):
+             patch.object(setter, '_run_command', return_value=True), \
+             patch('pathlib.Path.exists', return_value=True):
             
             setter.set(Path("/fake/image.png"), 0, "eDP-1")
             

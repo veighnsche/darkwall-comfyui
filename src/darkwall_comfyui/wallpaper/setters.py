@@ -302,6 +302,67 @@ class NitrogenSetter(WallpaperSetter):
             return False
 
 
+class HyprpaperSetter(WallpaperSetter):
+    """
+    Wallpaper setter using hyprpaper (Hyprland).
+    
+    TEAM_004: REQ-MISC-003 - Additional wallpaper setter.
+    
+    hyprpaper uses hyprctl to set wallpapers dynamically.
+    """
+    
+    def set(self, image_path: Path, monitor_index: int, monitor_name: Optional[str] = None) -> bool:
+        """
+        Set wallpaper for a specific monitor using hyprpaper.
+        
+        Args:
+            image_path: Path to wallpaper image
+            monitor_index: Monitor index (0-based)
+            monitor_name: Monitor name (e.g., "DP-1") - required for hyprpaper
+            
+        Returns:
+            True if successful
+        """
+        try:
+            # Validate image path exists
+            if not image_path.exists():
+                self.logger.error(f"Image file does not exist: {image_path}")
+                return False
+            
+            # Use monitor name or generate default
+            name = monitor_name or self._default_monitor_name(monitor_index)
+            
+            # First, preload the wallpaper
+            preload_cmd = ["hyprctl", "hyprpaper", "preload", str(image_path)]
+            if not self._run_command(preload_cmd):
+                self.logger.error(f"Failed to preload wallpaper: {image_path}")
+                return False
+            
+            # Then set the wallpaper for the monitor
+            wallpaper_cmd = ["hyprctl", "hyprpaper", "wallpaper", f"{name},{image_path}"]
+            if not self._run_command(wallpaper_cmd):
+                self.logger.error(f"Failed to set wallpaper for {name}")
+                return False
+            
+            # Optionally unload old wallpapers to free memory
+            # This is done asynchronously and failures are non-critical
+            try:
+                subprocess.run(
+                    ["hyprctl", "hyprpaper", "unload", "unused"],
+                    capture_output=True,
+                    timeout=5,
+                )
+            except Exception:
+                pass  # Non-critical
+            
+            self.logger.info(f"Set wallpaper via hyprpaper for {name}")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Unexpected error setting wallpaper via hyprpaper: {e}")
+            return False
+
+
 class CustomSetter(WallpaperSetter):
     """Wallpaper setter using a custom command template."""
     
@@ -363,6 +424,7 @@ SETTERS = {
     "swaybg": SwaybgSetter,
     "feh": FehSetter,
     "nitrogen": NitrogenSetter,
+    "hyprpaper": HyprpaperSetter,  # TEAM_004: Hyprland support
 }
 
 

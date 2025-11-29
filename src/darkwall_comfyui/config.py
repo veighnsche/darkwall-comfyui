@@ -58,6 +58,47 @@ class ThemeConfig:
         return self.get_prompts_path(config_dir) / template
 
 
+@dataclass
+class WorkflowConfig:
+    """
+    Configuration for a workflow with optional prompt filtering.
+    
+    TEAM_002: REQ-WORKFLOW-001, REQ-WORKFLOW-002
+    
+    Workflow ID = filename (without .json extension).
+    Prompts can be optionally restricted to a subset.
+    """
+    name: str  # Workflow ID (filename without .json)
+    prompts: Optional[List[str]] = None  # Optional: restrict to these prompts only
+    
+    def get_workflow_path(self, config_dir: Path) -> Path:
+        """
+        Get workflow file path.
+        
+        REQ-WORKFLOW-001: Workflow ID = filename.
+        """
+        workflow_id = self.name
+        if not workflow_id.endswith(".json"):
+            workflow_id = f"{workflow_id}.json"
+        return config_dir / "workflows" / workflow_id
+    
+    def filter_prompts(self, available_prompts: List[str]) -> List[str]:
+        """
+        Filter available prompts based on workflow config.
+        
+        REQ-WORKFLOW-002: Optional prompt filtering.
+        
+        Args:
+            available_prompts: All prompts available in the theme
+            
+        Returns:
+            Filtered list of prompts (all if no filter configured)
+        """
+        if self.prompts is None:
+            return available_prompts
+        return [p for p in available_prompts if p in self.prompts]
+
+
 # URL validation regex
 URL_PATTERN = re.compile(
     r'^https?://'  # http:// or https://
@@ -196,6 +237,26 @@ def validate_toml_structure(config_dict: Dict[str, Any], config_file: Path) -> N
         },
         # TEAM_001: Theme definitions
         'themes': dict,  # Dynamic keys: theme names -> theme config
+        # TEAM_002: Workflow definitions with optional prompt filtering
+        'workflows': dict,  # Dynamic keys: workflow names -> workflow config
+        # TEAM_003: Schedule configuration for theme switching
+        'schedule': {
+            'latitude': float,
+            'longitude': float,
+            'day_theme': str,
+            'night_theme': str,
+            'nsfw_start': str,  # "HH:MM" format
+            'nsfw_end': str,    # "HH:MM" format
+            'blend_duration_minutes': int,
+            'timezone': str,
+        },
+        # TEAM_004: Notifications configuration
+        'notifications': {
+            'enabled': bool,
+            'show_preview': bool,
+            'timeout_ms': int,
+            'urgency': str,
+        },
     }
     
     # Check for unknown sections
@@ -215,7 +276,7 @@ def validate_toml_structure(config_dict: Dict[str, Any], config_file: Path) -> N
         
         valid_keys = valid_structure[section_name]
         
-        # Skip validation for dynamic sections (monitors, themes)
+        # Skip validation for dynamic sections (monitors, themes, workflows)
         # These use [section.{name}] format with arbitrary keys
         if valid_keys == dict:
             continue
@@ -280,6 +341,9 @@ class MonitorsConfig:
     """
     monitors: Dict[str, PerMonitorConfig] = field(default_factory=dict)
     command: str = "swaybg"  # Wallpaper setter command
+    
+    def __len__(self) -> int:
+        return len(self.monitors)
     
     def get_monitor(self, name: str) -> Optional[PerMonitorConfig]:
         """Get configuration for a specific monitor."""
@@ -824,6 +888,175 @@ class Config:
         return config
     
     @classmethod
+    def load_v2(
+        cls,
+        config_file: Optional[Path] = None,
+        initialize: bool = True,
+        detect_monitors: bool = True,
+    ) -> 'ConfigV2':
+        """
+        Load configuration using new per-monitor format with auto-detection.
+        
+        REQ-MONITOR-001: Auto-detect monitors from compositor
+        REQ-MONITOR-003: Use [monitors.{name}] sections
+        REQ-MONITOR-012: Handle unconfigured monitors (skip with warning)
+        REQ-MONITOR-013: Handle disconnected monitors (warn and skip)
+        
+        Args:
+            config_file: Optional path to config TOML file
+            initialize: Whether to initialize config directory with defaults
+            detect_monitors: Whether to auto-detect monitors from compositor
+            
+        Returns:
+            ConfigV2 instance with loaded settings
+        """
+        logger = logging.getLogger(__name__)
+        
+        # Initialize config directory if requested
+        if initialize:
+            cls.initialize_config()
+        
+        # Determine config file path
+        if not config_file:
+            config_file = cls.get_config_dir() / "config.toml"
+        
+        # Load from TOML file
+        config_dict = {}
+        if config_file.exists():
+            try:
+                with open(config_file, 'rb') as f:
+                    config_dict = tomli.load(f)
+                
+                # REQ-CONFIG-005: Check for deprecated keys FIRST
+                check_deprecated_keys(config_dict, config_file)
+                
+                logger.info(f"Loaded config from {config_file}")
+            except (tomli.TOMLDecodeError, OSError, ConfigError) as e:
+                if isinstance(e, ConfigError):
+                    raise
+                logger.warning(f"Failed to load config: {e}")
+        
+        # Parse monitors section (new format)
+        monitors_dict = config_dict.get('monitors', {})
+        monitors_config = MonitorsConfig.from_dict(monitors_dict)
+        
+        # Auto-detect connected monitors
+        detected_monitors: List[str] = []
+        if detect_monitors:
+            try:
+                from .monitor_detection import detect_monitors as do_detect
+                detected = do_detect()
+                detected_monitors = [m.name for m in detected]
+                logger.info(f"Detected monitors: {detected_monitors}")
+            except Exception as e:
+                logger.warning(f"Monitor detection failed: {e}")
+        
+        # REQ-MONITOR-012: Check for unconfigured monitors
+        configured_names = monitors_config.get_monitor_names()
+        for detected_name in detected_monitors:
+            if detected_name not in configured_names:
+                logger.warning(
+                    f"Monitor '{detected_name}' detected but not configured. "
+                    f"Add [monitors.{detected_name}] section to config. Skipping."
+                )
+        
+        # REQ-MONITOR-013: Check for disconnected configured monitors
+        active_monitors: List[str] = []
+        for configured_name in configured_names:
+            if detected_monitors and configured_name not in detected_monitors:
+                logger.warning(
+                    f"Monitor '{configured_name}' configured but not connected. Skipping."
+                )
+            else:
+                active_monitors.append(configured_name)
+        
+        # TEAM_002: REQ-WORKFLOW-001 - Validate workflow files exist for active monitors
+        config_dir = cls.get_config_dir()
+        for monitor_name in active_monitors:
+            monitor = monitors_config.get_monitor(monitor_name)
+            if monitor:
+                workflow_path = monitor.get_workflow_path(config_dir)
+                if not workflow_path.exists():
+                    raise ConfigError(
+                        f"Workflow file not found for monitor '{monitor_name}': {workflow_path}\n"
+                        f"  Create the workflow file or update [monitors.{monitor_name}].workflow"
+                    )
+        
+        # Parse other sections
+        comfyui_config = ComfyUIConfig(**config_dict.get('comfyui', {}))
+        output_config = OutputConfig(**config_dict.get('output', {}))
+        prompt_config = PromptConfig(**config_dict.get('prompt', {}))
+        logging_config = LoggingConfig(**config_dict.get('logging', {}))
+        
+        # Parse themes
+        themes_dict: Dict[str, ThemeConfig] = {}
+        if 'themes' in config_dict:
+            for theme_name, theme_data in config_dict['themes'].items():
+                if isinstance(theme_data, dict):
+                    themes_dict[theme_name] = ThemeConfig(
+                        name=theme_name,
+                        atoms_dir=theme_data.get('atoms_dir', 'atoms'),
+                        prompts_dir=theme_data.get('prompts_dir', 'prompts'),
+                        default_template=theme_data.get('default_template', 'default.prompt'),
+                    )
+                else:
+                    themes_dict[theme_name] = ThemeConfig(name=theme_name)
+        
+        # TEAM_002: Parse workflows section (REQ-WORKFLOW-002)
+        workflows_dict: Dict[str, WorkflowConfig] = {}
+        if 'workflows' in config_dict:
+            for workflow_name, workflow_data in config_dict['workflows'].items():
+                if isinstance(workflow_data, dict):
+                    workflows_dict[workflow_name] = WorkflowConfig(
+                        name=workflow_name,
+                        prompts=workflow_data.get('prompts'),  # Optional list of prompts
+                    )
+                else:
+                    # Simple workflow reference (just the name, no prompt filtering)
+                    workflows_dict[workflow_name] = WorkflowConfig(name=workflow_name)
+        
+        # TEAM_003: Parse schedule section (REQ-SCHED-002)
+        schedule_config = None
+        if 'schedule' in config_dict:
+            from .schedule import ScheduleConfig
+            sched_data = config_dict['schedule']
+            schedule_config = ScheduleConfig(
+                latitude=sched_data.get('latitude'),
+                longitude=sched_data.get('longitude'),
+                day_theme=sched_data.get('day_theme', 'default'),
+                night_theme=sched_data.get('night_theme', 'nsfw'),
+                nsfw_start=sched_data.get('nsfw_start'),
+                nsfw_end=sched_data.get('nsfw_end'),
+                blend_duration_minutes=sched_data.get('blend_duration_minutes', 30),
+                timezone=sched_data.get('timezone'),
+            )
+        
+        # TEAM_004: Parse notifications section (REQ-MISC-001)
+        notifications_config = None
+        if 'notifications' in config_dict:
+            from .notifications import NotificationConfig
+            notif_data = config_dict['notifications']
+            notifications_config = NotificationConfig(
+                enabled=notif_data.get('enabled', False),
+                show_preview=notif_data.get('show_preview', True),
+                timeout_ms=notif_data.get('timeout_ms', 5000),
+                urgency=notif_data.get('urgency', 'normal'),
+            )
+        
+        return ConfigV2(
+            comfyui=comfyui_config,
+            monitors=monitors_config,
+            active_monitors=active_monitors,
+            output=output_config,
+            prompt=prompt_config,
+            logging=logging_config,
+            themes=themes_dict,
+            workflows=workflows_dict,
+            schedule=schedule_config,
+            notifications=notifications_config,
+        )
+    
+    @classmethod
     def _load_env_overrides(cls) -> Dict[str, Any]:
         """Load configuration overrides from environment variables."""
         overrides = {}
@@ -952,6 +1185,96 @@ class Config:
             raise ConfigError(f"Failed to save config to {config_file}: {e}")
         except Exception as e:
             raise ConfigError(f"Unexpected error saving config to {config_file}: {e}")
+
+
+@dataclass
+class ConfigV2:
+    """
+    New-style configuration using per-monitor format.
+    
+    REQ-MONITOR-001: Auto-detection via compositor
+    REQ-MONITOR-002: Compositor names as identifiers
+    REQ-MONITOR-003: Inline config sections
+    TEAM_002: REQ-WORKFLOW-001, REQ-WORKFLOW-002 - Workflow config with prompt filtering
+    TEAM_003: REQ-SCHED-002, REQ-SCHED-003 - Theme scheduling
+    """
+    comfyui: ComfyUIConfig = field(default_factory=ComfyUIConfig)
+    monitors: MonitorsConfig = field(default_factory=MonitorsConfig)
+    active_monitors: List[str] = field(default_factory=list)  # Currently connected & configured
+    output: OutputConfig = field(default_factory=OutputConfig)
+    prompt: PromptConfig = field(default_factory=PromptConfig)
+    logging: LoggingConfig = field(default_factory=LoggingConfig)
+    themes: Dict[str, ThemeConfig] = field(default_factory=dict)
+    # TEAM_002: Workflow definitions with optional prompt filtering
+    workflows: Dict[str, WorkflowConfig] = field(default_factory=dict)
+    # TEAM_003: Schedule configuration for theme switching
+    schedule: Optional['ScheduleConfig'] = None
+    # TEAM_004: Notifications configuration
+    notifications: Optional['NotificationConfig'] = None
+    
+    def get_monitor_config(self, name: str) -> Optional[PerMonitorConfig]:
+        """Get configuration for a specific monitor."""
+        return self.monitors.get_monitor(name)
+    
+    def get_active_monitor_names(self) -> List[str]:
+        """Get list of active (connected & configured) monitor names."""
+        return self.active_monitors
+    
+    def get_workflow_for_monitor(self, name: str) -> Optional[Path]:
+        """Get workflow path for a monitor."""
+        monitor = self.monitors.get_monitor(name)
+        if monitor:
+            return monitor.get_workflow_path(Config.get_config_dir())
+        return None
+    
+    def get_workflow_config(self, workflow_id: str) -> Optional[WorkflowConfig]:
+        """
+        Get workflow configuration by ID.
+        
+        TEAM_002: REQ-WORKFLOW-002 - Returns WorkflowConfig for prompt filtering.
+        
+        Args:
+            workflow_id: Workflow ID (filename without .json)
+            
+        Returns:
+            WorkflowConfig if explicitly configured, None otherwise
+        """
+        return self.workflows.get(workflow_id)
+    
+    def get_eligible_prompts_for_workflow(self, workflow_id: str, available_prompts: List[str]) -> List[str]:
+        """
+        Get eligible prompts for a workflow, applying optional filtering.
+        
+        TEAM_002: REQ-WORKFLOW-002 - Optional prompt filtering per workflow.
+        
+        Args:
+            workflow_id: Workflow ID (filename without .json)
+            available_prompts: All prompts available in the theme
+            
+        Returns:
+            Filtered list of prompts (all if no filter configured)
+        """
+        workflow_config = self.get_workflow_config(workflow_id)
+        if workflow_config:
+            return workflow_config.filter_prompts(available_prompts)
+        return available_prompts
+    
+    def get_output_for_monitor(self, name: str) -> Optional[Path]:
+        """Get output path for a monitor."""
+        monitor = self.monitors.get_monitor(name)
+        if monitor:
+            return monitor.get_output_path()
+        return None
+    
+    @classmethod
+    def get_config_dir(cls) -> Path:
+        """Get user configuration directory."""
+        return Config.get_config_dir()
+    
+    @classmethod
+    def get_state_file(cls) -> Path:
+        """Get state file path."""
+        return Config.get_state_file()
 
 
 class StateManager:

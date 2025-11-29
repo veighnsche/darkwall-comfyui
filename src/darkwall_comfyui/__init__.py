@@ -10,14 +10,18 @@ __author__ = "Vince"
 
 from .config import (
     Config,
+    ConfigV2,
     StateManager,
     NamedStateManager,
     MonitorsConfig,
     PerMonitorConfig,
+    WorkflowConfig,  # TEAM_002: REQ-WORKFLOW-002
 )
 from .prompt_generator import PromptGenerator
 from .comfy import ComfyClient, WorkflowManager
 from .wallpaper import WallpaperTarget
+from .schedule import ScheduleConfig, ThemeScheduler, ThemeResult  # TEAM_003: REQ-SCHED-002
+from .notifications import NotificationConfig, NotificationSender  # TEAM_004: REQ-MISC-001
 
 # Monitor detection module (may not be available in cached builds)
 try:
@@ -37,10 +41,17 @@ except ImportError:
 
 __all__ = [
     "Config",
+    "ConfigV2",
     "StateManager",
     "NamedStateManager",
     "MonitorsConfig",
     "PerMonitorConfig",
+    "WorkflowConfig",  # TEAM_002
+    "ScheduleConfig",  # TEAM_003
+    "ThemeScheduler",  # TEAM_003
+    "ThemeResult",     # TEAM_003
+    "NotificationConfig",  # TEAM_004
+    "NotificationSender",  # TEAM_004
     "PromptGenerator", 
     "ComfyClient",
     "WorkflowManager",

@@ -27,6 +27,7 @@
             tomli-w
             websocket-client
             tqdm
+            astral  # TEAM_003: Solar calculations for theme scheduling
           ];
           
           # Build dependencies

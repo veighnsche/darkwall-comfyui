@@ -1,24 +1,107 @@
-"""Generation commands."""
+"""Generation commands.
 
-import json
+REQ-MONITOR-001: Auto-detection via compositor
+REQ-MONITOR-002: Compositor names as identifiers  
+REQ-MONITOR-008: Independent template selection per monitor
+TEAM_002: REQ-WORKFLOW-002 - Optional prompt filtering per workflow
+
+TEAM_003: Consolidated from generate_v2.py - single canonical implementation.
+"""
+
 import logging
-import sys
+import random
 from pathlib import Path
+from typing import List, Optional
 
 from tqdm import tqdm
 
-from ..config import Config, StateManager, MonitorConfig, OutputConfig, ComfyUIConfig, PromptConfig
+from ..config import (
+    Config,
+    ConfigV2,
+    NamedStateManager,
+    PerMonitorConfig,
+)
 from ..comfy import ComfyClient, WorkflowManager
 from ..prompt_generator import PromptGenerator
 from ..wallpaper import WallpaperTarget
 from ..history import WallpaperHistory
 from ..exceptions import ConfigError, WorkflowError, GenerationError, PromptError, CommandError
 
+logger = logging.getLogger(__name__)
 
 _progress_bars = {}
 
 
+def _get_available_prompts(config: ConfigV2) -> List[str]:
+    """
+    Get list of available prompt templates from the theme.
+    
+    TEAM_002: Helper for REQ-WORKFLOW-002 prompt filtering.
+    
+    Returns:
+        List of prompt filenames (e.g., ["default.prompt", "cinematic.prompt"])
+    """
+    config_dir = Config.get_config_dir()
+    
+    # Try theme-aware path first
+    theme_name = config.prompt.theme
+    if config.themes and theme_name in config.themes:
+        theme = config.themes[theme_name]
+        prompts_dir = config_dir / "themes" / theme_name / theme.prompts_dir
+    else:
+        # Legacy fallback
+        prompts_dir = config_dir / "prompts"
+    
+    if not prompts_dir.exists():
+        return [config.prompt.default_template]
+    
+    prompts = []
+    for f in prompts_dir.iterdir():
+        if f.is_file() and f.suffix == ".prompt":
+            prompts.append(f.name)
+    
+    return prompts if prompts else [config.prompt.default_template]
+
+
+def _select_template_for_workflow(
+    config: ConfigV2,
+    workflow_id: str,
+    monitor_name: str,
+    seed: int,
+) -> str:
+    """
+    Select a template for a workflow, applying optional filtering.
+    
+    TEAM_002: REQ-WORKFLOW-002 - Optional prompt filtering per workflow.
+    REQ-WORKFLOW-003 - Seeded random selection.
+    
+    Args:
+        config: ConfigV2 instance
+        workflow_id: Workflow ID (filename without .json)
+        monitor_name: Monitor name for seed variation
+        seed: Base seed for deterministic selection
+        
+    Returns:
+        Selected template filename
+    """
+    available = _get_available_prompts(config)
+    eligible = config.get_eligible_prompts_for_workflow(workflow_id, available)
+    
+    if not eligible:
+        logger.warning(f"No eligible prompts for workflow '{workflow_id}', using default")
+        return config.prompt.default_template
+    
+    # REQ-WORKFLOW-003: Seeded random selection
+    combined_seed = seed + hash(monitor_name) % 10000
+    rng = random.Random(combined_seed)
+    selected = rng.choice(eligible)
+    
+    logger.debug(f"Selected template '{selected}' for workflow '{workflow_id}' (from {len(eligible)} eligible)")
+    return selected
+
+
 def _proxy_ws_event_to_stdout(event: object) -> None:
+    """Forward ComfyUI websocket events to stdout."""
     try:
         if isinstance(event, dict):
             event_type = event.get("type")
@@ -38,21 +121,6 @@ def _proxy_ws_event_to_stdout(event: object) -> None:
 
                 print(msg, flush=True)
                 return
-
-            if event_type == "status" and isinstance(data, dict):
-                status = data.get("status") or data
-                queue_remaining = None
-
-                if isinstance(status, dict):
-                    exec_info = status.get("exec_info") or {}
-                    if isinstance(exec_info, dict):
-                        queue_remaining = exec_info.get("queue_remaining")
-                    if queue_remaining is None:
-                        queue_remaining = status.get("queue_remaining")
-
-                if queue_remaining is not None:
-                    print(f"[comfy] queue remaining: {queue_remaining}", flush=True)
-                    return
 
             if event_type == "progress" and isinstance(data, dict):
                 prompt_id = data.get("prompt_id")
@@ -76,307 +144,215 @@ def _proxy_ws_event_to_stdout(event: object) -> None:
                     delta = value - bar.n
                     if delta > 0:
                         bar.update(delta)
-
                 return
-
-        else:
-            print(str(event), flush=True)
     except Exception:
         pass
 
 
-def generate_once(config: Config, dry_run: bool = False, workflow_path: str = None, template_path: str = None) -> None:
+def generate_for_monitor(
+    config: ConfigV2,
+    monitor_name: str,
+    dry_run: bool = False,
+    workflow_override: Optional[str] = None,
+    template_override: Optional[str] = None,
+) -> None:
     """
-    Generate wallpaper for the next monitor in rotation.
+    Generate wallpaper for a specific monitor by name.
     
-    Steps:
-    1. Get next monitor index from rotation state
-    2. Generate deterministic prompt
-    3. Load and submit workflow to ComfyUI
-    4. Download and save result
-    5. Set wallpaper
-    
-    Args:
-        config: Configuration object
-        dry_run: If True, show what would be done without executing
-        workflow_path: Optional workflow path override for this run
-        
-    Raises:
-        ConfigError: If configuration is invalid
-        GenerationError: If wallpaper generation fails
-        WorkflowError: If workflow loading/validation fails
-        PromptError: If prompt generation fails
-        CommandError: If wallpaper setting fails
-    """
-    logger = logging.getLogger(__name__)
-    
-    try:
-        # Get next monitor (but don't update state in dry run)
-        state = StateManager(config.monitors)
-        if dry_run:
-            # Just peek at next monitor without updating state
-            current_state = state.get_state()
-            last_index = current_state.get('last_monitor_index', -1)
-            monitor_index = (last_index + 1) % config.monitors.count
-        else:
-            monitor_index = state.get_next_monitor_index()
-        
-        output_path = config.monitors.get_output_path(monitor_index)
-        
-        # Get workflow path for this monitor (or use override)
-        if workflow_path:
-            actual_workflow_path = workflow_path
-        else:
-            actual_workflow_path = config.monitors.get_workflow_path(monitor_index, str(config.comfyui.workflow_path))
-        
-        if dry_run:
-            print(f"DRY RUN: Would generate wallpaper for monitor {monitor_index}")
-            print(f"  Output path: {output_path}")
-            print(f"  ComfyUI URL: {config.comfyui.base_url}")
-            print(f"  Workflow: {actual_workflow_path}")
-            
-            # Show prompt that would be generated
-            try:
-                if template_path:
-                    actual_template_path = template_path
-                else:
-                    actual_template_path = config.monitors.get_template_path(monitor_index, config.prompt.default_template)
-                
-                prompt_gen = PromptGenerator(config.prompt, Config.get_config_dir())
-                prompt = prompt_gen.generate_prompt(monitor_index=monitor_index, template_path=actual_template_path)
-                print(f"  Template: {actual_template_path}")
-                print(f"  Prompt: {prompt[:100]}...")
-            except PromptError as e:
-                print(f"  Prompt error: {e}")
-            except Exception as e:
-                print(f"  Unexpected prompt error: {e}")
-            
-            # Don't actually update state in dry run mode
-            print("DRY RUN: No actual changes made")
-            return
-        
-        logger.info(f"Generating wallpaper for monitor {monitor_index}")
-        logger.info(f"Output: {output_path}")
-        logger.info(f"Workflow: {actual_workflow_path}")
-        
-        # Generate prompt with per-monitor template (or override)
-        if template_path:
-            actual_template_path = template_path
-        else:
-            actual_template_path = config.monitors.get_template_path(monitor_index, config.prompt.default_template)
-        
-        prompt_gen = PromptGenerator(config.prompt, Config.get_config_dir())
-        prompts = prompt_gen.generate_prompt_pair(monitor_index=monitor_index, template_path=actual_template_path)
-        logger.info(f"Prompt: {prompts.positive[:100]}...")
-        if prompts.negative:
-            logger.info(f"Negative: {prompts.negative[:100]}...")
-        
-        # Load workflow
-        workflow_mgr = WorkflowManager(config.comfyui)
-        workflow = workflow_mgr.load(Path(actual_workflow_path), Config.get_config_dir())
-        
-        # Validate workflow (by path, not by dict)
-        warnings = workflow_mgr.validate(Path(actual_workflow_path), Config.get_config_dir())
-        for warning in warnings:
-            logger.warning(f"Workflow: {warning}")
-        
-        # Generate image
-        client = ComfyClient(config.comfyui)
-        
-        if not client.health_check():
-            raise GenerationError(f"ComfyUI not reachable at {config.comfyui.base_url}")
-        
-        result = client.generate(workflow, prompts, on_event=_proxy_ws_event_to_stdout)
-        logger.info(f"Generated: {result.filename}")
-        
-        # Save wallpaper
-        target = WallpaperTarget(config.monitors, config.output)
-        saved_path = target.save_wallpaper(result.image_data, output_path)
-        
-        # Save to history
-        history = WallpaperHistory(config.history)
-        history_entry = history.save_wallpaper(
-            image_data=result.image_data,
-            generation_result=result,
-            prompt_result=prompts,
-            monitor_index=monitor_index,
-            template=actual_template_path,
-            workflow=actual_workflow_path,
-            seed=getattr(prompts, "seed", None),
-        )
-        logger.info(f"Saved to history: {history_entry.filename}")
-        
-        # Set wallpaper
-        if target.set_wallpaper(saved_path, monitor_index):
-            logger.info(f"Wallpaper set for monitor {monitor_index}")
-        else:
-            logger.warning("Failed to set wallpaper (image saved successfully)")
-        
-        logger.info("Generation complete")
-        
-    except (ConfigError, GenerationError, WorkflowError, PromptError, CommandError):
-        # Re-raise our specific exceptions
-        raise
-    except Exception as e:
-        logger.error(f"Generation failed: {e}")
-        raise GenerationError(f"Generation failed: {e}")
-
-
-def generate_all(config: Config, dry_run: bool = False) -> None:
-    """
-    Generate wallpapers for all monitors.
+    REQ-MONITOR-002: Uses compositor output name.
+    REQ-MONITOR-008: Independent template selection.
+    TEAM_002: REQ-WORKFLOW-002 - Optional prompt filtering per workflow.
     
     Args:
-        config: Configuration object
+        config: ConfigV2 instance
+        monitor_name: Compositor output name (e.g., "DP-1")
         dry_run: If True, show what would be done without executing
-        
-    Raises:
-        ConfigError: If configuration is invalid
-        GenerationError: If wallpaper generation fails
-        WorkflowError: If workflow loading/validation fails
-        PromptError: If prompt generation fails
-        CommandError: If wallpaper setting fails
+        workflow_override: Optional workflow path override
+        template_override: Optional template path override
     """
-    logger = logging.getLogger(__name__)
+    monitor_config = config.get_monitor_config(monitor_name)
+    if not monitor_config:
+        raise ConfigError(f"Monitor '{monitor_name}' not configured")
+    
+    # Get paths
+    output_path = monitor_config.get_output_path()
+    workflow_path = workflow_override or str(monitor_config.get_workflow_path(Config.get_config_dir()))
+    workflow_id = monitor_config.workflow  # TEAM_002: Get workflow ID for prompt filtering
+    
+    # TEAM_002: REQ-WORKFLOW-002 - Select template based on workflow config
+    prompt_gen = PromptGenerator(config.prompt, Config.get_config_dir())
+    monitor_seed_offset = hash(monitor_name) % 10000
+    base_seed = prompt_gen.get_time_slot_seed(monitor_index=monitor_seed_offset)
+    
+    if template_override:
+        template_path = template_override
+    else:
+        template_path = _select_template_for_workflow(config, workflow_id, monitor_name, base_seed)
     
     if dry_run:
-        print(f"DRY RUN: Would generate wallpapers for all {config.monitors.count} monitors")
-        for i in range(config.monitors.count):
-            output_path = config.monitors.get_output_path(i)
-            workflow_path = config.monitors.get_workflow_path(i, str(config.comfyui.workflow_path))
-            print(f"  Monitor {i}: {output_path}")
-            print(f"    Workflow: {workflow_path}")
-            
-            # Show prompt that would be generated
-            try:
-                template_path = config.monitors.get_template_path(i, config.prompt.default_template)
-                prompt_gen = PromptGenerator(config.prompt, Config.get_config_dir())
-                prompt = prompt_gen.generate_prompt(monitor_index=i, template_path=template_path)
-                print(f"    Template: {template_path}")
-                print(f"    Prompt: {prompt[:100]}...")
-                
-                # Show workflow validation warnings
-                workflow_mgr = WorkflowManager(config.comfyui)
-                try:
-                    workflow = workflow_mgr.load(Path(workflow_path), Config.get_config_dir())
-                    warnings = workflow_mgr.validate(workflow)
-                    for warning in warnings:
-                        print(f"    Warning: {warning}")
-                except WorkflowError as e:
-                    print(f"    Workflow error: {e}")
-                except Exception as e:
-                    print(f"    Unexpected workflow error: {e}")
-                    
-            except PromptError as e:
-                print(f"    Prompt error: {e}")
-            except Exception as e:
-                print(f"    Unexpected prompt error: {e}")
+        print(f"DRY RUN: Would generate wallpaper for monitor {monitor_name}")
+        print(f"  Output path: {output_path}")
+        print(f"  ComfyUI URL: {config.comfyui.base_url}")
+        print(f"  Workflow: {workflow_path} (ID: {workflow_id})")
+        print(f"  Template: {template_path}")
+        
+        # Show workflow prompt filtering info
+        available = _get_available_prompts(config)
+        eligible = config.get_eligible_prompts_for_workflow(workflow_id, available)
+        if len(eligible) < len(available):
+            print(f"  Eligible prompts: {eligible} (filtered from {len(available)} available)")
+        
+        try:
+            prompt = prompt_gen.generate_prompt(
+                monitor_index=monitor_seed_offset,
+                template_path=template_path,
+            )
+            print(f"  Prompt: {prompt[:100]}...")
+        except PromptError as e:
+            print(f"  Prompt error: {e}")
         
         print("DRY RUN: No actual changes made")
         return
     
-    logger.info(f"Generating for all {config.monitors.count} monitors")
+    logger.info(f"Generating wallpaper for monitor {monitor_name}")
+    logger.info(f"Output: {output_path}")
+    logger.info(f"Workflow: {workflow_path} (ID: {workflow_id})")
+    logger.info(f"Template: {template_path}")
     
-    # Load shared resources once
-    prompt_gen = PromptGenerator(config.prompt, Config.get_config_dir())
+    # Generate prompt with monitor-specific seed
+    prompts = prompt_gen.generate_prompt_pair(
+        monitor_index=monitor_seed_offset,
+        template_path=template_path,
+    )
+    logger.info(f"Prompt: {prompts.positive[:100]}...")
+    if prompts.negative:
+        logger.info(f"Negative: {prompts.negative[:100]}...")
+    
+    # Load workflow
     workflow_mgr = WorkflowManager(config.comfyui)
-    client = ComfyClient(config.comfyui)
-    target = WallpaperTarget(config.monitors, config.output)
-    history = WallpaperHistory(config.history)
+    workflow = workflow_mgr.load(Path(workflow_path), Config.get_config_dir())
     
+    # Generate image
+    client = ComfyClient(config.comfyui)
     if not client.health_check():
         raise GenerationError(f"ComfyUI not reachable at {config.comfyui.base_url}")
     
+    result = client.generate(workflow, prompts, on_event=_proxy_ws_event_to_stdout)
+    logger.info(f"Generated: {result.filename}")
+    
+    # Save wallpaper (using legacy MonitorConfig wrapper for compatibility)
+    from ..config import MonitorConfig, OutputConfig
+    legacy_monitor_config = MonitorConfig(
+        count=1,
+        pattern=str(output_path),
+        command=config.monitors.command,
+    )
+    target = WallpaperTarget(legacy_monitor_config, config.output)
+    saved_path = target.save_wallpaper(result.image_data, output_path)
+    
+    # Save to history
+    history = WallpaperHistory(config.history if hasattr(config, 'history') else None)
+    history_entry = history.save_wallpaper(
+        image_data=result.image_data,
+        generation_result=result,
+        prompt_result=prompts,
+        monitor_index=monitor_seed_offset,
+        template=template_path,
+        workflow=workflow_path,
+        seed=getattr(prompts, "seed", None),
+    )
+    logger.info(f"Saved to history: {history_entry.filename}")
+    
+    # Set wallpaper
+    if target.set_wallpaper_by_name(saved_path, monitor_name):
+        logger.info(f"Wallpaper set for monitor {monitor_name}")
+    else:
+        logger.warning("Failed to set wallpaper (image saved successfully)")
+    
+    # TEAM_004: Send notification if enabled
+    if config.notifications:
+        from ..notifications import NotificationSender
+        notifier = NotificationSender(config.notifications)
+        notifier.notify_wallpaper_changed(
+            monitor_name=monitor_name,
+            image_path=saved_path,
+            prompt=prompts.positive[:100] if prompts.positive else None,
+        )
+    
+    logger.info("Generation complete")
+
+
+def generate_next(config: ConfigV2, dry_run: bool = False) -> None:
+    """
+    Generate wallpaper for the next monitor in rotation.
+    
+    Uses NamedStateManager for name-based rotation.
+    """
+    active_monitors = config.get_active_monitor_names()
+    if not active_monitors:
+        raise ConfigError("No active monitors configured")
+    
+    state = NamedStateManager(active_monitors)
+    
+    if dry_run:
+        next_monitor = state.peek_next_monitor()
+        print(f"DRY RUN: Next monitor in rotation: {next_monitor}")
+        generate_for_monitor(config, next_monitor, dry_run=True)
+        return
+    
+    next_monitor = state.get_next_monitor()
+    generate_for_monitor(config, next_monitor)
+
+
+def generate_all(config: ConfigV2, dry_run: bool = False) -> None:
+    """
+    Generate wallpapers for all active monitors.
+    
+    REQ-MONITOR-008: Each monitor gets independent template selection.
+    """
+    active_monitors = config.get_active_monitor_names()
+    if not active_monitors:
+        raise ConfigError("No active monitors configured")
+    
+    if dry_run:
+        print(f"DRY RUN: Would generate wallpapers for {len(active_monitors)} monitors:")
+        for name in active_monitors:
+            print(f"\n--- Monitor: {name} ---")
+            generate_for_monitor(config, name, dry_run=True)
+        print("\nDRY RUN: No actual changes made")
+        return
+    
+    logger.info(f"Generating for all {len(active_monitors)} monitors")
+    
     success_count = 0
     errors = []
-    variations = getattr(config.prompt, "variations_per_monitor", 1)
-    if variations < 1:
-        variations = 1
-    logger.info(f"Variations per monitor: {variations}")
     
-    for monitor_index in range(config.monitors.count):
-        logger.info(f"--- Monitor {monitor_index} ---")
-        
-        # Get workflow path for this monitor
-        workflow_path = config.monitors.get_workflow_path(monitor_index, str(config.comfyui.workflow_path))
-        logger.info(f"Using workflow: {workflow_path}")
+    for monitor_name in active_monitors:
+        logger.info(f"--- Monitor: {monitor_name} ---")
         
         try:
-            # Load workflow for this monitor
-            workflow = workflow_mgr.load(Path(workflow_path), Config.get_config_dir())
-            
-            # Validate workflow (by path, not by dict)
-            warnings = workflow_mgr.validate(Path(workflow_path), Config.get_config_dir())
-            for warning in warnings:
-                logger.warning(f"Workflow: {warning}")
-            
-            # Generate prompt with per-monitor template
-            template_path = config.monitors.get_template_path(monitor_index, config.prompt.default_template)
-            output_path = config.monitors.get_output_path(monitor_index)
-            
-            base_seed = prompt_gen.get_time_slot_seed(monitor_index=monitor_index)
-            last_output_path = None
-            
-            for variation_index in range(variations):
-                seed = base_seed + variation_index
-                prompts = prompt_gen.generate_prompt_pair(
-                    monitor_index=monitor_index,
-                    template_path=template_path,
-                    seed=seed,
-                )
-                logger.info(
-                    f"Monitor {monitor_index} variation {variation_index + 1}/{variations} "
-                    f"prompt: {prompts.positive[:100]}..."
-                )
-                if prompts.negative:
-                    logger.info(
-                        f"Monitor {monitor_index} variation {variation_index + 1}/{variations} "
-                        f"negative: {prompts.negative[:100]}..."
-                    )
-                
-                result = client.generate(workflow, prompts, on_event=_proxy_ws_event_to_stdout)
-                logger.info(
-                    f"Monitor {monitor_index} generated variation {variation_index + 1}/{variations}: "
-                    f"{result.filename}"
-                )
-                
-                # Save each variation to history
-                history_entry = history.save_wallpaper(
-                    image_data=result.image_data,
-                    generation_result=result,
-                    prompt_result=prompts,
-                    monitor_index=monitor_index,
-                    template=template_path,
-                    workflow=workflow_path,
-                    seed=getattr(prompts, "seed", None),
-                )
-                logger.info(f"Saved to history: {history_entry.filename}")
-                
-                # Only update the live wallpaper file for the final variation
-                if variation_index == variations - 1:
-                    last_output_path = target.save_wallpaper(result.image_data, output_path)
-            
-            if last_output_path is not None:
-                target.set_wallpaper(last_output_path, monitor_index)
-            
+            generate_for_monitor(config, monitor_name)
             success_count += 1
-            logger.info(f"Monitor {monitor_index}: OK")
-            
+            logger.info(f"Monitor {monitor_name}: OK")
         except (ConfigError, GenerationError, WorkflowError, PromptError, CommandError) as e:
-            error_msg = f"Monitor {monitor_index}: {e}"
+            error_msg = f"Monitor {monitor_name}: {e}"
             logger.error(error_msg)
             errors.append(error_msg)
         except Exception as e:
-            error_msg = f"Monitor {monitor_index}: Unexpected error: {e}"
+            error_msg = f"Monitor {monitor_name}: Unexpected error: {e}"
             logger.error(error_msg)
             errors.append(error_msg)
     
-    logger.info(f"Completed: {success_count}/{config.monitors.count} monitors")
+    logger.info(f"Completed: {success_count}/{len(active_monitors)} monitors")
     
-    if success_count < config.monitors.count:
-        error_summary = f"Failed to generate {len(errors)}/{config.monitors.count} wallpapers"
+    if success_count < len(active_monitors):
+        error_summary = f"Failed to generate {len(errors)}/{len(active_monitors)} wallpapers"
         if errors:
-            error_summary += ". Errors: " + "; ".join(errors[:3])  # Show first 3 errors
+            error_summary += ". Errors: " + "; ".join(errors[:3])
             if len(errors) > 3:
                 error_summary += f" (and {len(errors) - 3} more)"
         raise GenerationError(error_summary)
+
+
+# TEAM_003: Alias for CLI compatibility
+generate_once = generate_next

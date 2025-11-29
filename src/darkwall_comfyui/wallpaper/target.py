@@ -111,6 +111,22 @@ class WallpaperTarget:
             monitor_name = self.monitor_config.get_monitor_name(monitor_index)
         return self.setter.set(wallpaper_path, monitor_index, monitor_name)
     
+    def set_wallpaper_by_name(self, wallpaper_path: Path, monitor_name: str) -> bool:
+        """
+        Set wallpaper using monitor name directly.
+        
+        REQ-MONITOR-002: Uses compositor output name.
+        
+        Args:
+            wallpaper_path: Path to wallpaper image
+            monitor_name: Compositor output name (e.g., "DP-1")
+            
+        Returns:
+            True if successful
+        """
+        # Use index 0 as placeholder since we have the name
+        return self.setter.set(wallpaper_path, 0, monitor_name)
+    
     def _create_backup(self, current_path: Path) -> Optional[Path]:
         """Create backup of existing wallpaper."""
         try:

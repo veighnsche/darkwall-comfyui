@@ -1,16 +1,108 @@
-"""Status command."""
+"""Status command.
 
+TEAM_004: REQ-MISC-003 - JSON status output for waybar/polybar.
+"""
+
+import json
 import os
 import stat
 from pathlib import Path
+from typing import Any, Dict, Optional, Union
 
-from ..config import Config, StateManager
+from ..config import Config, ConfigV2, NamedStateManager
 from ..prompt_generator import PromptGenerator
 from ..comfy import ComfyClient
 
 
-def show_status(config: Config) -> None:
-    """Display current configuration and status."""
+def _get_comfyui_status(config: Union[Config, ConfigV2]) -> Dict[str, Any]:
+    """Get ComfyUI health status."""
+    client = ComfyClient(config.comfyui)
+    health = client.detailed_health_check()
+    
+    return {
+        "healthy": health.get("healthy", False),
+        "url": health.get("url", config.comfyui.base_url),
+        "response_time_ms": health.get("response_time_ms"),
+        "error": health.get("error"),
+        "devices": health.get("system_stats", {}).get("devices", []),
+        "queue": health.get("system_stats", {}).get("queue_status", {}),
+    }
+
+
+def _get_schedule_status(config: ConfigV2) -> Optional[Dict[str, Any]]:
+    """Get theme schedule status."""
+    if not config.schedule:
+        return None
+    
+    from ..schedule import ThemeScheduler
+    scheduler = ThemeScheduler(config.schedule)
+    return scheduler.to_json()
+
+
+def _get_monitors_status(config: ConfigV2) -> Dict[str, Any]:
+    """Get monitors status."""
+    monitors = {}
+    
+    for name in config.monitors.get_monitor_names():
+        monitor = config.monitors.get_monitor(name)
+        if monitor:
+            output_path = monitor.get_output_path()
+            monitors[name] = {
+                "workflow": monitor.workflow,
+                "output": str(output_path),
+                "exists": output_path.exists(),
+                "size_kb": output_path.stat().st_size / 1024 if output_path.exists() else 0,
+                "active": name in config.active_monitors,
+            }
+    
+    return monitors
+
+
+def get_status_json(config: ConfigV2) -> Dict[str, Any]:
+    """
+    Get full status as JSON-serializable dict.
+    
+    TEAM_004: REQ-MISC-003 - For waybar/polybar integration.
+    """
+    status = {
+        "config_dir": str(Config.get_config_dir()),
+        "comfyui": _get_comfyui_status(config),
+        "monitors": _get_monitors_status(config),
+        "active_monitors": config.active_monitors,
+        "theme": config.prompt.theme,
+        "time_slot_minutes": config.prompt.time_slot_minutes,
+    }
+    
+    # Add schedule info if configured
+    schedule = _get_schedule_status(config)
+    if schedule:
+        status["schedule"] = schedule
+    
+    # Add rotation state
+    if config.active_monitors:
+        state_mgr = NamedStateManager(config.active_monitors)
+        status["rotation"] = {
+            "next_monitor": state_mgr.peek_next_monitor(),
+            "rotation_count": state_mgr.get_state().get("rotation_count", 0),
+        }
+    
+    return status
+
+
+def show_status(config: ConfigV2, json_output: bool = False) -> None:
+    """
+    Display current configuration and status.
+    
+    TEAM_004: Updated to use ConfigV2 and support JSON output.
+    
+    Args:
+        config: ConfigV2 instance
+        json_output: If True, output JSON instead of human-readable text
+    """
+    if json_output:
+        status = get_status_json(config)
+        print(json.dumps(status, indent=2))
+        return
     
     print("DarkWall ComfyUI Status")
     print("=" * 40)
@@ -19,62 +111,81 @@ def show_status(config: Config) -> None:
     print(f"\nConfiguration")
     print(f"  Config dir: {Config.get_config_dir()}")
     print(f"  ComfyUI:    {config.comfyui.base_url}")
-    print(f"  Monitors:   {config.monitors.count}")
-    print(f"  Command:    {config.monitors.command}")
-    print(f"  Pattern:    {config.monitors.pattern}")
+    print(f"  Monitors:   {len(config.active_monitors)} active")
+    print(f"  Theme:      {config.prompt.theme}")
     print(f"  Time slot:  {config.prompt.time_slot_minutes} min")
     
     # ComfyUI connectivity
     print(f"\nComfyUI Status")
-    client = ComfyClient(config.comfyui)
-    health = client.detailed_health_check()
+    comfyui_status = _get_comfyui_status(config)
     
-    if health['healthy']:
+    if comfyui_status['healthy']:
         print(f"  Connection: ✓ OK")
-        if health['response_time_ms']:
-            print(f"  Response:   {health['response_time_ms']}ms")
+        if comfyui_status['response_time_ms']:
+            print(f"  Response:   {comfyui_status['response_time_ms']}ms")
         
-        # Show system stats if available
-        if health['system_stats']:
-            stats = health['system_stats']
-            if 'devices' in stats:
-                devices = stats['devices']
-                if devices:
-                    print(f"  Devices:    {len(devices)} detected")
-                    for device in devices[:2]:  # Show first 2 devices
-                        device_type = device.get('type', 'unknown')
-                        device_name = device.get('name', 'unknown')
-                        memory = device.get('vram_total_mb', 0)
-                        if memory:
-                            print(f"    - {device_type}: {device_name} ({memory}MB VRAM)")
-                        else:
-                            print(f"    - {device_type}: {device_name}")
-            if 'queue_status' in stats:
-                queue = stats['queue_status']
-                queue_running = queue.get('queue_running', 0)
-                queue_pending = queue.get('queue_pending', 0)
-                if queue_running > 0 or queue_pending > 0:
-                    print(f"  Queue:      {queue_running} running, {queue_pending} pending")
+        # Show devices
+        devices = comfyui_status.get('devices', [])
+        if devices:
+            print(f"  Devices:    {len(devices)} detected")
+            for device in devices[:2]:
+                device_type = device.get('type', 'unknown')
+                device_name = device.get('name', 'unknown')
+                memory = device.get('vram_total_mb', 0)
+                if memory:
+                    print(f"    - {device_type}: {device_name} ({memory}MB VRAM)")
+                else:
+                    print(f"    - {device_type}: {device_name}")
+        
+        # Show queue
+        queue = comfyui_status.get('queue', {})
+        queue_running = queue.get('queue_running', 0)
+        queue_pending = queue.get('queue_pending', 0)
+        if queue_running > 0 or queue_pending > 0:
+            print(f"  Queue:      {queue_running} running, {queue_pending} pending")
     else:
         print(f"  Connection: ✗ UNREACHABLE")
-        if health['error']:
-            print(f"  Error:      {health['error']}")
-        print(f"  URL:        {health['url']}")
+        if comfyui_status['error']:
+            print(f"  Error:      {comfyui_status['error']}")
+        print(f"  URL:        {comfyui_status['url']}")
+    
+    # Schedule status
+    if config.schedule:
+        print(f"\nTheme Schedule")
+        schedule = _get_schedule_status(config)
+        if schedule:
+            print(f"  Current:    {schedule['current_theme']}")
+            print(f"  Day theme:  {schedule['day_theme']}")
+            print(f"  Night theme: {schedule['night_theme']}")
+            if schedule.get('sunset_time'):
+                print(f"  Sunset:     {schedule['sunset_time']}")
+            if schedule.get('sunrise_time'):
+                print(f"  Sunrise:    {schedule['sunrise_time']}")
+            if schedule.get('is_blend_period'):
+                print(f"  Blend:      {schedule['probability']*100:.0f}% probability")
     
     # Rotation state
     print(f"\nRotation State")
-    state_mgr = StateManager(config)
-    state = state_mgr.get_state()
-    last = state.get('last_monitor_index', -1)
-    count = state.get('rotation_count', 0)
-    
-    if last >= 0:
-        next_idx = (last + 1) % config.monitors.count
-        print(f"  Last:       Monitor {last}")
-        print(f"  Next:       Monitor {next_idx}")
+    if config.active_monitors:
+        state_mgr = NamedStateManager(config.active_monitors)
+        next_monitor = state_mgr.peek_next_monitor()
+        state = state_mgr.get_state()
+        count = state.get('rotation_count', 0)
+        
+        print(f"  Next:       {next_monitor}")
+        print(f"  Rotations:  {count}")
     else:
-        print(f"  Next:       Monitor 0 (first run)")
-    print(f"  Rotations:  {count}")
+        print(f"  No active monitors")
+    
+    # Monitors status
+    print(f"\nMonitors")
+    monitors_status = _get_monitors_status(config)
+    for name, info in monitors_status.items():
+        active = "✓" if info['active'] else "✗"
+        if info['exists']:
+            print(f"  {active} {name}: {info['size_kb']:.0f} KB")
+        else:
+            print(f"  {active} {name}: not generated")
     
     # Atom counts
     print(f"\nPrompt Atoms")
@@ -84,34 +195,3 @@ def show_status(config: Config) -> None:
             print(f"  {pillar:12} {len(atoms)} atoms")
     except FileNotFoundError as e:
         print(f"  ERROR: {e}")
-    
-    # File permissions
-    print(f"\nFile Permissions")
-    config_dir = Config.get_config_dir()
-    
-    def check_file(path: Path) -> str:
-        if not path.exists():
-            return "MISSING"
-        writable = os.access(path, os.W_OK)
-        perms = stat.filemode(path.stat().st_mode)
-        return f"{perms} {'✓' if writable else '✗ READ-ONLY'}"
-    
-    print(f"  config.toml: {check_file(config_dir / 'config.toml')}")
-    
-    atoms_dir = config_dir / "atoms"
-    if atoms_dir.exists():
-        for f in sorted(atoms_dir.iterdir()):
-            if f.is_file():
-                print(f"  atoms/{f.name}: {check_file(f)}")
-    else:
-        print(f"  atoms/: MISSING")
-    
-    # Wallpaper status
-    print(f"\nWallpapers")
-    for i in range(config.monitors.count):
-        path = config.monitors.get_output_path(i)
-        if path.exists():
-            size_kb = path.stat().st_size / 1024
-            print(f"  Monitor {i}: {path.name} ({size_kb:.0f} KB)")
-        else:
-            print(f"  Monitor {i}: not generated")

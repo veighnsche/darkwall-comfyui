@@ -1,0 +1,8 @@
+# Abstract subject atoms for NSFW theme
+# TEAM_003: Example atoms
+geometric patterns
+flowing shapes
+ethereal forms
+cosmic nebula
+fractal design
+organic curves

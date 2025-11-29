@@ -1,4 +1,7 @@
-"""Test configuration and fixtures."""
+"""Test configuration and fixtures.
+
+TEAM_003: Updated to use ConfigV2 with per-monitor format.
+"""
 
 import tempfile
 from pathlib import Path
@@ -6,7 +9,15 @@ from typing import Generator
 
 import pytest
 
-from darkwall_comfyui.config import Config, ComfyUIConfig, MonitorConfig, OutputConfig, PromptConfig
+from darkwall_comfyui.config import (
+    Config,
+    ConfigV2,
+    ComfyUIConfig,
+    OutputConfig,
+    PromptConfig,
+    MonitorsConfig,
+    PerMonitorConfig,
+)
 
 
 @pytest.fixture
@@ -35,7 +46,12 @@ def temp_config_dir() -> Generator[Path, None, None]:
             "blurry, low quality\n"
         )
         
-        # Create test config file
+        # Create workflows directory with test workflow
+        workflows_dir = config_dir / "workflows"
+        workflows_dir.mkdir()
+        (workflows_dir / "default.json").write_text('{"1": {"class_type": "Test"}}')
+        
+        # Create test config file using NEW per-monitor format
         config_file = config_dir / "config.toml"
         config_file.write_text("""
 [comfyui]
@@ -44,11 +60,14 @@ workflow_path = "test_workflow.json"
 timeout = 300
 poll_interval = 2
 
-[monitors]
-count = 2
-command = "swww"
-pattern = "monitor_{index}.png"
-backup_pattern = "monitor_{index}_{timestamp}.png"
+# TEAM_003: New per-monitor format
+[monitors.DP-1]
+workflow = "default"
+output = "~/Pictures/wallpapers/DP-1.png"
+
+[monitors.HDMI-A-1]
+workflow = "default"
+output = "~/Pictures/wallpapers/HDMI-A-1.png"
 
 [output]
 create_backup = true
@@ -65,22 +84,17 @@ level = "INFO"
 
 
 @pytest.fixture
-def test_config(temp_config_dir: Path) -> Config:
-    """Create a test Config instance with isolated state."""
+def test_config(temp_config_dir: Path) -> ConfigV2:
+    """Create a test ConfigV2 instance with isolated state."""
     config_file = temp_config_dir / "config.toml"
     
-    # Create a config that uses the temp directory for everything
-    # This ensures state isolation between tests
-    original_get_config_dir = Config.get_config_dir
-    
-    def mock_get_config_dir():
-        return temp_config_dir
-    
     # Temporarily patch the config directory method
+    original_get_config_dir = Config.get_config_dir
     Config.get_config_dir = classmethod(lambda cls: temp_config_dir)
     
     try:
-        config = Config.load(config_file=config_file, initialize=False)
+        # Use load_v2 with monitor detection disabled for tests
+        config = Config.load_v2(config_file=config_file, initialize=False, detect_monitors=False)
         yield config
     finally:
         # Restore original method
@@ -88,25 +102,25 @@ def test_config(temp_config_dir: Path) -> Config:
 
 
 @pytest.fixture
-def comfyui_config(test_config: Config) -> ComfyUIConfig:
+def comfyui_config(test_config: ConfigV2) -> ComfyUIConfig:
     """Extract ComfyUIConfig from test config."""
     return test_config.comfyui
 
 
 @pytest.fixture
-def monitor_config(test_config: Config) -> MonitorConfig:
-    """Extract MonitorConfig from test config."""
+def monitors_config(test_config: ConfigV2) -> MonitorsConfig:
+    """Extract MonitorsConfig from test config."""
     return test_config.monitors
 
 
 @pytest.fixture
-def output_config(test_config: Config) -> OutputConfig:
+def output_config(test_config: ConfigV2) -> OutputConfig:
     """Extract OutputConfig from test config."""
     return test_config.output
 
 
 @pytest.fixture
-def prompt_config(test_config: Config) -> PromptConfig:
+def prompt_config(test_config: ConfigV2) -> PromptConfig:
     """Extract PromptConfig from test config."""
     return test_config.prompt
 

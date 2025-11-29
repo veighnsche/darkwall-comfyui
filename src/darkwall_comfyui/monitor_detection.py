@@ -229,22 +229,178 @@ class MonitorDetector:
         return monitors
     
     def _detect_sway(self) -> List[Monitor]:
-        """Detect monitors from sway compositor (planned)."""
-        # TODO: Implement sway detection
-        # Uses: swaymsg -t get_outputs
-        raise ConfigError(
-            "Sway monitor detection is not yet implemented.\n"
-            "Currently supported: niri"
-        )
+        """
+        Detect monitors from sway compositor.
+        
+        Uses: swaymsg -t get_outputs (JSON output)
+        """
+        try:
+            result = subprocess.run(
+                ["swaymsg", "-t", "get_outputs"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            
+            if result.returncode != 0:
+                error_msg = result.stderr.strip() or "Unknown error"
+                raise ConfigError(
+                    f"Failed to detect monitors from sway: {error_msg}\n"
+                    "Make sure sway is running and 'swaymsg -t get_outputs' works."
+                )
+            
+            return self._parse_sway_output(result.stdout)
+            
+        except subprocess.TimeoutExpired:
+            raise ConfigError(
+                "Timeout detecting monitors from sway.\n"
+                "'swaymsg -t get_outputs' took too long to respond."
+            )
+        except FileNotFoundError:
+            raise ConfigError(
+                "Could not find 'swaymsg' command.\n"
+                "Make sure sway is installed and in PATH."
+            )
+    
+    def _parse_sway_output(self, output: str) -> List[Monitor]:
+        """
+        Parse swaymsg -t get_outputs JSON format.
+        
+        Example output:
+        [
+          {
+            "name": "DP-1",
+            "make": "HP Inc.",
+            "model": "OMEN by HP 27",
+            "current_mode": {
+              "width": 2560,
+              "height": 1440,
+              "refresh": 59951
+            },
+            ...
+          }
+        ]
+        """
+        import json
+        
+        try:
+            outputs = json.loads(output)
+        except json.JSONDecodeError as e:
+            raise ConfigError(f"Failed to parse sway output: {e}")
+        
+        monitors = []
+        for output_info in outputs:
+            if not output_info.get("active", True):
+                continue  # Skip inactive outputs
+            
+            name = output_info.get("name")
+            if not name:
+                continue
+            
+            current_mode = output_info.get("current_mode", {})
+            width = current_mode.get("width", 0)
+            height = current_mode.get("height", 0)
+            resolution = f"{width}x{height}" if width and height else "unknown"
+            
+            model = output_info.get("model", "")
+            make = output_info.get("make", "")
+            full_model = f"{make} {model}".strip() if make or model else None
+            
+            monitors.append(Monitor(
+                name=name,
+                resolution=resolution,
+                model=full_model,
+            ))
+        
+        if not monitors:
+            raise ConfigError(
+                "No monitors detected from sway output.\n"
+                "Make sure at least one monitor is connected."
+            )
+        
+        return monitors
     
     def _detect_hyprland(self) -> List[Monitor]:
-        """Detect monitors from hyprland compositor (planned)."""
-        # TODO: Implement hyprland detection
-        # Uses: hyprctl monitors -j
-        raise ConfigError(
-            "Hyprland monitor detection is not yet implemented.\n"
-            "Currently supported: niri"
-        )
+        """
+        Detect monitors from hyprland compositor.
+        
+        Uses: hyprctl monitors -j (JSON output)
+        """
+        try:
+            result = subprocess.run(
+                ["hyprctl", "monitors", "-j"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            
+            if result.returncode != 0:
+                error_msg = result.stderr.strip() or "Unknown error"
+                raise ConfigError(
+                    f"Failed to detect monitors from hyprland: {error_msg}\n"
+                    "Make sure hyprland is running and 'hyprctl monitors -j' works."
+                )
+            
+            return self._parse_hyprland_output(result.stdout)
+            
+        except subprocess.TimeoutExpired:
+            raise ConfigError(
+                "Timeout detecting monitors from hyprland.\n"
+                "'hyprctl monitors -j' took too long to respond."
+            )
+        except FileNotFoundError:
+            raise ConfigError(
+                "Could not find 'hyprctl' command.\n"
+                "Make sure hyprland is installed and in PATH."
+            )
+    
+    def _parse_hyprland_output(self, output: str) -> List[Monitor]:
+        """
+        Parse hyprctl monitors -j JSON format.
+        
+        Example output:
+        [
+          {
+            "name": "DP-1",
+            "description": "HP Inc. OMEN by HP 27",
+            "width": 2560,
+            "height": 1440,
+            ...
+          }
+        ]
+        """
+        import json
+        
+        try:
+            monitors_data = json.loads(output)
+        except json.JSONDecodeError as e:
+            raise ConfigError(f"Failed to parse hyprland output: {e}")
+        
+        monitors = []
+        for monitor_info in monitors_data:
+            name = monitor_info.get("name")
+            if not name:
+                continue
+            
+            width = monitor_info.get("width", 0)
+            height = monitor_info.get("height", 0)
+            resolution = f"{width}x{height}" if width and height else "unknown"
+            
+            model = monitor_info.get("description", "")
+            
+            monitors.append(Monitor(
+                name=name,
+                resolution=resolution,
+                model=model if model else None,
+            ))
+        
+        if not monitors:
+            raise ConfigError(
+                "No monitors detected from hyprland output.\n"
+                "Make sure at least one monitor is connected."
+            )
+        
+        return monitors
 
 
 # Global detector instance for caching

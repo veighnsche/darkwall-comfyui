@@ -30,6 +30,7 @@ dependencies = [
     "tomli-w>=1.0.0",
     "websocket-client>=1.6.0",
     "tqdm>=4.60.0",
+    "astral>=3.2",  # TEAM_003: Solar calculations for theme scheduling
 ]
 
 [project.optional-dependencies]
@@ -52,13 +53,9 @@ Issues = "https://github.com/vince/darkwall-comfyui/issues"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
-packages = [
-    "darkwall_comfyui",
-    "darkwall_comfyui.comfy",
-    "darkwall_comfyui.commands",
-    "darkwall_comfyui.history",
-    "darkwall_comfyui.wallpaper",
-]
+
+[tool.setuptools.packages.find]
+where = ["src"]
 
 [tool.setuptools.package-data]
 # Config files are bundled via Nix, not package data
