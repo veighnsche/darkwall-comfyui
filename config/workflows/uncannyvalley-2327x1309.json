@@ -566,10 +566,10 @@
         "28",
         0
       ],
-      "steps": 20,
+      "steps": 25,
       "cfg": 1,
-      "sampler_name": "res_multistep_ancestral",
-      "scheduler": "sgm_uniform",
+      "sampler_name": "euler_ancestral",
+      "scheduler": "beta",
       "denoise": 1,
       "model": [
         "27:4",
@@ -765,10 +765,10 @@
         "28",
         0
       ],
-      "steps": 20,
+      "steps": 25,
       "cfg": 1,
-      "sampler_name": "res_multistep_ancestral",
-      "scheduler": "sgm_uniform",
+      "sampler_name": "euler_ancestral",
+      "scheduler": "beta",
       "denoise": 0.33,
       "mode_type": "Linear",
       "tile_width": [

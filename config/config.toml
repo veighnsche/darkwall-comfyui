@@ -1,6 +1,7 @@
 # DarkWall ComfyUI Configuration
 # ================================
 # Light mode during day, dark mode at night with solar-based scheduling
+# Theme determines workflow: {theme.workflow_prefix}-{monitor.resolution}
 
 [comfyui]
 base_url = "http://192.168.178.29:8188"
@@ -11,65 +12,68 @@ poll_interval = 5
 # Per-Monitor Configuration (REQ-MONITOR-003)
 # ============================================================================
 # Each monitor uses compositor output name as identifier
+# Resolution is used with theme.workflow_prefix to select workflow
 
 [monitors.DP-1]
 # Primary monitor - 2560x1440 scaled to 2327x1309
-workflow = "z-image-turbo-2327x1309"
+resolution = "2327x1309"
 output = "~/Pictures/wallpapers/monitor_DP-1.png"
 command = "swaybg"
 
 [monitors.HDMI-A-1]
 # Secondary monitor - 2560x1440 scaled to 2327x1309
-workflow = "z-image-turbo-2327x1309"
+resolution = "2327x1309"
 output = "~/Pictures/wallpapers/monitor_HDMI-A-1.png"
 command = "swaybg"
 
 [monitors.HDMI-A-2]
 # Third monitor - 1920x1080
-workflow = "z-image-turbo-1920x1080"
+resolution = "1920x1080"
 output = "~/Pictures/wallpapers/monitor_HDMI-A-2.png"
 command = "swaybg"
 
 # ============================================================================
 # Workflow Definitions (REQ-WORKFLOW-002)
 # ============================================================================
-# Each workflow can restrict which prompts it uses
+# Workflows are selected by theme: {workflow_prefix}-{resolution}
+# Each workflow can optionally restrict which prompts it uses
 
 [workflows.z-image-turbo-2327x1309]
-# Fast turbo model - works with both light and dark themes
 prompts = ["*"]  # All prompts
 
 [workflows.z-image-turbo-1920x1080]
 prompts = ["*"]
 
 [workflows.wan2_5-2327x1309]
-# Wan 2.5 model - light theme only (better for bright scenes)
-prompts = ["landscape", "nature", "abstract", "minimal"]
+prompts = ["*"]
 
 [workflows.wan2_5-1920x1080]
-prompts = ["landscape", "nature", "abstract", "minimal"]
+prompts = ["*"]
 
 [workflows.uncannyvalley-2327x1309]
-# Uncanny Valley model - dark theme only (better for moody scenes)
-prompts = ["cinematic", "cyberpunk", "noir", "artistic_*"]
+prompts = ["*"]
 
 [workflows.uncannyvalley-1920x1080]
-prompts = ["cinematic", "cyberpunk", "noir", "artistic_*"]
+prompts = ["*"]
 
 # ============================================================================
 # Theme Definitions
 # ============================================================================
+# workflow_prefix determines which workflow to use: {prefix}-{monitor.resolution}
 
 [themes.light]
-# Daytime theme - bright, cheerful wallpapers
-atoms_dir = "atoms"
-prompts_dir = "prompts"
+# Daytime theme - uses wan2_5 model (better for bright scenes)
+workflow_prefix = "wan2_5"
 default_template = "default.prompt"
 
 [themes.dark]
-# Nighttime theme - dark, moody wallpapers
-atoms_dir = "atoms"
-prompts_dir = "prompts"
+# Nighttime theme - uses z-image-turbo model (good for dark/moody scenes)
+workflow_prefix = "z-image-turbo"
+default_template = "default.prompt"
+
+[themes.uncannyvalley]
+# Anime theme - uses uncannyvalley model
+workflow_prefix = "uncannyvalley"
 default_template = "default.prompt"
 
 # ============================================================================
@@ -82,9 +86,18 @@ latitude = 52.3676
 longitude = 4.9041
 timezone = "Europe/Amsterdam"
 
-# Theme assignments
-day_theme = "light"
-night_theme = "dark"
+# TEAM_006: Weighted theme lists for day/night periods
+# Each theme has a weight - higher weight = more likely to be selected
+# Day themes: only light (100%)
+day_themes = [
+    { name = "light", weight = 1.0 }
+]
+
+# Night themes: 70% dark, 30% uncannyvalley
+night_themes = [
+    { name = "dark", weight = 0.7 },
+    { name = "uncannyvalley", weight = 0.3 }
+]
 
 # Blend duration for smooth transitions (minutes)
 blend_duration_minutes = 30

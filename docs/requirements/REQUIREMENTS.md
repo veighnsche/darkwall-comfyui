@@ -321,21 +321,26 @@ themes/
 
 ---
 
-## REQ-THEME-002: Theme Config Section 🔧 IMPLEMENTED
+## REQ-THEME-002: Theme Config Section ✅ FROZEN
 
-**Behavior**: Themes defined in `config.toml`:
+**Behavior**: Themes defined in `config.toml` with workflow_prefix for model selection:
 
 ```toml
-[themes.default]
-atoms_dir = "themes/default/atoms"
-prompts_dir = "themes/default/prompts"
+[themes.light]
+workflow_prefix = "wan2_5"  # Uses wan2_5-{resolution} workflows
 default_template = "default.prompt"
 
-[themes.nsfw]
-atoms_dir = "themes/nsfw/atoms"
-prompts_dir = "themes/nsfw/prompts"
+[themes.dark]
+workflow_prefix = "z-image-turbo"  # Uses z-image-turbo-{resolution} workflows
+default_template = "default.prompt"
+
+[themes.uncannyvalley]
+workflow_prefix = "uncannyvalley"  # Uses uncannyvalley-{resolution} workflows
 default_template = "default.prompt"
 ```
+
+**TEAM_006**: `workflow_prefix` determines which ComfyUI model/workflow to use.
+The full workflow is computed as: `{workflow_prefix}-{monitor.resolution}`
 
 **Test**: `tests/test_config.py`
 
@@ -440,14 +445,22 @@ themes/
 
 ```toml
 [monitors.DP-1]
-workflow = "2327x1309"
+resolution = "2327x1309"  # Used with theme.workflow_prefix
+output = "~/Pictures/wallpapers/monitor_DP-1.png"
+command = "swaybg"
 
 [monitors.HDMI-A-2]
-workflow = "1920x1080"
+resolution = "1920x1080"
+output = "~/Pictures/wallpapers/monitor_HDMI-A-2.png"
 
 [monitors.HDMI-A-1]
-workflow = "2327x1309"
+resolution = "2327x1309"
+output = "~/Pictures/wallpapers/monitor_HDMI-A-1.png"
 ```
+
+**TEAM_006**: `resolution` is combined with `theme.workflow_prefix` to select workflow:
+- Theme `dark` with `workflow_prefix = "z-image-turbo"` + monitor `resolution = "2327x1309"`
+- → Uses workflow `z-image-turbo-2327x1309.json`
 
 **Test**: `tests/test_config.py`
 

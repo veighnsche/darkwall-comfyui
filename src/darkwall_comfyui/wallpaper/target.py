@@ -11,14 +11,18 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
-from ..config import Config, MonitorConfig, OutputConfig
+from ..config import Config, MonitorsConfig, OutputConfig
 from ..exceptions import CommandError
 from .setters import get_setter, WallpaperSetter
+
+# TEAM_006: MonitorConfig deleted - using MonitorsConfig
 
 
 class WallpaperTarget:
     """
     Manages wallpaper output paths and filesystem operations.
+    
+    TEAM_006: Updated to use MonitorsConfig instead of legacy MonitorConfig.
     
     Responsibilities:
     - Creating output directories
@@ -27,8 +31,8 @@ class WallpaperTarget:
     - Coordinating with wallpaper setters
     """
     
-    def __init__(self, monitor_config: MonitorConfig, output_config: OutputConfig) -> None:
-        self.monitor_config = monitor_config
+    def __init__(self, monitors_config: MonitorsConfig, output_config: OutputConfig) -> None:
+        self.monitors_config = monitors_config
         self.output_config = output_config
         self.logger = logging.getLogger(__name__)
         self._setter: Optional[WallpaperSetter] = None
@@ -37,7 +41,7 @@ class WallpaperTarget:
     def setter(self) -> WallpaperSetter:
         """Lazy-load wallpaper setter."""
         if self._setter is None:
-            self._setter = get_setter(self.monitor_config.command)
+            self._setter = get_setter(self.monitors_config.command)
         return self._setter
     
     def save_wallpaper(self, image_data: bytes, output_path: Path) -> Path:

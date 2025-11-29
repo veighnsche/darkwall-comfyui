@@ -2,17 +2,20 @@
 Theme scheduling based on solar position.
 
 TEAM_003: REQ-SCHED-002, REQ-SCHED-003, REQ-SCHED-004
+TEAM_006: Added weighted theme selection for day/night periods
 
 Provides automatic SFW/NSFW theme switching based on:
 - Solar position (sunrise/sunset)
 - Manual time overrides
 - Probability blending during transitions
+- Weighted random theme selection per period
 """
 
 import logging
+import random
 from dataclasses import dataclass, field
 from datetime import datetime, time, timedelta, date
-from typing import Optional, List, Tuple
+from typing import Optional, List, Tuple, Dict, Union
 
 from astral import LocationInfo
 from astral.sun import sun
@@ -23,19 +26,91 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
+class WeightedTheme:
+    """
+    A theme with a selection weight.
+    
+    TEAM_006: For weighted random theme selection.
+    """
+    name: str
+    weight: float = 1.0  # Higher weight = more likely to be selected
+    
+    @classmethod
+    def from_config(cls, value: Union[str, Dict]) -> 'WeightedTheme':
+        """
+        Parse from config value.
+        
+        Supports:
+        - Simple string: "light" -> WeightedTheme("light", 1.0)
+        - Dict: {name = "dark", weight = 0.7} -> WeightedTheme("dark", 0.7)
+        """
+        if isinstance(value, str):
+            return cls(name=value, weight=1.0)
+        elif isinstance(value, dict):
+            return cls(
+                name=value.get('name', value.get('theme', '')),
+                weight=value.get('weight', 1.0)
+            )
+        else:
+            raise ValueError(f"Invalid theme config: {value}")
+
+
+def select_weighted_theme(themes: List[WeightedTheme]) -> str:
+    """
+    Select a theme randomly based on weights.
+    
+    TEAM_006: Weighted random selection.
+    
+    Args:
+        themes: List of WeightedTheme objects
+        
+    Returns:
+        Selected theme name
+    """
+    if not themes:
+        raise ValueError("No themes to select from")
+    
+    if len(themes) == 1:
+        return themes[0].name
+    
+    # Normalize weights to probabilities
+    total_weight = sum(t.weight for t in themes)
+    if total_weight <= 0:
+        # Fallback to uniform if weights are invalid
+        return random.choice(themes).name
+    
+    # Weighted random selection
+    r = random.uniform(0, total_weight)
+    cumulative = 0.0
+    for theme in themes:
+        cumulative += theme.weight
+        if r <= cumulative:
+            return theme.name
+    
+    # Fallback (shouldn't reach here)
+    return themes[-1].name
+
+
+@dataclass
 class ScheduleConfig:
     """
     Configuration for theme scheduling.
     
     TEAM_003: REQ-SCHED-002 - Solar-based scheduling with manual override.
+    TEAM_006: Added weighted theme lists for day/night periods.
     """
     # Location for solar calculations
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     
-    # Theme names
+    # TEAM_006: Legacy single theme (for backwards compatibility)
     day_theme: str = "default"
     night_theme: str = "nsfw"
+    
+    # TEAM_006: Weighted theme lists (takes priority over single theme)
+    # Format: [{ name = "light", weight = 1.0 }] or ["light"] for equal weight
+    day_themes: Optional[List[WeightedTheme]] = None
+    night_themes: Optional[List[WeightedTheme]] = None
     
     # Manual time overrides (take priority over solar)
     nsfw_start: Optional[str] = None  # "HH:MM" format
@@ -66,6 +141,42 @@ class ScheduleConfig:
         if self.nsfw_end:
             return datetime.strptime(self.nsfw_end, "%H:%M").time()
         return None
+    
+    def get_day_themes(self) -> List[WeightedTheme]:
+        """
+        Get weighted day themes list.
+        
+        TEAM_006: Returns day_themes if set, otherwise wraps day_theme.
+        """
+        if self.day_themes:
+            return self.day_themes
+        return [WeightedTheme(name=self.day_theme, weight=1.0)]
+    
+    def get_night_themes(self) -> List[WeightedTheme]:
+        """
+        Get weighted night themes list.
+        
+        TEAM_006: Returns night_themes if set, otherwise wraps night_theme.
+        """
+        if self.night_themes:
+            return self.night_themes
+        return [WeightedTheme(name=self.night_theme, weight=1.0)]
+    
+    def select_day_theme(self) -> str:
+        """
+        Select a day theme based on weights.
+        
+        TEAM_006: Weighted random selection.
+        """
+        return select_weighted_theme(self.get_day_themes())
+    
+    def select_night_theme(self) -> str:
+        """
+        Select a night theme based on weights.
+        
+        TEAM_006: Weighted random selection.
+        """
+        return select_weighted_theme(self.get_night_themes())
 
 
 @dataclass
@@ -265,7 +376,7 @@ class ThemeScheduler:
             # No scheduling configured - use day theme
             logger.warning("No schedule configured, using day theme")
             return ThemeResult(
-                theme=self.config.day_theme,
+                theme=self.config.select_day_theme(),  # TEAM_006: Use weighted selection
                 probability=1.0,
             )
         
@@ -298,17 +409,21 @@ class ThemeScheduler:
                 sfw_prob, nsfw_prob = sunrise_sfw, sunrise_nsfw
                 is_blend = True
         
-        # Determine theme based on probability
+        # TEAM_006: Determine theme using weighted selection
         if is_blend:
-            # During blend, use the higher probability theme
+            # During blend, use the higher probability period's themes
             if nsfw_prob > sfw_prob:
-                theme = self.config.night_theme
+                theme = self.config.select_night_theme()
                 probability = nsfw_prob
             else:
-                theme = self.config.day_theme
+                theme = self.config.select_day_theme()
                 probability = sfw_prob
         else:
-            theme = self.config.night_theme if is_night else self.config.day_theme
+            # TEAM_006: Select from weighted theme list
+            if is_night:
+                theme = self.config.select_night_theme()
+            else:
+                theme = self.config.select_day_theme()
             probability = 1.0
         
         return ThemeResult(

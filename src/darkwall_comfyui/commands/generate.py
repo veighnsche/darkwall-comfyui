@@ -17,10 +17,10 @@ from tqdm import tqdm
 
 from ..config import (
     Config,
-    ConfigV2,
     NamedStateManager,
     PerMonitorConfig,
 )
+# TEAM_006: ConfigV2 deleted - merged into Config
 from ..comfy import ComfyClient, WorkflowManager
 from ..prompt_generator import PromptGenerator
 from ..wallpaper import WallpaperTarget
@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 _progress_bars = {}
 
 
-def _get_available_prompts(config: ConfigV2) -> List[str]:
+def _get_available_prompts(config: Config) -> List[str]:
     """
     Get list of available prompt templates from the theme.
     
@@ -64,7 +64,7 @@ def _get_available_prompts(config: ConfigV2) -> List[str]:
 
 
 def _select_template_for_workflow(
-    config: ConfigV2,
+    config: Config,
     workflow_id: str,
     monitor_name: str,
     seed: int,
@@ -76,7 +76,7 @@ def _select_template_for_workflow(
     REQ-WORKFLOW-003 - Seeded random selection.
     
     Args:
-        config: ConfigV2 instance
+        config: Config instance
         workflow_id: Workflow ID (filename without .json)
         monitor_name: Monitor name for seed variation
         seed: Base seed for deterministic selection
@@ -150,7 +150,7 @@ def _proxy_ws_event_to_stdout(event: object) -> None:
 
 
 def generate_for_monitor(
-    config: ConfigV2,
+    config: Config,
     monitor_name: str,
     dry_run: bool = False,
     workflow_override: Optional[str] = None,
@@ -164,7 +164,7 @@ def generate_for_monitor(
     TEAM_002: REQ-WORKFLOW-002 - Optional prompt filtering per workflow.
     
     Args:
-        config: ConfigV2 instance
+        config: Config instance
         monitor_name: Compositor output name (e.g., "DP-1")
         dry_run: If True, show what would be done without executing
         workflow_override: Optional workflow path override
@@ -240,14 +240,8 @@ def generate_for_monitor(
     result = client.generate(workflow, prompts, on_event=_proxy_ws_event_to_stdout)
     logger.info(f"Generated: {result.filename}")
     
-    # Save wallpaper (using legacy MonitorConfig wrapper for compatibility)
-    from ..config import MonitorConfig, OutputConfig
-    legacy_monitor_config = MonitorConfig(
-        count=1,
-        pattern=str(output_path),
-        command=config.monitors.command,
-    )
-    target = WallpaperTarget(legacy_monitor_config, config.output)
+    # TEAM_006: Use MonitorsConfig directly (no legacy wrapper)
+    target = WallpaperTarget(config.monitors, config.output)
     saved_path = target.save_wallpaper(result.image_data, output_path)
     
     # Save to history
@@ -282,7 +276,7 @@ def generate_for_monitor(
     logger.info("Generation complete")
 
 
-def generate_next(config: ConfigV2, dry_run: bool = False) -> None:
+def generate_next(config: Config, dry_run: bool = False) -> None:
     """
     Generate wallpaper for the next monitor in rotation.
     
@@ -304,7 +298,7 @@ def generate_next(config: ConfigV2, dry_run: bool = False) -> None:
     generate_for_monitor(config, next_monitor)
 
 
-def generate_all(config: ConfigV2, dry_run: bool = False) -> None:
+def generate_all(config: Config, dry_run: bool = False) -> None:
     """
     Generate wallpapers for all active monitors.
     

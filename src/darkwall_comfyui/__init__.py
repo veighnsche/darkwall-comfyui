@@ -10,13 +10,13 @@ __author__ = "Vince"
 
 from .config import (
     Config,
-    ConfigV2,
     StateManager,
     NamedStateManager,
     MonitorsConfig,
     PerMonitorConfig,
     WorkflowConfig,  # TEAM_002: REQ-WORKFLOW-002
 )
+# TEAM_006: ConfigV2 deleted - merged into Config
 from .prompt_generator import PromptGenerator
 from .comfy import ComfyClient, WorkflowManager
 from .wallpaper import WallpaperTarget
@@ -74,7 +74,6 @@ except ImportError:
 __all__ = [
     # Config
     "Config",
-    "ConfigV2",
     "StateManager",
     "NamedStateManager",
     "MonitorsConfig",

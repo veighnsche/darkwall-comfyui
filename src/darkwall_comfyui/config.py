@@ -38,11 +38,15 @@ class ThemeConfig:
     
     Themes contain atoms (phrase fragments) and prompts (templates).
     Each theme is a self-contained content set that can be switched.
+    
+    TEAM_006: Added workflow_prefix for theme-to-workflow mapping.
+    The workflow for a monitor is: {workflow_prefix}-{monitor_resolution}
     """
     name: str
     atoms_dir: str = "atoms"      # Relative to theme directory
     prompts_dir: str = "prompts"  # Relative to theme directory
     default_template: str = "default.prompt"
+    workflow_prefix: Optional[str] = None  # TEAM_006: e.g., "z-image-turbo", "wan2_5", "uncannyvalley"
     
     def get_atoms_path(self, config_dir: Path) -> Path:
         """Get absolute path to atoms directory for this theme."""
@@ -56,6 +60,23 @@ class ThemeConfig:
         """Get absolute path to a template file."""
         template = template_name or self.default_template
         return self.get_prompts_path(config_dir) / template
+    
+    def get_workflow_for_resolution(self, resolution: str) -> str:
+        """
+        Get workflow name for a given resolution.
+        
+        TEAM_006: Theme determines workflow prefix, resolution comes from monitor.
+        
+        Args:
+            resolution: Monitor resolution string (e.g., "2327x1309", "1920x1080")
+            
+        Returns:
+            Full workflow name (e.g., "z-image-turbo-2327x1309")
+        """
+        if self.workflow_prefix:
+            return f"{self.workflow_prefix}-{resolution}"
+        # Fallback: use theme name as prefix
+        return f"{self.name}-{resolution}"
 
 
 @dataclass
@@ -240,11 +261,14 @@ def validate_toml_structure(config_dict: Dict[str, Any], config_file: Path) -> N
         # TEAM_002: Workflow definitions with optional prompt filtering
         'workflows': dict,  # Dynamic keys: workflow names -> workflow config
         # TEAM_003: Schedule configuration for theme switching
+        # TEAM_006: Added day_themes/night_themes for weighted selection
         'schedule': {
             'latitude': float,
             'longitude': float,
             'day_theme': str,
             'night_theme': str,
+            'day_themes': list,   # TEAM_006: Weighted theme list
+            'night_themes': list,  # TEAM_006: Weighted theme list
             'nsfw_start': str,  # "HH:MM" format
             'nsfw_end': str,    # "HH:MM" format
             'blend_duration_minutes': int,
@@ -303,12 +327,15 @@ class PerMonitorConfig:
     Configuration for a single monitor (new format).
     
     REQ-MONITOR-003: Inline config sections per monitor.
+    TEAM_006: Added resolution for theme-based workflow selection.
     """
     name: str  # Compositor output name (e.g., "DP-1")
-    workflow: str = "default"  # Workflow ID (filename without .json)
+    workflow: str = "default"  # Workflow ID (filename without .json) - DEPRECATED, use resolution + theme
     output: Optional[str] = None  # Output path (defaults to ~/Pictures/wallpapers/{name}.png)
     backup: Optional[str] = None  # Backup path pattern
     templates: Optional[List[str]] = None  # Allowed templates for this monitor
+    resolution: Optional[str] = None  # TEAM_006: e.g., "2327x1309", "1920x1080" - used with theme.workflow_prefix
+    command: Optional[str] = None  # Per-monitor wallpaper setter override
     
     def get_output_path(self) -> Path:
         """Get output path for this monitor."""
@@ -322,12 +349,26 @@ class PerMonitorConfig:
             return Path(self.backup.format(name=self.name, timestamp=timestamp)).expanduser()
         return Path(f"~/Pictures/wallpapers/backups/{self.name}_{timestamp}.png").expanduser()
     
-    def get_workflow_path(self, config_dir: Path) -> Path:
-        """Get workflow file path."""
-        workflow_id = self.workflow
+    def get_workflow_path(self, config_dir: Path, theme: Optional['ThemeConfig'] = None) -> Path:
+        """
+        Get workflow file path.
+        
+        TEAM_006: If theme has workflow_prefix and monitor has resolution,
+        compute workflow as {prefix}-{resolution}. Otherwise use explicit workflow.
+        """
+        # TEAM_006: Theme-based workflow selection
+        if theme and theme.workflow_prefix and self.resolution:
+            workflow_id = theme.get_workflow_for_resolution(self.resolution)
+        else:
+            workflow_id = self.workflow
+            
         if not workflow_id.endswith(".json"):
             workflow_id = f"{workflow_id}.json"
         return config_dir / "workflows" / workflow_id
+    
+    def get_resolution(self) -> Optional[str]:
+        """Get monitor resolution string."""
+        return self.resolution
 
 
 @dataclass
@@ -358,10 +399,13 @@ class MonitorsConfig:
         """
         Create MonitorsConfig from config dictionary.
         
+        TEAM_006: Updated to support resolution field for theme-based workflow selection.
+        
         Expects format:
         {
-            "DP-1": {"workflow": "2327x1309"},
-            "HDMI-A-1": {"workflow": "1920x1080"},
+            "DP-1": {"resolution": "2327x1309", "output": "~/Pictures/wallpapers/DP-1.png"},
+            "HDMI-A-1": {"resolution": "2327x1309"},
+            "HDMI-A-2": {"resolution": "1920x1080"},
             "command": "swaybg"
         }
         """
@@ -379,53 +423,14 @@ class MonitorsConfig:
                     output=value.get("output"),
                     backup=value.get("backup"),
                     templates=value.get("templates"),
+                    resolution=value.get("resolution"),  # TEAM_006: For theme-based workflow
+                    command=value.get("command"),  # Per-monitor wallpaper setter
                 )
         
         return cls(monitors=monitors, command=command)
 
 
-@dataclass
-class MonitorConfig:
-    """Configuration for monitor management (legacy format - deprecated)."""
-    count: int = 3
-    pattern: str = "~/Pictures/wallpapers/monitor_{index}.png"
-    paths: Optional[List[str]] = None
-    command: str = "swaybg"
-    backup_pattern: str = "~/Pictures/wallpapers/backups/monitor_{index}_{timestamp}.png"
-    workflows: Optional[List[str]] = None  # Per-monitor workflow paths
-    templates: Optional[List[str]] = None  # Per-monitor template files
-    names: Optional[List[str]] = None      # Per-monitor output names (e.g. eDP-1, HDMI-A-1)
-    
-    def get_output_path(self, index: int) -> Path:
-        """Get output path for specific monitor index."""
-        if self.paths and len(self.paths) > index:
-            return Path(self.paths[index]).expanduser()
-        
-        return Path(self.pattern.format(index=index)).expanduser()
-    
-    def get_backup_path(self, index: int, timestamp: str) -> Path:
-        """Get backup path for specific monitor index."""
-        return Path(self.backup_pattern.format(index=index, timestamp=timestamp)).expanduser()
-    
-    def get_workflow_path(self, index: int, global_workflow_path: str) -> str:
-        """Get workflow path for specific monitor index."""
-        if self.workflows and len(self.workflows) > index and self.workflows[index]:
-            return self.workflows[index]
-        
-        return global_workflow_path
-    
-    def get_template_path(self, index: int, default_template: str) -> str:
-        """Get template path for specific monitor index."""
-        if self.templates and len(self.templates) > index and self.templates[index]:
-            return self.templates[index]
-        
-        return default_template
-
-    def get_monitor_name(self, index: int) -> Optional[str]:
-        """Get configured monitor output name for a specific index, if available."""
-        if self.names and len(self.names) > index and self.names[index]:
-            return self.names[index]
-        return None
+# TEAM_006: MonitorConfig deleted - was legacy format, now using MonitorsConfig/PerMonitorConfig
 
 
 @dataclass
@@ -481,17 +486,26 @@ class Config:
     """
     Main configuration class for DarkWall ComfyUI.
     
+    TEAM_006: Merged ConfigV2 into Config. Uses per-monitor format with MonitorsConfig.
+    
     Configuration is loaded from TOML files with environment variable overrides.
     """
     
     comfyui: ComfyUIConfig = field(default_factory=ComfyUIConfig)
-    monitors: MonitorConfig = field(default_factory=MonitorConfig)
+    monitors: MonitorsConfig = field(default_factory=MonitorsConfig)  # TEAM_006: Was MonitorConfig
+    active_monitors: List[str] = field(default_factory=list)  # TEAM_006: From ConfigV2
     output: OutputConfig = field(default_factory=OutputConfig)
     prompt: PromptConfig = field(default_factory=PromptConfig)
     logging: LoggingConfig = field(default_factory=LoggingConfig)
     history: HistoryConfig = field(default_factory=HistoryConfig)
     # TEAM_001: Theme definitions - maps theme name to ThemeConfig
     themes: Dict[str, ThemeConfig] = field(default_factory=dict)
+    # TEAM_002: Workflow definitions with optional prompt filtering
+    workflows: Dict[str, WorkflowConfig] = field(default_factory=dict)
+    # TEAM_003: Schedule configuration for theme switching
+    schedule: Optional['ScheduleConfig'] = None
+    # TEAM_004: Notifications configuration
+    notifications: Optional['NotificationConfig'] = None
     
     def __post_init__(self) -> None:
         """Validate and post-process configuration."""
@@ -514,72 +528,6 @@ class Config:
                 "Must be between 1 and 60 seconds."
             )
         
-        # Validate workflow path format
-        workflow_path = Path(self.comfyui.workflow_path)
-        if workflow_path.suffix.lower() != '.json':
-            raise ConfigValidationError(
-                f"Workflow path must be a JSON file: {workflow_path}\n"
-                f"Got file extension: {workflow_path.suffix or '(none)'}"
-            )
-        
-        # Validate monitor settings
-        if self.monitors.count <= 0 or self.monitors.count > 10:
-            raise ConfigValidationError(
-                f"Monitor count ({self.monitors.count}) out of range.\n"
-                "Must be between 1 and 10."
-            )
-        
-        # Validate wallpaper command
-        valid_commands = ['swaybg', 'swww', 'feh', 'nitrogen', 'hyprpaper']
-        if not self.monitors.command.startswith('custom:'):
-            if self.monitors.command not in valid_commands:
-                raise ConfigValidationError(
-                    f"Invalid wallpaper command: {self.monitors.command}\n"
-                    f"Valid commands: {valid_commands}\n"
-                    "Or use 'custom:<template>' for custom commands."
-                )
-        
-        # Validate path patterns contain required placeholders
-        if '{index}' not in self.monitors.pattern:
-            raise ConfigValidationError(
-                f"Monitor pattern missing {{index}} placeholder: {self.monitors.pattern}\n"
-                "Example: ~/Pictures/wallpapers/monitor_{{index}}.png"
-            )
-        
-        if '{index}' not in self.monitors.backup_pattern:
-            raise ConfigValidationError(
-                f"Backup pattern missing {{index}} placeholder: {self.monitors.backup_pattern}"
-            )
-        
-        if '{timestamp}' not in self.monitors.backup_pattern:
-            raise ConfigValidationError(
-                f"Backup pattern missing {{timestamp}} placeholder: {self.monitors.backup_pattern}"
-            )
-        
-        # Validate paths array if provided
-        if self.monitors.paths is not None:
-            if len(self.monitors.paths) != self.monitors.count:
-                raise ConfigValidationError(
-                    f"Paths array length ({len(self.monitors.paths)}) must match "
-                    f"monitor count ({self.monitors.count})"
-                )
-        
-        # Validate workflows array if provided
-        if self.monitors.workflows is not None:
-            if len(self.monitors.workflows) != self.monitors.count:
-                raise ConfigValidationError(
-                    f"Workflows array length ({len(self.monitors.workflows)}) must match "
-                    f"monitor count ({self.monitors.count})"
-                )
-        
-        # Validate names array if provided
-        if getattr(self.monitors, 'names', None) is not None:
-            if len(self.monitors.names) != self.monitors.count:
-                raise ConfigValidationError(
-                    f"Names array length ({len(self.monitors.names)}) must match "
-                    f"monitor count ({self.monitors.count})"
-                )
-        
         # Validate prompt settings
         if self.prompt.time_slot_minutes <= 0 or self.prompt.time_slot_minutes > 1440:
             raise ConfigValidationError(
@@ -593,14 +541,6 @@ class Config:
                 "Must be between 1 and 20."
             )
         
-        # TEAM_001: Ensure default theme exists if themes are configured
-        if self.themes and self.prompt.theme not in self.themes:
-            available = list(self.themes.keys())
-            raise ConfigValidationError(
-                f"Theme '{self.prompt.theme}' not found.\n"
-                f"Available themes: {available}"
-            )
-        
         # Validate logging settings
         valid_levels = ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']
         if self.logging.level.upper() not in valid_levels:
@@ -608,6 +548,40 @@ class Config:
                 f"Invalid log level: {self.logging.level}\n"
                 f"Must be one of: {valid_levels}"
             )
+    
+    # TEAM_006: Methods from ConfigV2
+    def get_monitor_config(self, name: str) -> Optional[PerMonitorConfig]:
+        """Get configuration for a specific monitor."""
+        return self.monitors.get_monitor(name)
+    
+    def get_active_monitor_names(self) -> List[str]:
+        """Get list of active (connected & configured) monitor names."""
+        return self.active_monitors
+    
+    def get_workflow_for_monitor(self, name: str, theme: Optional[ThemeConfig] = None) -> Optional[Path]:
+        """Get workflow path for a monitor."""
+        monitor = self.monitors.get_monitor(name)
+        if monitor:
+            return monitor.get_workflow_path(self.get_config_dir(), theme)
+        return None
+    
+    def get_workflow_config(self, workflow_id: str) -> Optional[WorkflowConfig]:
+        """Get workflow configuration by ID."""
+        return self.workflows.get(workflow_id)
+    
+    def get_eligible_prompts_for_workflow(self, workflow_id: str, available_prompts: List[str]) -> List[str]:
+        """Get eligible prompts for a workflow, applying optional filtering."""
+        workflow_config = self.get_workflow_config(workflow_id)
+        if workflow_config:
+            return workflow_config.filter_prompts(available_prompts)
+        return available_prompts
+    
+    def get_output_for_monitor(self, name: str) -> Optional[Path]:
+        """Get output path for a monitor."""
+        monitor = self.monitors.get_monitor(name)
+        if monitor:
+            return monitor.get_output_path()
+        return None
     
     def get_theme(self, theme_name: Optional[str] = None) -> ThemeConfig:
         """
@@ -847,98 +821,16 @@ class Config:
                         log.error(f"Failed to copy {src_item.name}: {e}")
     
     @classmethod
-    def load(cls, config_file: Optional[Path] = None, initialize: bool = True) -> 'Config':
-        """
-        Load configuration from TOML file and environment variables.
-        
-        Args:
-            config_file: Optional path to config TOML file
-            initialize: Whether to initialize config directory with defaults
-            
-        Returns:
-            Config instance with loaded settings
-        """
-        # Initialize config directory if requested
-        if initialize:
-            cls.initialize_config()
-        
-        # Determine config file path
-        if not config_file:
-            config_file = cls.get_config_dir() / "config.toml"
-        
-        # Load from TOML file if it exists
-        config_dict = {}
-        
-        if config_file.exists():
-            try:
-                with open(config_file, 'rb') as f:
-                    config_dict = tomli.load(f)
-                
-                # REQ-CONFIG-005: Check for deprecated keys FIRST (fail hard)
-                check_deprecated_keys(config_dict, config_file)
-                
-                # Validate TOML structure before proceeding
-                validate_toml_structure(config_dict, config_file)
-                
-                logging.getLogger(__name__).info(f"Loaded config from {config_file}")
-            except (tomli.TOMLDecodeError, OSError, ConfigError) as e:
-                logging.getLogger(__name__).warning(f"Failed to load config file {config_file}: {e}")
-                # If validation fails, re-raise as ConfigError
-                if isinstance(e, ConfigError):
-                    raise
-                # For other errors (like TOML parsing), continue with defaults
-        else:
-            logging.getLogger(__name__).warning(f"Config file not found: {config_file}, using defaults")
-        
-        # Extract environment variable overrides
-        env_overrides = cls._load_env_overrides()
-        
-        # Merge configurations: defaults -> file -> env vars
-        merged_config = cls._merge_configs(config_dict, env_overrides)
-        
-        # Convert section dictionaries to dataclass instances
-        comfyui_config = ComfyUIConfig(**merged_config.get('comfyui', {}))
-        monitors_config = MonitorConfig(**merged_config.get('monitors', {}))
-        output_config = OutputConfig(**merged_config.get('output', {}))
-        prompt_config = PromptConfig(**merged_config.get('prompt', {}))
-        logging_config = LoggingConfig(**merged_config.get('logging', {}))
-        
-        # TEAM_001: Parse themes section into ThemeConfig instances
-        themes_dict: Dict[str, ThemeConfig] = {}
-        if 'themes' in merged_config:
-            for theme_name, theme_data in merged_config['themes'].items():
-                if isinstance(theme_data, dict):
-                    themes_dict[theme_name] = ThemeConfig(
-                        name=theme_name,
-                        atoms_dir=theme_data.get('atoms_dir', 'atoms'),
-                        prompts_dir=theme_data.get('prompts_dir', 'prompts'),
-                        default_template=theme_data.get('default_template', 'default.prompt'),
-                    )
-                else:
-                    # Simple theme reference (just the name, use defaults)
-                    themes_dict[theme_name] = ThemeConfig(name=theme_name)
-        
-        # Create Config instance with dataclass fields
-        config = cls(
-            comfyui=comfyui_config,
-            monitors=monitors_config,
-            output=output_config,
-            prompt=prompt_config,
-            logging=logging_config,
-            themes=themes_dict,
-        )
-        
-        return config
-    
-    @classmethod
-    def load_v2(
+    def load(
         cls,
         config_file: Optional[Path] = None,
         initialize: bool = True,
         detect_monitors: bool = True,
-    ) -> 'ConfigV2':
+    ) -> 'Config':
         """
-        Load configuration using new per-monitor format with auto-detection.
+        Load configuration from TOML file with monitor auto-detection.
+        
+        TEAM_006: Merged load_v2 into load. Uses per-monitor format.
         
         REQ-MONITOR-001: Auto-detect monitors from compositor
         REQ-MONITOR-003: Use [monitors.{name}] sections
@@ -951,7 +843,7 @@ class Config:
             detect_monitors: Whether to auto-detect monitors from compositor
             
         Returns:
-            ConfigV2 instance with loaded settings
+            Config instance with loaded settings
         """
         logger = logging.getLogger(__name__)
         
@@ -973,13 +865,16 @@ class Config:
                 # REQ-CONFIG-005: Check for deprecated keys FIRST
                 check_deprecated_keys(config_dict, config_file)
                 
+                # Validate TOML structure
+                validate_toml_structure(config_dict, config_file)
+                
                 logger.info(f"Loaded config from {config_file}")
             except (tomli.TOMLDecodeError, OSError, ConfigError) as e:
                 if isinstance(e, ConfigError):
                     raise
                 logger.warning(f"Failed to load config: {e}")
         
-        # Parse monitors section (new format)
+        # Parse monitors section (per-monitor format)
         monitors_dict = config_dict.get('monitors', {})
         monitors_config = MonitorsConfig.from_dict(monitors_dict)
         
@@ -1013,18 +908,6 @@ class Config:
             else:
                 active_monitors.append(configured_name)
         
-        # TEAM_002: REQ-WORKFLOW-001 - Validate workflow files exist for active monitors
-        config_dir = cls.get_config_dir()
-        for monitor_name in active_monitors:
-            monitor = monitors_config.get_monitor(monitor_name)
-            if monitor:
-                workflow_path = monitor.get_workflow_path(config_dir)
-                if not workflow_path.exists():
-                    raise ConfigError(
-                        f"Workflow file not found for monitor '{monitor_name}': {workflow_path}\n"
-                        f"  Create the workflow file or update [monitors.{monitor_name}].workflow"
-                    )
-        
         # Parse other sections
         comfyui_config = ComfyUIConfig(**config_dict.get('comfyui', {}))
         output_config = OutputConfig(**config_dict.get('output', {}))
@@ -1032,6 +915,7 @@ class Config:
         logging_config = LoggingConfig(**config_dict.get('logging', {}))
         
         # Parse themes
+        # TEAM_006: Added workflow_prefix for theme-to-workflow mapping
         themes_dict: Dict[str, ThemeConfig] = {}
         if 'themes' in config_dict:
             for theme_name, theme_data in config_dict['themes'].items():
@@ -1041,6 +925,7 @@ class Config:
                         atoms_dir=theme_data.get('atoms_dir', 'atoms'),
                         prompts_dir=theme_data.get('prompts_dir', 'prompts'),
                         default_template=theme_data.get('default_template', 'default.prompt'),
+                        workflow_prefix=theme_data.get('workflow_prefix'),  # TEAM_006
                     )
                 else:
                     themes_dict[theme_name] = ThemeConfig(name=theme_name)
@@ -1063,11 +948,28 @@ class Config:
         if 'schedule' in config_dict:
             from .schedule import ScheduleConfig
             sched_data = config_dict['schedule']
+            # TEAM_006: Parse weighted theme lists
+            from .schedule import WeightedTheme
+            
+            day_themes = None
+            if 'day_themes' in sched_data:
+                day_themes = [
+                    WeightedTheme.from_config(t) for t in sched_data['day_themes']
+                ]
+            
+            night_themes = None
+            if 'night_themes' in sched_data:
+                night_themes = [
+                    WeightedTheme.from_config(t) for t in sched_data['night_themes']
+                ]
+            
             schedule_config = ScheduleConfig(
                 latitude=sched_data.get('latitude'),
                 longitude=sched_data.get('longitude'),
                 day_theme=sched_data.get('day_theme', 'default'),
                 night_theme=sched_data.get('night_theme', 'nsfw'),
+                day_themes=day_themes,    # TEAM_006
+                night_themes=night_themes,  # TEAM_006
                 nsfw_start=sched_data.get('nsfw_start'),
                 nsfw_end=sched_data.get('nsfw_end'),
                 blend_duration_minutes=sched_data.get('blend_duration_minutes', 30),
@@ -1086,7 +988,8 @@ class Config:
                 urgency=notif_data.get('urgency', 'normal'),
             )
         
-        return ConfigV2(
+        # TEAM_006: Return Config (not ConfigV2 - that class is deleted)
+        return cls(
             comfyui=comfyui_config,
             monitors=monitors_config,
             active_monitors=active_monitors,
@@ -1230,102 +1133,15 @@ class Config:
             raise ConfigError(f"Unexpected error saving config to {config_file}: {e}")
 
 
-@dataclass
-class ConfigV2:
-    """
-    New-style configuration using per-monitor format.
-    
-    REQ-MONITOR-001: Auto-detection via compositor
-    REQ-MONITOR-002: Compositor names as identifiers
-    REQ-MONITOR-003: Inline config sections
-    TEAM_002: REQ-WORKFLOW-001, REQ-WORKFLOW-002 - Workflow config with prompt filtering
-    TEAM_003: REQ-SCHED-002, REQ-SCHED-003 - Theme scheduling
-    """
-    comfyui: ComfyUIConfig = field(default_factory=ComfyUIConfig)
-    monitors: MonitorsConfig = field(default_factory=MonitorsConfig)
-    active_monitors: List[str] = field(default_factory=list)  # Currently connected & configured
-    output: OutputConfig = field(default_factory=OutputConfig)
-    prompt: PromptConfig = field(default_factory=PromptConfig)
-    logging: LoggingConfig = field(default_factory=LoggingConfig)
-    themes: Dict[str, ThemeConfig] = field(default_factory=dict)
-    # TEAM_002: Workflow definitions with optional prompt filtering
-    workflows: Dict[str, WorkflowConfig] = field(default_factory=dict)
-    # TEAM_003: Schedule configuration for theme switching
-    schedule: Optional['ScheduleConfig'] = None
-    # TEAM_004: Notifications configuration
-    notifications: Optional['NotificationConfig'] = None
-    
-    def get_monitor_config(self, name: str) -> Optional[PerMonitorConfig]:
-        """Get configuration for a specific monitor."""
-        return self.monitors.get_monitor(name)
-    
-    def get_active_monitor_names(self) -> List[str]:
-        """Get list of active (connected & configured) monitor names."""
-        return self.active_monitors
-    
-    def get_workflow_for_monitor(self, name: str) -> Optional[Path]:
-        """Get workflow path for a monitor."""
-        monitor = self.monitors.get_monitor(name)
-        if monitor:
-            return monitor.get_workflow_path(Config.get_config_dir())
-        return None
-    
-    def get_workflow_config(self, workflow_id: str) -> Optional[WorkflowConfig]:
-        """
-        Get workflow configuration by ID.
-        
-        TEAM_002: REQ-WORKFLOW-002 - Returns WorkflowConfig for prompt filtering.
-        
-        Args:
-            workflow_id: Workflow ID (filename without .json)
-            
-        Returns:
-            WorkflowConfig if explicitly configured, None otherwise
-        """
-        return self.workflows.get(workflow_id)
-    
-    def get_eligible_prompts_for_workflow(self, workflow_id: str, available_prompts: List[str]) -> List[str]:
-        """
-        Get eligible prompts for a workflow, applying optional filtering.
-        
-        TEAM_002: REQ-WORKFLOW-002 - Optional prompt filtering per workflow.
-        
-        Args:
-            workflow_id: Workflow ID (filename without .json)
-            available_prompts: All prompts available in the theme
-            
-        Returns:
-            Filtered list of prompts (all if no filter configured)
-        """
-        workflow_config = self.get_workflow_config(workflow_id)
-        if workflow_config:
-            return workflow_config.filter_prompts(available_prompts)
-        return available_prompts
-    
-    def get_output_for_monitor(self, name: str) -> Optional[Path]:
-        """Get output path for a monitor."""
-        monitor = self.monitors.get_monitor(name)
-        if monitor:
-            return monitor.get_output_path()
-        return None
-    
-    @classmethod
-    def get_config_dir(cls) -> Path:
-        """Get user configuration directory."""
-        return Config.get_config_dir()
-    
-    @classmethod
-    def get_state_file(cls) -> Path:
-        """Get state file path."""
-        return Config.get_state_file()
+# TEAM_006: ConfigV2 deleted - merged into Config
 
 
 class StateManager:
-    """Manages persistent state for multi-monitor rotation."""
+    """Manages persistent state for multi-monitor rotation (legacy - use NamedStateManager)."""
     
-    def __init__(self, monitor_config: MonitorConfig) -> None:
-        self.monitor_config = monitor_config
-        self.state_file = Config.get_state_file()  # Still need Config for static method
+    def __init__(self, monitors_config: MonitorsConfig) -> None:
+        self.monitors_config = monitors_config
+        self.state_file = Config.get_state_file()
         self.logger = logging.getLogger(__name__)
     
     def get_state(self) -> Dict[str, Any]:
@@ -1361,7 +1177,8 @@ class StateManager:
         last_index = state.get('last_monitor_index', -1)
         
         # Cycle to next monitor
-        next_index = (last_index + 1) % self.monitor_config.count
+        monitor_count = len(self.monitors_config)
+        next_index = (last_index + 1) % monitor_count if monitor_count > 0 else 0
         
         # Update state
         state['last_monitor_index'] = next_index

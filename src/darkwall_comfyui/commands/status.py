@@ -9,12 +9,14 @@ import stat
 from pathlib import Path
 from typing import Any, Dict, Optional, Union
 
-from ..config import Config, ConfigV2, NamedStateManager
+from ..config import Config, NamedStateManager
 from ..prompt_generator import PromptGenerator
 from ..comfy import ComfyClient
 
+# TEAM_006: ConfigV2 deleted - merged into Config
 
-def _get_comfyui_status(config: Union[Config, ConfigV2]) -> Dict[str, Any]:
+
+def _get_comfyui_status(config: Config) -> Dict[str, Any]:
     """Get ComfyUI health status."""
     client = ComfyClient(config.comfyui)
     health = client.detailed_health_check()
@@ -29,7 +31,7 @@ def _get_comfyui_status(config: Union[Config, ConfigV2]) -> Dict[str, Any]:
     }
 
 
-def _get_schedule_status(config: ConfigV2) -> Optional[Dict[str, Any]]:
+def _get_schedule_status(config: Config) -> Optional[Dict[str, Any]]:
     """Get theme schedule status."""
     if not config.schedule:
         return None
@@ -39,7 +41,7 @@ def _get_schedule_status(config: ConfigV2) -> Optional[Dict[str, Any]]:
     return scheduler.to_json()
 
 
-def _get_monitors_status(config: ConfigV2) -> Dict[str, Any]:
+def _get_monitors_status(config: Config) -> Dict[str, Any]:
     """Get monitors status."""
     monitors = {}
     
@@ -58,7 +60,7 @@ def _get_monitors_status(config: ConfigV2) -> Dict[str, Any]:
     return monitors
 
 
-def get_status_json(config: ConfigV2) -> Dict[str, Any]:
+def get_status_json(config: Config) -> Dict[str, Any]:
     """
     Get full status as JSON-serializable dict.
     
@@ -89,14 +91,14 @@ def get_status_json(config: ConfigV2) -> Dict[str, Any]:
     return status
 
 
-def show_status(config: ConfigV2, json_output: bool = False) -> None:
+def show_status(config: Config, json_output: bool = False) -> None:
     """
     Display current configuration and status.
     
-    TEAM_004: Updated to use ConfigV2 and support JSON output.
+    TEAM_006: Uses Config (ConfigV2 merged).
     
     Args:
-        config: ConfigV2 instance
+        config: Config instance
         json_output: If True, output JSON instead of human-readable text
     """
     if json_output:
