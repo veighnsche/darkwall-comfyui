@@ -9,6 +9,7 @@ import os
 import json
 import logging
 import re
+from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, Optional, List
 from dataclasses import dataclass, field
@@ -32,6 +33,22 @@ class CleanupPolicy:
 
 
 @dataclass
+class WeightedWorkflow:
+    """A workflow prefix with a selection weight."""
+    prefix: str
+    weight: float = 1.0
+    
+    @classmethod
+    def from_config(cls, data) -> 'WeightedWorkflow':
+        """Parse from config (string or dict)."""
+        if isinstance(data, str):
+            return cls(prefix=data, weight=1.0)
+        elif isinstance(data, dict):
+            return cls(prefix=data['prefix'], weight=data.get('weight', 1.0))
+        raise ValueError(f"Invalid workflow config: {data}")
+
+
+@dataclass
 class ThemeConfig:
     """
     Configuration for a content theme.
@@ -41,12 +58,15 @@ class ThemeConfig:
     
     TEAM_006: Added workflow_prefix for theme-to-workflow mapping.
     The workflow for a monitor is: {workflow_prefix}-{monitor_resolution}
+    
+    TEAM_006: Added workflows list for weighted random workflow selection.
     """
     name: str
     atoms_dir: str = "atoms"      # Relative to theme directory
     prompts_dir: str = "prompts"  # Relative to theme directory
     default_template: str = "default.prompt"
-    workflow_prefix: Optional[str] = None  # TEAM_006: e.g., "z-image-turbo", "wan2_5", "uncannyvalley"
+    workflow_prefix: Optional[str] = None  # TEAM_006: Single prefix (legacy)
+    workflows: Optional[List[WeightedWorkflow]] = None  # TEAM_006: Weighted list of prefixes
     
     def get_atoms_path(self, config_dir: Path) -> Path:
         """Get absolute path to atoms directory for this theme."""
@@ -61,11 +81,38 @@ class ThemeConfig:
         template = template_name or self.default_template
         return self.get_prompts_path(config_dir) / template
     
+    def select_workflow_prefix(self) -> str:
+        """
+        Select a workflow prefix, using weighted random if multiple are configured.
+        
+        TEAM_006: Supports weighted random selection from workflows list.
+        
+        Returns:
+            Selected workflow prefix
+        """
+        import random
+        
+        # If workflows list is configured, use weighted selection
+        if self.workflows:
+            total_weight = sum(w.weight for w in self.workflows)
+            if total_weight > 0:
+                r = random.random() * total_weight
+                cumulative = 0.0
+                for w in self.workflows:
+                    cumulative += w.weight
+                    if r <= cumulative:
+                        return w.prefix
+                return self.workflows[-1].prefix
+        
+        # Fallback to single workflow_prefix or theme name
+        return self.workflow_prefix or self.name
+    
     def get_workflow_for_resolution(self, resolution: str) -> str:
         """
         Get workflow name for a given resolution.
         
         TEAM_006: Theme determines workflow prefix, resolution comes from monitor.
+        Uses weighted random selection if multiple workflows configured.
         
         Args:
             resolution: Monitor resolution string (e.g., "2327x1309", "1920x1080")
@@ -73,10 +120,16 @@ class ThemeConfig:
         Returns:
             Full workflow name (e.g., "z-image-turbo-2327x1309")
         """
-        if self.workflow_prefix:
-            return f"{self.workflow_prefix}-{resolution}"
-        # Fallback: use theme name as prefix
-        return f"{self.name}-{resolution}"
+        prefix = self.select_workflow_prefix()
+        return f"{prefix}-{resolution}"
+    
+    def get_workflow_weights_display(self) -> str:
+        """Get a display string showing workflow weights."""
+        if self.workflows:
+            parts = [f"{w.prefix}: {w.weight/(sum(ww.weight for ww in self.workflows))*100:.0f}%" 
+                     for w in self.workflows]
+            return ", ".join(parts)
+        return self.workflow_prefix or self.name
 
 
 @dataclass
@@ -108,6 +161,7 @@ class WorkflowConfig:
         Filter available prompts based on workflow config.
         
         REQ-WORKFLOW-002: Optional prompt filtering.
+        TEAM_006: ["*"] means all prompts (wildcard).
         
         Args:
             available_prompts: All prompts available in the theme
@@ -116,6 +170,9 @@ class WorkflowConfig:
             Filtered list of prompts (all if no filter configured)
         """
         if self.prompts is None:
+            return available_prompts
+        # TEAM_006: ["*"] means all prompts
+        if "*" in self.prompts:
             return available_prompts
         return [p for p in available_prompts if p in self.prompts]
 
@@ -915,17 +972,25 @@ class Config:
         logging_config = LoggingConfig(**config_dict.get('logging', {}))
         
         # Parse themes
-        # TEAM_006: Added workflow_prefix for theme-to-workflow mapping
+        # TEAM_006: Added workflow_prefix and workflows for theme-to-workflow mapping
         themes_dict: Dict[str, ThemeConfig] = {}
         if 'themes' in config_dict:
             for theme_name, theme_data in config_dict['themes'].items():
                 if isinstance(theme_data, dict):
+                    # TEAM_006: Parse weighted workflows list if present
+                    workflows_list = None
+                    if 'workflows' in theme_data:
+                        workflows_list = [
+                            WeightedWorkflow.from_config(w) for w in theme_data['workflows']
+                        ]
+                    
                     themes_dict[theme_name] = ThemeConfig(
                         name=theme_name,
                         atoms_dir=theme_data.get('atoms_dir', 'atoms'),
                         prompts_dir=theme_data.get('prompts_dir', 'prompts'),
                         default_template=theme_data.get('default_template', 'default.prompt'),
-                        workflow_prefix=theme_data.get('workflow_prefix'),  # TEAM_006
+                        workflow_prefix=theme_data.get('workflow_prefix'),  # TEAM_006: Legacy single prefix
+                        workflows=workflows_list,  # TEAM_006: Weighted list
                     )
                 else:
                     themes_dict[theme_name] = ThemeConfig(name=theme_name)
@@ -1297,3 +1362,54 @@ class NamedStateManager:
             'monitor_order': self.monitor_names,
         })
         self.logger.info("Reset monitor rotation state")
+    
+    def save_last_generation(
+        self,
+        monitor_name: str,
+        theme_name: str,
+        workflow_id: str,
+        template: str,
+        prompt: str,
+        negative_prompt: Optional[str],
+        seed: int,
+        output_path: str,
+        history_path: Optional[str] = None,
+    ) -> None:
+        """
+        Save details of the last generation for retry functionality.
+        
+        TEAM_006: Enables retry with same prompt but different seed.
+        """
+        state = self.get_state()
+        state['last_generation'] = {
+            'monitor_name': monitor_name,
+            'theme_name': theme_name,
+            'workflow_id': workflow_id,
+            'template': template,
+            'prompt': prompt,
+            'negative_prompt': negative_prompt,
+            'seed': seed,
+            'output_path': output_path,
+            'history_path': history_path,
+            'timestamp': datetime.now().isoformat(),
+        }
+        self.save_state(state)
+        self.logger.debug(f"Saved last generation state for {monitor_name}")
+    
+    def get_last_generation(self) -> Optional[Dict[str, Any]]:
+        """
+        Get details of the last generation.
+        
+        Returns:
+            Dict with generation details or None if no previous generation.
+        """
+        state = self.get_state()
+        return state.get('last_generation')
+    
+    def clear_last_generation(self) -> None:
+        """Clear the last generation state."""
+        state = self.get_state()
+        if 'last_generation' in state:
+            del state['last_generation']
+            self.save_state(state)
+            self.logger.debug("Cleared last generation state")

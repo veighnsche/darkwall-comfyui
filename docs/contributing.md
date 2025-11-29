@@ -311,9 +311,10 @@ def temp_config_dir(tmpdir):
 @pytest.fixture
 def mock_config():
     """Create mock configuration."""
+    # TEAM_006: Use MonitorsConfig instead of MonitorConfig
     return Config(
         comfyui=ComfyUIConfig(base_url="http://localhost:8188"),
-        monitors=MonitorConfig(count=1)
+        monitors=MonitorsConfig(monitors={"DP-1": PerMonitorConfig(name="DP-1")})
     )
 ```
 

@@ -1,10 +1,13 @@
-"""Tests for dependency injection refactoring."""
+"""Tests for dependency injection refactoring.
+
+TEAM_006: Updated to use MonitorsConfig instead of MonitorConfig.
+"""
 
 import pytest
 from pathlib import Path
 
 from darkwall_comfyui.config import (
-    ComfyUIConfig, MonitorConfig, OutputConfig, PromptConfig, StateManager
+    ComfyUIConfig, MonitorsConfig, PerMonitorConfig, OutputConfig, PromptConfig, StateManager
 )
 from darkwall_comfyui.comfy.client import ComfyClient
 from darkwall_comfyui.comfy.workflow import WorkflowManager
@@ -71,36 +74,41 @@ class TestDependencyInjection:
             assert prompt_gen.config == prompt_config
             assert prompt_gen.config_dir == config_dir
     
-    def test_wallpaper_target_accepts_monitor_and_output_configs(self):
-        """Test WallpaperTarget accepts MonitorConfig and OutputConfig."""
-        monitor_config = MonitorConfig(
-            count=2,
-            pattern="monitor_{index}.png",
-            command="swww",
-            backup_pattern="backup_{index}_{timestamp}.png"
+    def test_wallpaper_target_accepts_monitors_and_output_configs(self):
+        """Test WallpaperTarget accepts MonitorsConfig and OutputConfig."""
+        # TEAM_006: Use MonitorsConfig instead of MonitorConfig
+        monitors_config = MonitorsConfig(
+            monitors={
+                "DP-1": PerMonitorConfig(name="DP-1", workflow="default"),
+                "HDMI-A-1": PerMonitorConfig(name="HDMI-A-1", workflow="default"),
+            },
+            command="swww"
         )
         output_config = OutputConfig(create_backup=True)
         
-        target = WallpaperTarget(monitor_config, output_config)
+        target = WallpaperTarget(monitors_config, output_config)
         
-        assert target.monitor_config == monitor_config
+        assert target.monitors_config == monitors_config
         assert target.output_config == output_config
-        assert target.monitor_config.count == 2
+        assert len(target.monitors_config) == 2
         assert target.output_config.create_backup is True
     
-    def test_state_manager_accepts_monitor_config(self):
-        """Test StateManager accepts MonitorConfig only."""
-        monitor_config = MonitorConfig(
-            count=3,
-            pattern="monitor_{index}.png",
-            command="swaybg",
-            backup_pattern="backup_{index}_{timestamp}.png"
+    def test_state_manager_accepts_monitors_config(self):
+        """Test StateManager accepts MonitorsConfig only."""
+        # TEAM_006: Use MonitorsConfig instead of MonitorConfig
+        monitors_config = MonitorsConfig(
+            monitors={
+                "DP-1": PerMonitorConfig(name="DP-1", workflow="default"),
+                "HDMI-A-1": PerMonitorConfig(name="HDMI-A-1", workflow="default"),
+                "DP-2": PerMonitorConfig(name="DP-2", workflow="default"),
+            },
+            command="swaybg"
         )
         
-        state_mgr = StateManager(monitor_config)
+        state_mgr = StateManager(monitors_config)
         
-        assert state_mgr.monitor_config == monitor_config
-        assert state_mgr.monitor_config.count == 3
+        assert state_mgr.monitors_config == monitors_config
+        assert len(state_mgr.monitors_config) == 3
     
     def test_classes_dont_accept_full_config_anymore(self):
         """Test that classes have been properly refactored and don't expect full Config."""

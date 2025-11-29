@@ -7,25 +7,33 @@ The configuration system provides type-safe configuration loading, validation, a
 ### Config
 Main configuration class that aggregates all configuration sections.
 
+TEAM_006: ConfigV2 merged into Config. Uses per-monitor format with MonitorsConfig.
+
 ```python
 @dataclass
 class Config:
     comfyui: ComfyUIConfig
-    monitors: MonitorConfig
+    monitors: MonitorsConfig  # TEAM_006: Was MonitorConfig
+    active_monitors: List[str]  # Currently connected & configured
     output: OutputConfig
     prompt: PromptConfig
     logging: LoggingConfig
     history: HistoryConfig
+    themes: Dict[str, ThemeConfig]
+    workflows: Dict[str, WorkflowConfig]
+    schedule: Optional[ScheduleConfig]
+    notifications: Optional[NotificationConfig]
 ```
 
 #### Methods
 
-##### `load(config_file: Optional[Path] = None, initialize: bool = True) -> Config`
-Load configuration from file with environment variable overrides.
+##### `load(config_file: Optional[Path] = None, initialize: bool = True, detect_monitors: bool = True) -> Config`
+Load configuration from file with monitor auto-detection.
 
 **Parameters:**
 - `config_file`: Path to custom config file (default: ~/.config/darkwall-comfyui/config.toml)
 - `initialize`: Whether to initialize config directory if missing
+- `detect_monitors`: Whether to auto-detect monitors from compositor
 
 **Returns:** Config instance with validation applied
 
@@ -62,34 +70,50 @@ class ComfyUIConfig:
     headers: Dict[str, str] = field(default_factory=dict)
 ```
 
-### MonitorConfig
-Monitor configuration and output settings.
+### MonitorsConfig
+Per-monitor configuration using compositor output names.
+
+TEAM_006: Replaces legacy MonitorConfig.
 
 ```python
 @dataclass
-class MonitorConfig:
-    count: int = 3
-    pattern: str = "~/Pictures/wallpapers/monitor_{index}.png"
-    paths: Optional[List[str]] = None
-    command: str = "swaybg"
-    backup_pattern: str = "~/Pictures/wallpapers/backups/monitor_{index}_{timestamp}.png"
-    workflows: Optional[List[str]] = None
-    templates: Optional[List[str]] = None
+class MonitorsConfig:
+    monitors: Dict[str, PerMonitorConfig]  # Keyed by compositor name (e.g., "DP-1")
+    command: str = "swaybg"  # Wallpaper setter command
 ```
 
 #### Methods
 
-##### `get_output_path(index: int) -> Path`
-Get output path for specific monitor index.
+##### `get_monitor(name: str) -> Optional[PerMonitorConfig]`
+Get configuration for a specific monitor by compositor name.
 
-##### `get_backup_path(index: int, timestamp: str) -> Path`
-Get backup path for specific monitor index.
+##### `get_monitor_names() -> List[str]`
+Get list of configured monitor names.
 
-##### `get_workflow_path(index: int, global_workflow_path: str) -> str`
-Get workflow path for specific monitor index.
+### PerMonitorConfig
+Configuration for a single monitor.
 
-##### `get_template_path(index: int, default_template: str) -> str`
-Get template path for specific monitor index.
+```python
+@dataclass
+class PerMonitorConfig:
+    name: str  # Compositor output name (e.g., "DP-1")
+    workflow: str = "default"  # Workflow ID (filename without .json)
+    resolution: Optional[str] = None  # For theme-based workflow selection
+    output: Optional[str] = None  # Output path
+    backup: Optional[str] = None  # Backup path pattern
+    templates: Optional[List[str]] = None  # Allowed templates
+```
+
+#### Methods
+
+##### `get_output_path() -> Path`
+Get output path for this monitor.
+
+##### `get_backup_path(timestamp: str) -> Path`
+Get backup path for this monitor.
+
+##### `get_workflow_path(config_dir: Path, theme: Optional[ThemeConfig] = None) -> Path`
+Get workflow file path, optionally using theme's workflow_prefix.
 
 ### HistoryConfig
 Wallpaper history configuration.

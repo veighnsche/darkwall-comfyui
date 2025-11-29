@@ -86,11 +86,11 @@
 |--------|--------------|------------|-------------|
 | REQ-MONITOR-001 | `monitor_detection.py` (NEW) | `tests/test_monitor_detection.py` | — |
 | REQ-MONITOR-002 | `config.py` | `tests/test_config.py` | `monitors.*` |
-| REQ-MONITOR-003 | `config.py:MonitorConfig` | `tests/test_config.py` | `monitors.{name}.*` |
+| REQ-MONITOR-003 | `config.py:MonitorsConfig` | `tests/test_config.py` | `monitors.{name}.*` |
 | REQ-MONITOR-004 | `config.py:validate_monitors()` | `tests/test_config.py` | — |
 | REQ-MONITOR-005 | `state.py:StateManager` | `tests/test_state.py` | — |
-| REQ-MONITOR-006 | `config.py:MonitorConfig` | `tests/test_config.py` | `monitors.{name}.output` |
-| REQ-MONITOR-007 | `config.py:MonitorConfig` | `tests/test_config.py` | `monitors.{name}.workflow` |
+| REQ-MONITOR-006 | `config.py:MonitorsConfig` | `tests/test_config.py` | `monitors.{name}.output` |
+| REQ-MONITOR-007 | `config.py:MonitorsConfig` | `tests/test_config.py` | `monitors.{name}.workflow` |
 | REQ-MONITOR-008 | `prompt_generator.py` | `tests/test_prompt_generator.py` | — |
 | REQ-MONITOR-009 | `cli.py`, `commands/generate.py` | `tests/test_commands.py` | — |
 | REQ-MONITOR-010 | `monitor_detection.py` | `tests/test_monitor_detection.py` | — |

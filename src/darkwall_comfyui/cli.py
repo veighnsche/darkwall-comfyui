@@ -36,6 +36,7 @@ from .exceptions import (
 from .commands import (
     generate_once,
     generate_all,
+    retry_last,
     show_status,
     init_config,
     fix_permissions,
@@ -108,8 +109,24 @@ def main() -> int:
     
     subparsers = parser.add_subparsers(dest="command", help="Commands")
     
-    subparsers.add_parser("generate", help="Generate for next monitor (default)")
+    # TEAM_006: Generate with optional monitor selection
+    generate_parser = subparsers.add_parser("generate", help="Generate for next monitor (default)")
+    generate_parser.add_argument(
+        "-m", "--monitor",
+        type=str,
+        help="Generate for specific monitor by name (e.g., DP-1, HDMI-A-1)"
+    )
+    
     subparsers.add_parser("generate-all", help="Generate for all monitors")
+    
+    # TEAM_006: Retry command for failed generations
+    retry_parser = subparsers.add_parser("retry", help="Retry last generation with new seed")
+    retry_parser.add_argument(
+        "--keep-failed",
+        action="store_true",
+        help="Keep the failed wallpaper instead of deleting it"
+    )
+    
     subparsers.add_parser("status", help="Show status")
     subparsers.add_parser("init", help="Initialize config")
     subparsers.add_parser("reset", help="Reset rotation")
@@ -280,9 +297,18 @@ def main() -> int:
             return 0
         
         if command == "generate":
-            generate_once(config, dry_run=args.dry_run, workflow_path=args.workflow, template_path=args.template)
+            # TEAM_006: Support generating for specific monitor
+            if hasattr(args, 'monitor') and args.monitor:
+                from .commands import generate_for_monitor
+                generate_for_monitor(config, args.monitor, dry_run=args.dry_run, 
+                                    workflow_override=args.workflow, template_override=args.template)
+            else:
+                generate_once(config, dry_run=args.dry_run, workflow_path=args.workflow, template_path=args.template)
         elif command == "generate-all":
             generate_all(config, dry_run=args.dry_run)
+        elif command == "retry":
+            # TEAM_006: Retry last generation with new seed
+            retry_last(config, dry_run=args.dry_run, delete_failed=not args.keep_failed)
         elif command == "status":
             show_status(config)
         elif command == "init":

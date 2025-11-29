@@ -94,8 +94,8 @@ workflow = "2327x1309"
 - [x] Exported new classes from `__init__.py`
 
 ### 3.3 ✅ Config Integration
-- [x] Added `Config.load_v2()` with monitor detection
-- [x] Added `ConfigV2` dataclass with active monitors
+- [x] TEAM_006: Merged `load_v2()` into `Config.load()`
+- [x] TEAM_006: Merged `ConfigV2` into `Config`
 - [x] REQ-MONITOR-012: Unconfigured monitors → skip with warning
 - [x] REQ-MONITOR-013: Disconnected monitors → warn and skip
 
@@ -136,8 +136,8 @@ workflow = "2327x1309"
 ### 4.3 ✅ Implementation Tasks
 - [x] BDD: `workflow_system.feature` passes (5/5 scenarios)
 - [x] Added `WorkflowConfig` to config.py
-- [x] Added `[workflows.{name}]` section parsing to ConfigV2
-- [x] Updated generate_v2.py with workflow-based template selection
+- [x] Added `[workflows.{name}]` section parsing to Config
+- [x] TEAM_006: Consolidated generate_v2.py into generate.py
 
 ---
 
@@ -194,7 +194,7 @@ nsfw_end = "06:00"
 ### 6.2 ✅ JSON Status (REQ-MISC-003)
 - [x] `darkwall status --json` for waybar/polybar
 - [x] Include: theme, schedule, monitors, comfyui status
-- [x] Updated `status.py` to use ConfigV2 and support JSON output
+- [x] TEAM_006: Updated `status.py` to use Config and support JSON output
 
 ### 6.3 ✅ Additional Wallpaper Setters
 - [x] hyprpaper (Hyprland) - Added `HyprpaperSetter`
@@ -223,8 +223,8 @@ urgency = "normal"  # low, normal, critical
 ### ComfyUI Integration ✅
 - Workflow loading, API client, prompt injection, polling, health checks
 
-### Multi-Monitor Support ✅ (old index-based)
-- MonitorConfig, rotation state, wallpaper commands, swaybg management
+### Multi-Monitor Support ✅
+- TEAM_006: MonitorsConfig/PerMonitorConfig, rotation state, wallpaper commands, swaybg management
 
 ### Configuration System ✅
 - TOML config, dataclasses, env overrides, auto-init

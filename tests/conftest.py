@@ -1,6 +1,6 @@
 """Test configuration and fixtures.
 
-TEAM_003: Updated to use ConfigV2 with per-monitor format.
+TEAM_006: Updated to use Config with per-monitor format (ConfigV2 merged).
 """
 
 import tempfile
@@ -11,13 +11,13 @@ import pytest
 
 from darkwall_comfyui.config import (
     Config,
-    ConfigV2,
     ComfyUIConfig,
     OutputConfig,
     PromptConfig,
     MonitorsConfig,
     PerMonitorConfig,
 )
+# TEAM_006: ConfigV2 deleted - merged into Config
 
 
 @pytest.fixture
@@ -84,8 +84,8 @@ level = "INFO"
 
 
 @pytest.fixture
-def test_config(temp_config_dir: Path) -> ConfigV2:
-    """Create a test ConfigV2 instance with isolated state."""
+def test_config(temp_config_dir: Path) -> Config:
+    """Create a test Config instance with isolated state."""
     config_file = temp_config_dir / "config.toml"
     
     # Temporarily patch the config directory method
@@ -93,8 +93,8 @@ def test_config(temp_config_dir: Path) -> ConfigV2:
     Config.get_config_dir = classmethod(lambda cls: temp_config_dir)
     
     try:
-        # Use load_v2 with monitor detection disabled for tests
-        config = Config.load_v2(config_file=config_file, initialize=False, detect_monitors=False)
+        # TEAM_006: Use Config.load with monitor detection disabled for tests
+        config = Config.load(config_file=config_file, initialize=False, detect_monitors=False)
         yield config
     finally:
         # Restore original method
@@ -102,25 +102,25 @@ def test_config(temp_config_dir: Path) -> ConfigV2:
 
 
 @pytest.fixture
-def comfyui_config(test_config: ConfigV2) -> ComfyUIConfig:
+def comfyui_config(test_config: Config) -> ComfyUIConfig:
     """Extract ComfyUIConfig from test config."""
     return test_config.comfyui
 
 
 @pytest.fixture
-def monitors_config(test_config: ConfigV2) -> MonitorsConfig:
+def monitors_config(test_config: Config) -> MonitorsConfig:
     """Extract MonitorsConfig from test config."""
     return test_config.monitors
 
 
 @pytest.fixture
-def output_config(test_config: ConfigV2) -> OutputConfig:
+def output_config(test_config: Config) -> OutputConfig:
     """Extract OutputConfig from test config."""
     return test_config.output
 
 
 @pytest.fixture
-def prompt_config(test_config: ConfigV2) -> PromptConfig:
+def prompt_config(test_config: Config) -> PromptConfig:
     """Extract PromptConfig from test config."""
     return test_config.prompt
 
