@@ -5,8 +5,9 @@ import subprocess
 from pathlib import Path
 from unittest.mock import Mock, patch, MagicMock
 
-from darkwall_comfyui.config import MonitorsConfig, PerMonitorConfig, OutputConfig
+from darkwall_comfyui.config import MonitorsConfig, PerMonitorConfig
 # TEAM_006: MonitorConfig deleted - using MonitorsConfig
+# TEAM_007: OutputConfig removed - no longer exists
 from darkwall_comfyui.wallpaper.setters import (
     WallpaperSetter, SwwwSetter, SwaybgSetter, FehSetter, get_setter
 )
@@ -185,8 +186,9 @@ class TestWallpaperTargetConsolidation:
     """Test that WallpaperTarget properly uses injected configs."""
     
     def test_wallpaper_target_uses_injected_configs(self):
-        """Test that WallpaperTarget uses injected MonitorsConfig and OutputConfig."""
+        """Test that WallpaperTarget uses injected MonitorsConfig."""
         # TEAM_006: Use MonitorsConfig instead of MonitorConfig
+        # TEAM_007: OutputConfig removed - WallpaperTarget only needs MonitorsConfig
         monitors_config = MonitorsConfig(
             monitors={
                 "DP-1": PerMonitorConfig(name="DP-1", workflow="default"),
@@ -194,13 +196,10 @@ class TestWallpaperTargetConsolidation:
             },
             command="swww"
         )
-        output_config = OutputConfig(create_backup=True)
         
         from darkwall_comfyui.wallpaper.target import WallpaperTarget
-        target = WallpaperTarget(monitors_config, output_config)
+        target = WallpaperTarget(monitors_config)
         
         # Should use injected configs, not a full Config object
         assert target.monitors_config == monitors_config
-        assert target.output_config == output_config
         assert len(target.monitors_config) == 2
-        assert target.output_config.create_backup is True

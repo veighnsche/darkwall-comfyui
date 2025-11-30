@@ -6,6 +6,7 @@ from unittest.mock import Mock, patch
 
 from darkwall_comfyui.comfy.client import ComfyClient, ComfyClientError, ComfyConnectionError
 from darkwall_comfyui.comfy.client import ComfyTimeoutError, ComfyGenerationError
+from darkwall_comfyui.prompt_generator import PromptResult
 
 
 def test_client_initialization(comfyui_config):
@@ -353,3 +354,175 @@ def test_download_image_not_found(comfyui_config):
         
         with pytest.raises(ComfyClientError, match="Image not found"):
             client._download_image("test.png")
+
+
+# TEAM_007: Tests for multi-prompt placeholder injection
+
+def test_inject_prompts_legacy_placeholders(comfyui_config):
+    """Test legacy __POSITIVE_PROMPT__ and __NEGATIVE_PROMPT__ placeholders."""
+    client = ComfyClient(comfyui_config)
+    
+    workflow = {
+        "1": {
+            "class_type": "CLIPTextEncode",
+            "inputs": {"text": "__POSITIVE_PROMPT__", "clip": ["2", 0]}
+        },
+        "2": {
+            "class_type": "CLIPTextEncode",
+            "inputs": {"text": "__NEGATIVE_PROMPT__", "clip": ["2", 0]}
+        }
+    }
+    
+    prompts = PromptResult.from_legacy(
+        positive="beautiful landscape",
+        negative="ugly, blurry"
+    )
+    
+    result = client._inject_prompts(workflow, prompts)
+    
+    assert result["1"]["inputs"]["text"] == "beautiful landscape"
+    assert result["2"]["inputs"]["text"] == "ugly, blurry"
+
+
+def test_inject_prompts_new_format_single_section(comfyui_config):
+    """Test new __PROMPT:name__ format with single section."""
+    client = ComfyClient(comfyui_config)
+    
+    workflow = {
+        "1": {
+            "class_type": "CLIPTextEncode",
+            "inputs": {"text": "__PROMPT:positive__", "clip": ["2", 0]}
+        },
+        "2": {
+            "class_type": "CLIPTextEncode",
+            "inputs": {"text": "__NEGATIVE:positive__", "clip": ["2", 0]}
+        }
+    }
+    
+    prompts = PromptResult(
+        prompts={"positive": "beautiful landscape"},
+        negatives={"positive": "ugly, blurry"}
+    )
+    
+    result = client._inject_prompts(workflow, prompts)
+    
+    assert result["1"]["inputs"]["text"] == "beautiful landscape"
+    assert result["2"]["inputs"]["text"] == "ugly, blurry"
+
+
+def test_inject_prompts_multi_section(comfyui_config):
+    """Test multi-section prompt injection (environment + subject)."""
+    client = ComfyClient(comfyui_config)
+    
+    workflow = {
+        "10": {
+            "class_type": "CLIPTextEncode",
+            "_meta": {"title": "Environment Positive"},
+            "inputs": {"text": "__PROMPT:environment__", "clip": ["4", 0]}
+        },
+        "11": {
+            "class_type": "CLIPTextEncode",
+            "_meta": {"title": "Environment Negative"},
+            "inputs": {"text": "__NEGATIVE:environment__", "clip": ["4", 0]}
+        },
+        "20": {
+            "class_type": "CLIPTextEncode",
+            "_meta": {"title": "Subject Positive"},
+            "inputs": {"text": "__PROMPT:subject__", "clip": ["4", 0]}
+        },
+        "21": {
+            "class_type": "CLIPTextEncode",
+            "_meta": {"title": "Subject Negative"},
+            "inputs": {"text": "__NEGATIVE:subject__", "clip": ["4", 0]}
+        }
+    }
+    
+    prompts = PromptResult(
+        prompts={
+            "environment": "mountain landscape, golden hour",
+            "subject": "woman standing on right side"
+        },
+        negatives={
+            "environment": "ugly, blurry",
+            "subject": "bad anatomy, extra limbs"
+        }
+    )
+    
+    result = client._inject_prompts(workflow, prompts)
+    
+    assert result["10"]["inputs"]["text"] == "mountain landscape, golden hour"
+    assert result["11"]["inputs"]["text"] == "ugly, blurry"
+    assert result["20"]["inputs"]["text"] == "woman standing on right side"
+    assert result["21"]["inputs"]["text"] == "bad anatomy, extra limbs"
+
+
+def test_inject_prompts_missing_negative_uses_empty(comfyui_config):
+    """Test that missing negative sections use empty string (lenient mode)."""
+    client = ComfyClient(comfyui_config)
+    
+    workflow = {
+        "1": {
+            "class_type": "CLIPTextEncode",
+            "inputs": {"text": "__PROMPT:environment__", "clip": ["2", 0]}
+        },
+        "2": {
+            "class_type": "CLIPTextEncode",
+            "inputs": {"text": "__NEGATIVE:environment__", "clip": ["2", 0]}
+        }
+    }
+    
+    # No negative provided
+    prompts = PromptResult(
+        prompts={"environment": "mountain landscape"},
+        negatives={}
+    )
+    
+    result = client._inject_prompts(workflow, prompts)
+    
+    assert result["1"]["inputs"]["text"] == "mountain landscape"
+    assert result["2"]["inputs"]["text"] == ""  # Empty string for missing negative
+
+
+def test_inject_prompts_no_placeholders_raises(comfyui_config):
+    """Test that workflow without any placeholders raises error."""
+    client = ComfyClient(comfyui_config)
+    
+    workflow = {
+        "1": {
+            "class_type": "CLIPTextEncode",
+            "inputs": {"text": "hardcoded prompt", "clip": ["2", 0]}
+        }
+    }
+    
+    prompts = PromptResult(
+        prompts={"positive": "test"},
+        negatives={}
+    )
+    
+    # Use Exception to avoid module identity issues between installed/local package
+    with pytest.raises(Exception) as exc_info:
+        client._inject_prompts(workflow, prompts)
+    
+    assert "WorkflowError" in type(exc_info.value).__name__
+    assert "missing prompt placeholders" in str(exc_info.value)
+
+
+def test_inject_prompts_deep_copy(comfyui_config):
+    """Test that injection creates a deep copy and doesn't modify original."""
+    client = ComfyClient(comfyui_config)
+    
+    workflow = {
+        "1": {
+            "class_type": "CLIPTextEncode",
+            "inputs": {"text": "__POSITIVE_PROMPT__", "clip": ["2", 0]}
+        }
+    }
+    
+    prompts = PromptResult.from_legacy(positive="new prompt")
+    
+    result = client._inject_prompts(workflow, prompts)
+    
+    # Original should be unchanged
+    assert workflow["1"]["inputs"]["text"] == "__POSITIVE_PROMPT__"
+    # Result should have new value
+    assert result["1"]["inputs"]["text"] == "new prompt"

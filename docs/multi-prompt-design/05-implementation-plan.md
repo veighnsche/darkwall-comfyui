@@ -121,12 +121,12 @@ Add example multi-section templates to `config/themes/*/prompts/`.
 
 ## Checklist
 
-- [ ] Phase 1.1: Update PromptResult dataclass
-- [ ] Phase 1.2: Update _parse_template_sections
-- [ ] Phase 2.1: Update generate_prompt_pair
-- [ ] Phase 3.1: Update _inject_prompts
-- [ ] Phase 3.2: Add validation/logging
-- [ ] Phase 4.1: Unit tests
+- [x] Phase 1.1: Update PromptResult dataclass (TEAM_007)
+- [x] Phase 1.2: Update _parse_template_sections (TEAM_007)
+- [x] Phase 2.1: Update generate_prompt_pair (TEAM_007)
+- [x] Phase 3.1: Update _inject_prompts (TEAM_007)
+- [x] Phase 3.2: Add validation/logging (TEAM_007)
+- [x] Phase 4.1: Unit tests (TEAM_007)
 - [ ] Phase 4.2: Integration tests
 - [ ] Phase 5.1: Update configuration docs
 - [ ] Phase 5.2: Update migration docs

@@ -26,10 +26,58 @@ from .exceptions import PromptError, TemplateNotFoundError, AtomFileError, Templ
 
 @dataclass
 class PromptResult:
-    """Result of prompt generation with positive and negative prompts."""
-    positive: str
-    negative: str = ""
+    """
+    Result of prompt generation with named prompt sections.
+    
+    TEAM_007: Updated to support arbitrary named sections for multi-prompt workflows.
+    Backwards compatible via .positive and .negative properties.
+    """
+    prompts: Dict[str, str]      # {"positive": "...", "environment": "...", "subject": "..."}
+    negatives: Dict[str, str]    # {"positive": "...", "environment": "...", "subject": "..."}
     seed: Optional[int] = None
+    
+    # Backwards compatibility properties
+    @property
+    def positive(self) -> str:
+        """Get the 'positive' section for backwards compatibility."""
+        return self.prompts.get("positive", "")
+    
+    @property
+    def negative(self) -> str:
+        """Get the 'positive:negative' section for backwards compatibility."""
+        return self.negatives.get("positive", "")
+    
+    def get_prompt(self, section: str) -> str:
+        """Get a named prompt section."""
+        return self.prompts.get(section, "")
+    
+    def get_negative(self, section: str) -> str:
+        """Get a named negative section."""
+        return self.negatives.get(section, "")
+    
+    def sections(self) -> List[str]:
+        """List all available prompt sections."""
+        return list(self.prompts.keys())
+    
+    @classmethod
+    def from_legacy(cls, positive: str, negative: str = "", seed: int = None) -> 'PromptResult':
+        """Create from legacy positive/negative format."""
+        return cls(
+            prompts={"positive": positive},
+            negatives={"positive": negative} if negative else {},
+            seed=seed
+        )
+    
+    def __str__(self) -> str:
+        """String representation for logging."""
+        sections = []
+        for name in sorted(self.prompts.keys()):
+            prompt_preview = self.prompts[name][:50] + "..." if len(self.prompts[name]) > 50 else self.prompts[name]
+            sections.append(f"[{name}] {prompt_preview}")
+            if name in self.negatives:
+                neg_preview = self.negatives[name][:50] + "..." if len(self.negatives[name]) > 50 else self.negatives[name]
+                sections.append(f"[{name}:negative] {neg_preview}")
+        return "\n".join(sections)
 
 
 class PromptGenerator:
@@ -348,36 +396,57 @@ class PromptGenerator:
             ) from e
     
     
-    def _parse_template_sections(self, template: str) -> Tuple[str, str]:
+    def _parse_template_sections(self, template: str) -> Dict[str, str]:
         """
-        Parse template into positive and negative sections.
+        Parse template into named sections.
+        
+        TEAM_007: Updated to support arbitrary named sections.
+        
+        Section syntax:
+            ---section_name---      -> prompts["section_name"]
+            ---section_name:negative--- -> negatives["section_name"]
+            ---negative---          -> negatives["positive"] (legacy)
+        
+        Content before first section marker goes to "positive".
         
         Args:
             template: Full template content
             
         Returns:
-            Tuple of (positive_template, negative_template)
+            Dict mapping section names to content (including :negative suffix for negatives)
         """
-        # Remove comment lines
-        lines = []
+        sections: Dict[str, str] = {}
+        current_section = "positive"  # Default section for content before first marker
+        current_content: List[str] = []
+        
         for line in template.split('\n'):
             stripped = line.strip()
-            if stripped and not stripped.startswith('#'):
-                lines.append(line)
+            
+            # Skip comments
+            if stripped.startswith('#'):
+                continue
+            
+            # Check for section marker: ---name--- or ---name:negative---
+            if stripped.startswith('---') and stripped.endswith('---') and len(stripped) > 6:
+                # Save previous section if it has content
+                if current_content:
+                    content = '\n'.join(current_content).strip()
+                    if content:
+                        sections[current_section] = content
+                
+                # Start new section
+                current_section = stripped[3:-3]  # Remove --- from both ends
+                current_content = []
+            else:
+                current_content.append(line)
         
-        content = '\n'.join(lines)
+        # Save final section
+        if current_content:
+            content = '\n'.join(current_content).strip()
+            if content:
+                sections[current_section] = content
         
-        # Split on ---negative--- separator
-        separator = '---negative---'
-        if separator in content:
-            parts = content.split(separator, 1)
-            positive = parts[0].strip()
-            negative = parts[1].strip() if len(parts) > 1 else ""
-        else:
-            positive = content.strip()
-            negative = ""
-        
-        return positive, negative
+        return sections
     
     def generate_prompt(self, monitor_index: int = None, template_path: str = None) -> str:
         """
@@ -398,7 +467,9 @@ class PromptGenerator:
     
     def generate_prompt_pair(self, monitor_index: int = None, template_path: str = None, seed: int = None) -> PromptResult:
         """
-        Generate both positive and negative prompts.
+        Generate prompts for all sections in the template.
+        
+        TEAM_007: Updated to support arbitrary named sections.
         
         Args:
             monitor_index: Optional monitor index for variation
@@ -406,7 +477,7 @@ class PromptGenerator:
             seed: Optional specific seed to use (default: time-based)
             
         Returns:
-            PromptResult with positive and negative prompts
+            PromptResult with named prompt sections
             
         Raises:
             PromptError: If prompt generation fails
@@ -416,30 +487,54 @@ class PromptGenerator:
                 seed = self.get_time_slot_seed(monitor_index=monitor_index)
             self.logger.debug(f"Generated seed {seed} for monitor {monitor_index or 'default'}")
             
-            # Load and parse template
+            # Load and parse template into named sections
             template = self._load_template(template_path)
-            positive_template, negative_template = self._parse_template_sections(template)
+            sections = self._parse_template_sections(template)
             
-            # Resolve templates
-            positive = self._resolve_template(positive_template, seed)
-            negative = self._resolve_template(negative_template, seed + 50000)  # Different seed for negative
+            # TEAM_007: Process sections into prompts and negatives dicts
+            prompts: Dict[str, str] = {}
+            negatives: Dict[str, str] = {}
             
-            # Clean up whitespace
-            positive = ' '.join(positive.split())
-            negative = ' '.join(negative.split())
+            for section_name, content in sections.items():
+                # Use section name hash for variation to ensure reproducibility
+                section_offset = hash(section_name) % 10000
+                
+                if section_name.endswith(':negative'):
+                    # This is a negative section: ---subject:negative---
+                    base_name = section_name[:-9]  # Remove ':negative'
+                    resolved = self._resolve_template(content, seed + section_offset)
+                    negatives[base_name] = ' '.join(resolved.split())
+                elif section_name == 'negative':
+                    # Legacy: ---negative--- maps to positive:negative
+                    resolved = self._resolve_template(content, seed + 50000)
+                    negatives['positive'] = ' '.join(resolved.split())
+                else:
+                    # Regular prompt section
+                    resolved = self._resolve_template(content, seed + section_offset)
+                    prompts[section_name] = ' '.join(resolved.split())
             
-            # Validate
-            if not positive or len(positive.strip()) < 10:
+            # Validate: must have at least one prompt section
+            if not prompts:
                 raise TemplateParseError(
-                    f"Generated prompt too short ({len(positive)} chars).\n"
+                    "No prompt sections found in template.\n"
+                    "Templates must contain at least one prompt section."
+                )
+            
+            # Validate: primary prompt (positive or first section) must be substantial
+            primary_prompt = prompts.get('positive', next(iter(prompts.values())))
+            if len(primary_prompt.strip()) < 10:
+                raise TemplateParseError(
+                    f"Generated prompt too short ({len(primary_prompt)} chars).\n"
                     "Check that your template contains valid content and wildcards resolve correctly."
                 )
             
-            self.logger.info(f"Generated prompt: {positive[:80]}...")
-            if negative:
-                self.logger.debug(f"Negative prompt: {negative[:80]}...")
+            # Log generated prompts
+            for name, prompt in prompts.items():
+                self.logger.info(f"Generated [{name}]: {prompt[:60]}...")
+            for name, neg in negatives.items():
+                self.logger.debug(f"Generated [{name}:negative]: {neg[:60]}...")
             
-            return PromptResult(positive=positive, negative=negative, seed=seed)
+            return PromptResult(prompts=prompts, negatives=negatives, seed=seed)
             
         except PromptError:
             raise

@@ -101,7 +101,8 @@ class TestWallpaperHistory:
     @pytest.fixture
     def mock_prompt_result(self):
         """Create mock prompt result."""
-        return PromptResult(
+        # TEAM_007: Use new PromptResult format with prompts/negatives dicts
+        return PromptResult.from_legacy(
             positive="test positive prompt",
             negative="test negative prompt"
         )

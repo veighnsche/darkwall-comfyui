@@ -12,12 +12,12 @@ import pytest
 from darkwall_comfyui.config import (
     Config,
     ComfyUIConfig,
-    OutputConfig,
     PromptConfig,
     MonitorsConfig,
     PerMonitorConfig,
 )
 # TEAM_006: ConfigV2 deleted - merged into Config
+# TEAM_007: OutputConfig removed - no longer exists
 
 
 @pytest.fixture
@@ -69,9 +69,6 @@ output = "~/Pictures/wallpapers/DP-1.png"
 workflow = "default"
 output = "~/Pictures/wallpapers/HDMI-A-1.png"
 
-[output]
-create_backup = true
-
 [prompt]
 atoms_dir = "atoms"
 time_slot_minutes = 60
@@ -111,12 +108,6 @@ def comfyui_config(test_config: Config) -> ComfyUIConfig:
 def monitors_config(test_config: Config) -> MonitorsConfig:
     """Extract MonitorsConfig from test config."""
     return test_config.monitors
-
-
-@pytest.fixture
-def output_config(test_config: Config) -> OutputConfig:
-    """Extract OutputConfig from test config."""
-    return test_config.output
 
 
 @pytest.fixture

@@ -6,6 +6,7 @@ Handles communication with ComfyUI: workflow submission, polling, and image down
 
 import json
 import logging
+import re
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -241,49 +242,100 @@ class ComfyClient:
         
         return workflow
     
+    # TEAM_007: Regex patterns for new multi-prompt placeholder format
+    _PROMPT_PATTERN = re.compile(r'^__PROMPT:([a-z0-9_]+)__$')
+    _NEGATIVE_PATTERN = re.compile(r'^__NEGATIVE:([a-z0-9_]+)__$')
+    
     def _inject_prompts(self, workflow: dict[str, Any], prompts: PromptResult) -> dict[str, Any]:
-        """Inject both positive and negative prompts into workflow nodes using placeholders."""
+        """
+        Inject prompts into workflow nodes using placeholders.
+        
+        TEAM_007: Updated to support arbitrary named sections.
+        
+        Placeholder formats:
+            __PROMPT:section_name__   -> prompts.prompts["section_name"]
+            __NEGATIVE:section_name__ -> prompts.negatives["section_name"]
+            __POSITIVE_PROMPT__       -> prompts.prompts["positive"] (legacy)
+            __NEGATIVE_PROMPT__       -> prompts.negatives["positive"] (legacy)
+        """
         import json
         workflow = json.loads(json.dumps(workflow))  # Deep copy
         
-        positive_injected = False
-        negative_injected = False
+        injected: set[str] = set()
+        missing_sections: set[str] = set()
         
-        # Look for placeholder-based injection (REQUIRED)
         for node_id, node in workflow.items():
             if not isinstance(node, dict):
                 continue
             
             inputs = node.get('inputs', {})
             
-            # Check for placeholder-based injection
             for field, value in inputs.items():
-                if isinstance(value, str):
-                    if value == "__POSITIVE_PROMPT__":
-                        inputs[field] = prompts.positive
-                        self.logger.debug(f"Injected positive prompt into placeholder node {node_id}.{field}")
-                        positive_injected = True
-                    elif value == "__NEGATIVE_PROMPT__" and prompts.negative:
-                        inputs[field] = prompts.negative
-                        self.logger.debug(f"Injected negative prompt into placeholder node {node_id}.{field}")
-                        negative_injected = True
+                if not isinstance(value, str):
+                    continue
+                
+                # TEAM_007: Check for new format: __PROMPT:name__
+                match = self._PROMPT_PATTERN.match(value)
+                if match:
+                    section = match.group(1)
+                    if section in prompts.prompts:
+                        inputs[field] = prompts.prompts[section]
+                        self.logger.debug(f"Injected PROMPT:{section} into node {node_id}.{field}")
+                        injected.add(f"PROMPT:{section}")
+                    else:
+                        missing_sections.add(f"PROMPT:{section}")
+                    continue
+                
+                # TEAM_007: Check for new format: __NEGATIVE:name__
+                match = self._NEGATIVE_PATTERN.match(value)
+                if match:
+                    section = match.group(1)
+                    if section in prompts.negatives:
+                        inputs[field] = prompts.negatives[section]
+                        self.logger.debug(f"Injected NEGATIVE:{section} into node {node_id}.{field}")
+                        injected.add(f"NEGATIVE:{section}")
+                    else:
+                        # For negatives, use empty string if missing (lenient mode)
+                        inputs[field] = ""
+                        self.logger.debug(f"No NEGATIVE:{section} in template, using empty string")
+                        missing_sections.add(f"NEGATIVE:{section}")
+                    continue
+                
+                # Legacy: __POSITIVE_PROMPT__ -> prompts["positive"]
+                if value == "__POSITIVE_PROMPT__":
+                    inputs[field] = prompts.prompts.get("positive", "")
+                    self.logger.debug(f"Injected legacy positive prompt into node {node_id}.{field}")
+                    injected.add("PROMPT:positive")
+                    continue
+                
+                # Legacy: __NEGATIVE_PROMPT__ -> negatives["positive"]
+                if value == "__NEGATIVE_PROMPT__":
+                    neg = prompts.negatives.get("positive", "")
+                    if neg:
+                        inputs[field] = neg
+                        self.logger.debug(f"Injected legacy negative prompt into node {node_id}.{field}")
+                        injected.add("NEGATIVE:positive")
+                    continue
         
-        # Validate injection was successful
-        if not positive_injected:
+        # Validate: at least one prompt was injected
+        prompt_injections = [i for i in injected if i.startswith("PROMPT:")]
+        if not prompt_injections:
             raise WorkflowError(
-                "Workflow missing __POSITIVE_PROMPT__ placeholder. "
-                "Please update your workflow to use placeholder-based prompt injection. "
+                "Workflow missing prompt placeholders. "
+                "Use __PROMPT:section__ or __POSITIVE_PROMPT__ placeholders. "
                 "See docs/workflow-migration.md for migration guide."
             )
         
-        if prompts.negative and not negative_injected:
-            # Soft behavior: warn and continue with positive-only
-            self.logger.warning(
-                "Negative prompt provided but workflow missing __NEGATIVE_PROMPT__ placeholder; "
-                "continuing with positive prompt only."
-            )
+        # Log warnings for missing sections
+        for missing in missing_sections:
+            if missing.startswith("PROMPT:"):
+                self.logger.warning(f"Workflow requests {missing} but template has no matching section")
         
-        self.logger.info("Successfully injected prompts using placeholder-based system")
+        # Log summary
+        self.logger.info(f"Injected prompts: {', '.join(sorted(injected))}")
+        if missing_sections:
+            self.logger.debug(f"Missing sections (used defaults): {', '.join(sorted(missing_sections))}")
+        
         return workflow
 
     def _inject_seed(self, workflow: dict[str, Any], seed: int) -> dict[str, Any]:

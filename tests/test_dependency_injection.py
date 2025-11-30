@@ -7,8 +7,9 @@ import pytest
 from pathlib import Path
 
 from darkwall_comfyui.config import (
-    ComfyUIConfig, MonitorsConfig, PerMonitorConfig, OutputConfig, PromptConfig, NamedStateManager
+    ComfyUIConfig, MonitorsConfig, PerMonitorConfig, PromptConfig, NamedStateManager
 )
+# TEAM_007: OutputConfig removed - no longer exists
 from darkwall_comfyui.comfy.client import ComfyClient
 from darkwall_comfyui.comfy.workflow import WorkflowManager
 from darkwall_comfyui.prompt_generator import PromptGenerator
@@ -74,9 +75,10 @@ class TestDependencyInjection:
             assert prompt_gen.config == prompt_config
             assert prompt_gen.config_dir == config_dir
     
-    def test_wallpaper_target_accepts_monitors_and_output_configs(self):
-        """Test WallpaperTarget accepts MonitorsConfig and OutputConfig."""
+    def test_wallpaper_target_accepts_monitors_config(self):
+        """Test WallpaperTarget accepts MonitorsConfig."""
         # TEAM_006: Use MonitorsConfig instead of MonitorConfig
+        # TEAM_007: OutputConfig removed - WallpaperTarget only needs MonitorsConfig
         monitors_config = MonitorsConfig(
             monitors={
                 "DP-1": PerMonitorConfig(name="DP-1", workflow="default"),
@@ -84,14 +86,11 @@ class TestDependencyInjection:
             },
             command="swww"
         )
-        output_config = OutputConfig(create_backup=True)
         
-        target = WallpaperTarget(monitors_config, output_config)
+        target = WallpaperTarget(monitors_config)
         
         assert target.monitors_config == monitors_config
-        assert target.output_config == output_config
         assert len(target.monitors_config) == 2
-        assert target.output_config.create_backup is True
     
     def test_named_state_manager_accepts_monitor_names(self):
         """Test NamedStateManager accepts list of monitor names."""

@@ -99,6 +99,7 @@ def test_template_sections(prompt_config, config_dir):
     """Test parsing positive/negative sections."""
     gen = PromptGenerator(prompt_config, config_dir)
     
+    # TEAM_007: Test legacy format (content before first marker -> "positive")
     template = """
     # Comment line
     positive prompt here
@@ -107,10 +108,46 @@ def test_template_sections(prompt_config, config_dir):
     negative prompt here
     """
     
-    positive, negative = gen._parse_template_sections(template)
-    assert "positive prompt here" in positive
-    assert "negative prompt here" in negative
-    assert "Comment" not in positive
+    sections = gen._parse_template_sections(template)
+    assert "positive" in sections
+    assert "negative" in sections
+    assert "positive prompt here" in sections["positive"]
+    assert "negative prompt here" in sections["negative"]
+    # Comments should be stripped
+    assert "Comment" not in sections["positive"]
+
+
+def test_template_sections_multi(prompt_config, config_dir):
+    """Test parsing multi-section templates (TEAM_007)."""
+    gen = PromptGenerator(prompt_config, config_dir)
+    
+    template = """
+    # Multi-section template
+    
+    ---environment---
+    mountain landscape, golden hour
+    
+    ---environment:negative---
+    ugly, blurry
+    
+    ---subject---
+    woman standing on right
+    
+    ---subject:negative---
+    bad anatomy
+    """
+    
+    sections = gen._parse_template_sections(template)
+    
+    assert "environment" in sections
+    assert "environment:negative" in sections
+    assert "subject" in sections
+    assert "subject:negative" in sections
+    
+    assert "mountain landscape" in sections["environment"]
+    assert "ugly, blurry" in sections["environment:negative"]
+    assert "woman standing" in sections["subject"]
+    assert "bad anatomy" in sections["subject:negative"]
 
 
 def test_prompt_pair_generation(prompt_config, config_dir):
@@ -168,3 +205,70 @@ def test_missing_wildcard_handling(prompt_config, config_dir):
     # Template with missing wildcard marks it
     result = gen._resolve_template("test __nonexistent__ end", seed=42)
     assert "[missing:nonexistent]" in result
+
+
+# TEAM_007: Tests for new multi-prompt functionality
+
+def test_prompt_result_backwards_compat():
+    """Test PromptResult backwards compatibility properties."""
+    result = PromptResult(
+        prompts={"positive": "a beautiful landscape"},
+        negatives={"positive": "ugly, blurry"},
+        seed=12345
+    )
+    # Old API still works
+    assert result.positive == "a beautiful landscape"
+    assert result.negative == "ugly, blurry"
+    assert result.seed == 12345
+
+
+def test_prompt_result_multi_section():
+    """Test PromptResult with multiple sections."""
+    result = PromptResult(
+        prompts={
+            "environment": "mountain landscape",
+            "subject": "woman standing right"
+        },
+        negatives={
+            "environment": "ugly",
+            "subject": "bad anatomy"
+        },
+        seed=12345
+    )
+    
+    # New API
+    assert result.get_prompt("environment") == "mountain landscape"
+    assert result.get_prompt("subject") == "woman standing right"
+    assert result.get_negative("environment") == "ugly"
+    assert result.get_negative("subject") == "bad anatomy"
+    assert set(result.sections()) == {"environment", "subject"}
+    
+    # Backwards compat returns empty for missing "positive"
+    assert result.positive == ""
+    assert result.negative == ""
+
+
+def test_prompt_result_from_legacy():
+    """Test PromptResult.from_legacy factory method."""
+    result = PromptResult.from_legacy(
+        positive="test prompt",
+        negative="test negative",
+        seed=42
+    )
+    
+    assert result.positive == "test prompt"
+    assert result.negative == "test negative"
+    assert result.prompts == {"positive": "test prompt"}
+    assert result.negatives == {"positive": "test negative"}
+
+
+def test_prompt_result_str():
+    """Test PromptResult string representation."""
+    result = PromptResult(
+        prompts={"positive": "short prompt"},
+        negatives={"positive": "short neg"},
+        seed=1
+    )
+    s = str(result)
+    assert "[positive]" in s
+    assert "short prompt" in s
