@@ -27,10 +27,9 @@ requires-python = ">=3.9"
 dependencies = [
     "requests>=2.25.0",
     "tomli>=2.0.0",
-    "tomli-w>=1.0.0",
     "websocket-client>=1.6.0",
     "tqdm>=4.60.0",
-    "astral>=3.2",  # TEAM_003: Solar calculations for theme scheduling
+    "astral>=3.2",
 ]
 
 [project.optional-dependencies]
@@ -44,7 +43,7 @@ dev = [
 ]
 
 [project.scripts]
-generate-wallpaper-once = "darkwall_comfyui.cli:main"
+darkwall = "darkwall_comfyui.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/vince/darkwall-comfyui"

@@ -24,10 +24,9 @@
           dependencies = with pkgs.python3Packages; [
             requests
             tomli
-            tomli-w
             websocket-client
             tqdm
-            astral  # TEAM_003: Solar calculations for theme scheduling
+            astral  # Solar calculations for theme scheduling
           ];
           
           # Build dependencies
@@ -48,62 +47,12 @@
           ];
           
           postInstall = ''
-            # Copy default configuration files to share directory FIRST
             mkdir -p $out/share/darkwall-comfyui
+            cp -r $src/config/* $out/share/darkwall-comfyui/
             
-            # Wrap the binary to include wallpaper setters in PATH
-            # and set DARKWALL_CONFIG_TEMPLATES for config initialization
-            wrapProgram $out/bin/generate-wallpaper-once \
+            wrapProgram $out/bin/darkwall \
               --prefix PATH : ${pkgs.lib.makeBinPath runtimeDependencies} \
               --set DARKWALL_CONFIG_TEMPLATES "$out/share/darkwall-comfyui"
-            
-            # Check if config directory exists and copy files
-            if [ -d "$src/config" ]; then
-              cp -r $src/config/* $out/share/darkwall-comfyui/ || true
-              echo "Config templates copied from $src/config"
-            else
-              echo "Warning: Config directory not found at $src/config"
-              # Create minimal config structure
-              mkdir -p $out/share/darkwall-comfyui/atoms
-              mkdir -p $out/share/darkwall-comfyui/prompts
-              mkdir -p $out/share/darkwall-comfyui/workflows
-              cat > $out/share/darkwall-comfyui/config.toml << 'EOF'
-[comfyui]
-base_url = "http://localhost:8188"
-workflow_path = "workflow.json"
-timeout = 300
-poll_interval = 5
-
-[monitors]
-count = 1
-command = "swww"
-pattern = "monitor_{index}.png"
-backup_pattern = "monitor_{index}_{timestamp}.png"
-
-[output]
-directory = "~/Pictures/wallpapers"
-create_backup = true
-
-[prompt]
-atoms_dir = "atoms"
-time_slot_minutes = 30
-default_template = "default.prompt"
-
-[history]
-enabled = true
-max_entries = 1000
-
-[logging]
-level = "INFO"
-EOF
-            fi
-            
-            # Copy systemd service files if they exist
-            if [ -d "$src/systemd" ]; then
-              mkdir -p $out/share/systemd/user
-              cp $src/systemd/*.service $out/share/systemd/user/ 2>/dev/null || true
-              cp $src/systemd/*.timer $out/share/systemd/user/ 2>/dev/null || true
-            fi
           '';
           
           meta = {
@@ -111,7 +60,7 @@ EOF
             homepage = "https://github.com/vince/darkwall-comfyui";
             license = pkgs.lib.licenses.mit;
             platforms = pkgs.lib.platforms.linux;
-            mainProgram = "generate-wallpaper-once";
+            mainProgram = "darkwall";
           };
         };
 
@@ -141,10 +90,6 @@ EOF
                 type = types.attrsOf types.str;
                 default = {};
                 description = "Environment variables for the service";
-                example = {
-                  COMFYUI_BASE_URL = "https://comfyui.home.arpa";
-                  TIME_SLOT_MINUTES = "30";
-                };
               };
               
               timer = {
@@ -179,7 +124,7 @@ EOF
                 
                 serviceConfig = {
                   Type = "oneshot";
-                  ExecStart = "${cfg.package}/bin/generate-wallpaper-once generate";
+                  ExecStart = "${cfg.package}/bin/darkwall generate";
                   Environment = cfg.environment;
                   Restart = "on-failure";
                   RestartSec = 60;
@@ -219,11 +164,6 @@ EOF
                 type = types.attrsOf types.str;
                 default = {};
                 description = "Environment variables for the service";
-                example = {
-                  COMFYUI_BASE_URL = "https://comfyui.home.arpa";
-                  TIME_SLOT_MINUTES = "30";
-                  WALLPAPER_OUTPUT_PATH = "%h/Pictures/wallpapers/current.png";
-                };
               };
               
               timer = {
@@ -253,7 +193,7 @@ EOF
                 
                 Service = {
                   Type = "oneshot";
-                  ExecStart = "${cfg.package}/bin/generate-wallpaper-once generate";
+                  ExecStart = "${cfg.package}/bin/darkwall generate";
                   Environment = cfg.environment;
                 };
               };
@@ -288,8 +228,8 @@ EOF
             python3
             python3Packages.requests
             python3Packages.tomli
-            python3Packages.tomli-w
             python3Packages.websocket-client
+            python3Packages.astral
             python3Packages.tqdm
             python3Packages.pytest
             python3Packages.pytest-bdd
@@ -332,7 +272,7 @@ EOF
         # App definition for nix run
         apps.default = {
           type = "app";
-          program = "${darkwall-comfyui}/bin/generate-wallpaper-once";
+          program = "${darkwall-comfyui}/bin/darkwall";
         };
         
         # Formatter for this flake

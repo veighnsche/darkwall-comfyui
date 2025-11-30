@@ -2,7 +2,7 @@
 Command-line interface for DarkWall ComfyUI.
 
 Usage:
-    generate-wallpaper-once [command] [options]
+    darkwall [command] [options]
     
 Commands:
     generate      Generate wallpaper for next monitor (default)
@@ -66,7 +66,7 @@ def setup_logging(level: str = "INFO") -> None:
 def main() -> int:
     """Main entry point."""
     parser = argparse.ArgumentParser(
-        prog="generate-wallpaper-once",
+        prog="darkwall",
         description="Deterministic dark-mode wallpaper generator using ComfyUI"
     )
     
