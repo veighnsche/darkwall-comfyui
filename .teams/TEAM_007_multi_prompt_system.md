@@ -59,6 +59,21 @@ Implement arbitrary named prompt sections per design docs in `docs/multi-prompt-
 - [ ] Phase 5.2: Update docs/workflow-migration.md with new placeholders
 - [ ] Phase 5.3: Create example multi-section templates
 
+### Session 2 - 2024-11-30 (continued)
+
+**Refactored comfy/client.py** ✅
+Split 632-line monolith into focused modules:
+
+| File | Lines | Responsibility |
+|------|-------|----------------|
+| `client.py` | 149 | Orchestration layer |
+| `transport.py` | 449 | HTTP/WebSocket transport |
+| `injection.py` | 196 | Workflow injection |
+
+- All 134 tests pass
+- Backwards compatible (private methods delegate to modules)
+- Updated `comfy/__init__.py` exports
+
 ## Handoff Notes
 Multi-prompt system is fully implemented and tested:
 
@@ -66,6 +81,7 @@ Multi-prompt system is fully implemented and tested:
 2. **Workflow placeholders**: Use `__PROMPT:name__` and `__NEGATIVE:name__`
 3. **Backwards compatible**: Old templates and workflows work unchanged
 4. **134 tests pass**
+5. **client.py refactored**: Split into transport.py + injection.py
 
 Example template:
 ```

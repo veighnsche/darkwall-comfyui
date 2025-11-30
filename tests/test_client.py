@@ -4,8 +4,13 @@ import json
 import pytest
 from unittest.mock import Mock, patch
 
-from darkwall_comfyui.comfy.client import ComfyClient, ComfyClientError, ComfyConnectionError
-from darkwall_comfyui.comfy.client import ComfyTimeoutError, ComfyGenerationError
+from darkwall_comfyui.comfy.client import ComfyClient
+from darkwall_comfyui.exceptions import (
+    ComfyClientError,
+    ComfyConnectionError,
+    ComfyTimeoutError,
+    ComfyGenerationError,
+)
 from darkwall_comfyui.prompt_generator import PromptResult
 
 
@@ -140,7 +145,8 @@ def test_submit_workflow_success(comfyui_config):
     
     workflow = {"1": {"class_type": "TestNode", "inputs": {}}}
     
-    with patch("darkwall_comfyui.comfy.client.uuid.uuid4", return_value="test-123"), \
+    # TEAM_007: Patch uuid in transport module where it's used
+    with patch("darkwall_comfyui.comfy.transport.uuid.uuid4", return_value="test-123"), \
          patch.object(client.session, 'post') as mock_post:
         mock_response = Mock()
         mock_response.raise_for_status.return_value = None
@@ -278,8 +284,9 @@ def test_wait_for_result_uses_websocket_and_history(comfyui_config):
         }
     }
 
-    with patch("darkwall_comfyui.comfy.client.websocket.create_connection", return_value=ws_mock), \
-         patch.object(client, "_get_history", return_value=history):
+    # TEAM_007: Patch websocket in transport module where it's used
+    with patch("darkwall_comfyui.comfy.transport.websocket.create_connection", return_value=ws_mock), \
+         patch.object(client._transport, "get_history", return_value=history):
         result = client._wait_for_result(prompt_id)
 
     assert result["filename"] == "test.png"
