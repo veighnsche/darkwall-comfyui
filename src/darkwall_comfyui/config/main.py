@@ -74,10 +74,9 @@ class Config:
                 "Expected format: http://hostname:port or https://hostname"
             )
         
-        if self.comfyui.timeout <= 0 or self.comfyui.timeout > 3600:  # Max 1 hour
+        if self.comfyui.timeout <= 0:
             raise ConfigValidationError(
-                f"Generation timeout ({self.comfyui.timeout}s) out of range.\n"
-                "Must be between 1 and 3600 seconds."
+                f"Generation timeout ({self.comfyui.timeout}s) must be positive."
             )
         
         if self.comfyui.poll_interval <= 0 or self.comfyui.poll_interval > 60:  # Max 1 minute

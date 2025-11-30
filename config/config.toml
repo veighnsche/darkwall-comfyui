@@ -5,7 +5,7 @@
 
 [comfyui]
 base_url = "http://192.168.178.29:8188"
-timeout = 300
+timeout = 5340  # 89 minutes (3 monitors × 30 min each)
 poll_interval = 5
 
 # ============================================================================
