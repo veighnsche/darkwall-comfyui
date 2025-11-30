@@ -21,17 +21,216 @@
       "title": "Save Image"
     }
   },
-  "30:120:106": {
+  "27:26:23": {
     "inputs": {
-      "op": "Round",
+      "value": "You are an assistant designed to generate high quality anime images based on textual prompts. <Prompt Start> "
+    },
+    "class_type": "PrimitiveStringMultiline",
+    "_meta": {
+      "title": "System prompt"
+    }
+  },
+  "27:4": {
+    "inputs": {
+      "ckpt_name": "uncannyValley_Noob3dV3.safetensors"
+    },
+    "class_type": "CheckpointLoaderSimple",
+    "_meta": {
+      "title": "Load Checkpoint"
+    }
+  },
+  "27:26:24": {
+    "inputs": {
+      "value": "__POSITIVE_PROMPT__"
+    },
+    "class_type": "PrimitiveStringMultiline",
+    "_meta": {
+      "title": "Prompt"
+    }
+  },
+  "27:25:23": {
+    "inputs": {
+      "value": "You are an assistant designed to generate low-quality images based on textual prompts <Prompt Start> "
+    },
+    "class_type": "PrimitiveStringMultiline",
+    "_meta": {
+      "title": "System prompt"
+    }
+  },
+  "27:25:24": {
+    "inputs": {
+      "value": "__NEGATIVE_PROMPT__"
+    },
+    "class_type": "PrimitiveStringMultiline",
+    "_meta": {
+      "title": "System prompt"
+    }
+  },
+  "30:138": {
+    "inputs": {
+      "value": 1024
+    },
+    "class_type": "PrimitiveInt",
+    "_meta": {
+      "title": "generation height"
+    }
+  },
+  "30:137": {
+    "inputs": {
+      "value": 1024
+    },
+    "class_type": "PrimitiveInt",
+    "_meta": {
+      "title": "generation width"
+    }
+  },
+  "30:139": {
+    "inputs": {
+      "value": 2327
+    },
+    "class_type": "PrimitiveInt",
+    "_meta": {
+      "title": "output width"
+    }
+  },
+  "30:140": {
+    "inputs": {
+      "value": 1309
+    },
+    "class_type": "PrimitiveInt",
+    "_meta": {
+      "title": "output height"
+    }
+  },
+  "27:26:22": {
+    "inputs": {
+      "string_a": [
+        "27:26:23",
+        0
+      ],
+      "string_b": [
+        "27:26:24",
+        0
+      ],
+      "delimiter": ""
+    },
+    "class_type": "StringConcatenate",
+    "_meta": {
+      "title": "Concatenate"
+    }
+  },
+  "27:25:22": {
+    "inputs": {
+      "string_a": [
+        "27:25:23",
+        0
+      ],
+      "string_b": [
+        "27:25:24",
+        0
+      ],
+      "delimiter": ""
+    },
+    "class_type": "StringConcatenate",
+    "_meta": {
+      "title": "Concatenate"
+    }
+  },
+  "30:141": {
+    "inputs": {
       "a": [
-        "30:120:105",
+        "30:138",
         0
       ]
     },
-    "class_type": "CM_FloatUnaryOperation",
+    "class_type": "CM_IntToFloat",
     "_meta": {
-      "title": "FloatUnaryOperation"
+      "title": "IntToFloat"
+    }
+  },
+  "30:144": {
+    "inputs": {
+      "a": [
+        "30:137",
+        0
+      ]
+    },
+    "class_type": "CM_IntToFloat",
+    "_meta": {
+      "title": "IntToFloat"
+    }
+  },
+  "30:143": {
+    "inputs": {
+      "a": [
+        "30:139",
+        0
+      ]
+    },
+    "class_type": "CM_IntToFloat",
+    "_meta": {
+      "title": "IntToFloat"
+    }
+  },
+  "30:142": {
+    "inputs": {
+      "a": [
+        "30:140",
+        0
+      ]
+    },
+    "class_type": "CM_IntToFloat",
+    "_meta": {
+      "title": "IntToFloat"
+    }
+  },
+  "27:26:7": {
+    "inputs": {
+      "text": [
+        "27:26:22",
+        0
+      ],
+      "clip": [
+        "27:4",
+        1
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (Positive Prompt)"
+    }
+  },
+  "27:25:7": {
+    "inputs": {
+      "text": [
+        "27:25:22",
+        0
+      ],
+      "clip": [
+        "27:4",
+        1
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (Negative Prompt)"
+    }
+  },
+  "30:149": {
+    "inputs": {
+      "op": "Mul",
+      "a": [
+        "30:144",
+        0
+      ],
+      "b": [
+        "30:141",
+        0
+      ]
+    },
+    "class_type": "CM_FloatBinaryOperation",
+    "_meta": {
+      "title": "FloatBinaryOperation"
     }
   },
   "30:120:105": {
@@ -48,11 +247,82 @@
       "title": "FloatBinaryOperation"
     }
   },
-  "30:120:107": {
+  "30:164": {
+    "inputs": {
+      "op": "Div",
+      "a": [
+        "30:143",
+        0
+      ],
+      "b": 2
+    },
+    "class_type": "CM_FloatBinaryOperation",
+    "_meta": {
+      "title": "FloatBinaryOperation"
+    }
+  },
+  "30:122:105": {
+    "inputs": {
+      "op": "Div",
+      "a": [
+        "30:142",
+        0
+      ],
+      "b": 16
+    },
+    "class_type": "CM_FloatBinaryOperation",
+    "_meta": {
+      "title": "FloatBinaryOperation"
+    }
+  },
+  "30:151": {
     "inputs": {
       "op": "Mul",
       "a": [
-        "30:120:106",
+        "30:143",
+        0
+      ],
+      "b": [
+        "30:142",
+        0
+      ]
+    },
+    "class_type": "CM_FloatBinaryOperation",
+    "_meta": {
+      "title": "FloatBinaryOperation"
+    }
+  },
+  "30:163": {
+    "inputs": {
+      "preview": "",
+      "source": [
+        "30:149",
+        0
+      ]
+    },
+    "class_type": "PreviewAny",
+    "_meta": {
+      "title": "Preview Any"
+    }
+  },
+  "30:120:106": {
+    "inputs": {
+      "op": "Round",
+      "a": [
+        "30:120:105",
+        0
+      ]
+    },
+    "class_type": "CM_FloatUnaryOperation",
+    "_meta": {
+      "title": "FloatUnaryOperation"
+    }
+  },
+  "30:126:105": {
+    "inputs": {
+      "op": "Div",
+      "a": [
+        "30:164",
         0
       ],
       "b": 16
@@ -75,39 +345,41 @@
       "title": "FloatUnaryOperation"
     }
   },
-  "30:122:105": {
+  "30:152": {
     "inputs": {
       "op": "Div",
       "a": [
-        "30:142",
+        "30:149",
         0
       ],
-      "b": 16
+      "b": [
+        "30:151",
+        0
+      ]
     },
     "class_type": "CM_FloatBinaryOperation",
     "_meta": {
       "title": "FloatBinaryOperation"
     }
   },
-  "30:122:107": {
+  "30:162": {
+    "inputs": {
+      "preview": "",
+      "source": [
+        "30:151",
+        0
+      ]
+    },
+    "class_type": "PreviewAny",
+    "_meta": {
+      "title": "Preview Any"
+    }
+  },
+  "30:120:107": {
     "inputs": {
       "op": "Mul",
       "a": [
-        "30:122:106",
-        0
-      ],
-      "b": 16
-    },
-    "class_type": "CM_FloatBinaryOperation",
-    "_meta": {
-      "title": "FloatBinaryOperation"
-    }
-  },
-  "30:126:105": {
-    "inputs": {
-      "op": "Div",
-      "a": [
-        "30:164",
+        "30:120:106",
         0
       ],
       "b": 16
@@ -130,6 +402,58 @@
       "title": "FloatUnaryOperation"
     }
   },
+  "30:122:107": {
+    "inputs": {
+      "op": "Mul",
+      "a": [
+        "30:122:106",
+        0
+      ],
+      "b": 16
+    },
+    "class_type": "CM_FloatBinaryOperation",
+    "_meta": {
+      "title": "FloatBinaryOperation"
+    }
+  },
+  "30:153": {
+    "inputs": {
+      "op": "Sqrt",
+      "a": [
+        "30:152",
+        0
+      ]
+    },
+    "class_type": "CM_FloatUnaryOperation",
+    "_meta": {
+      "title": "FloatUnaryOperation"
+    }
+  },
+  "30:161": {
+    "inputs": {
+      "preview": "",
+      "source": [
+        "30:152",
+        0
+      ]
+    },
+    "class_type": "PreviewAny",
+    "_meta": {
+      "title": "Preview Any"
+    }
+  },
+  "30:128": {
+    "inputs": {
+      "a": [
+        "30:120:107",
+        0
+      ]
+    },
+    "class_type": "CM_FloatToInt",
+    "_meta": {
+      "title": "FloatToInt"
+    }
+  },
   "30:126:107": {
     "inputs": {
       "op": "Mul",
@@ -144,123 +468,16 @@
       "title": "FloatBinaryOperation"
     }
   },
-  "30:144": {
+  "30:121": {
     "inputs": {
       "a": [
-        "30:137",
+        "30:122:107",
         0
       ]
     },
-    "class_type": "CM_IntToFloat",
+    "class_type": "CM_FloatToInt",
     "_meta": {
-      "title": "IntToFloat"
-    }
-  },
-  "30:141": {
-    "inputs": {
-      "a": [
-        "30:138",
-        0
-      ]
-    },
-    "class_type": "CM_IntToFloat",
-    "_meta": {
-      "title": "IntToFloat"
-    }
-  },
-  "30:131:106": {
-    "inputs": {
-      "op": "Round",
-      "a": [
-        "30:131:105",
-        0
-      ]
-    },
-    "class_type": "CM_FloatUnaryOperation",
-    "_meta": {
-      "title": "FloatUnaryOperation"
-    }
-  },
-  "30:131:105": {
-    "inputs": {
-      "op": "Div",
-      "a": [
-        "30:154",
-        0
-      ],
-      "b": 16
-    },
-    "class_type": "CM_FloatBinaryOperation",
-    "_meta": {
-      "title": "FloatBinaryOperation"
-    }
-  },
-  "30:131:107": {
-    "inputs": {
-      "op": "Mul",
-      "a": [
-        "30:131:106",
-        0
-      ],
-      "b": 16
-    },
-    "class_type": "CM_FloatBinaryOperation",
-    "_meta": {
-      "title": "FloatBinaryOperation"
-    }
-  },
-  "30:130:106": {
-    "inputs": {
-      "op": "Round",
-      "a": [
-        "30:130:105",
-        0
-      ]
-    },
-    "class_type": "CM_FloatUnaryOperation",
-    "_meta": {
-      "title": "FloatUnaryOperation"
-    }
-  },
-  "30:130:105": {
-    "inputs": {
-      "op": "Div",
-      "a": [
-        "30:155",
-        0
-      ],
-      "b": 16
-    },
-    "class_type": "CM_FloatBinaryOperation",
-    "_meta": {
-      "title": "FloatBinaryOperation"
-    }
-  },
-  "30:130:107": {
-    "inputs": {
-      "op": "Mul",
-      "a": [
-        "30:130:106",
-        0
-      ],
-      "b": 16
-    },
-    "class_type": "CM_FloatBinaryOperation",
-    "_meta": {
-      "title": "FloatBinaryOperation"
-    }
-  },
-  "30:159": {
-    "inputs": {
-      "preview": "768.0183352631543",
-      "source": [
-        "30:155",
-        0
-      ]
-    },
-    "class_type": "PreviewAny",
-    "_meta": {
-      "title": "Preview Any"
+      "title": "FloatToInt"
     }
   },
   "30:154": {
@@ -297,22 +514,9 @@
       "title": "FloatBinaryOperation"
     }
   },
-  "30:153": {
-    "inputs": {
-      "op": "Sqrt",
-      "a": [
-        "30:152",
-        0
-      ]
-    },
-    "class_type": "CM_FloatUnaryOperation",
-    "_meta": {
-      "title": "FloatUnaryOperation"
-    }
-  },
   "30:160": {
     "inputs": {
-      "preview": "0.586721417313334",
+      "preview": "",
       "source": [
         "30:153",
         0
@@ -323,126 +527,35 @@
       "title": "Preview Any"
     }
   },
-  "30:152": {
+  "30:127": {
+    "inputs": {
+      "a": [
+        "30:126:107",
+        0
+      ]
+    },
+    "class_type": "CM_FloatToInt",
+    "_meta": {
+      "title": "FloatToInt"
+    }
+  },
+  "30:131:105": {
     "inputs": {
       "op": "Div",
       "a": [
-        "30:149",
+        "30:154",
         0
       ],
-      "b": [
-        "30:151",
-        0
-      ]
+      "b": 16
     },
     "class_type": "CM_FloatBinaryOperation",
     "_meta": {
       "title": "FloatBinaryOperation"
-    }
-  },
-  "30:161": {
-    "inputs": {
-      "preview": "0.34424202153416744",
-      "source": [
-        "30:152",
-        0
-      ]
-    },
-    "class_type": "PreviewAny",
-    "_meta": {
-      "title": "Preview Any"
-    }
-  },
-  "30:162": {
-    "inputs": {
-      "preview": "3046043.0",
-      "source": [
-        "30:151",
-        0
-      ]
-    },
-    "class_type": "PreviewAny",
-    "_meta": {
-      "title": "Preview Any"
-    }
-  },
-  "30:151": {
-    "inputs": {
-      "op": "Mul",
-      "a": [
-        "30:143",
-        0
-      ],
-      "b": [
-        "30:142",
-        0
-      ]
-    },
-    "class_type": "CM_FloatBinaryOperation",
-    "_meta": {
-      "title": "FloatBinaryOperation"
-    }
-  },
-  "30:163": {
-    "inputs": {
-      "preview": "1048576.0",
-      "source": [
-        "30:149",
-        0
-      ]
-    },
-    "class_type": "PreviewAny",
-    "_meta": {
-      "title": "Preview Any"
-    }
-  },
-  "30:149": {
-    "inputs": {
-      "op": "Mul",
-      "a": [
-        "30:144",
-        0
-      ],
-      "b": [
-        "30:141",
-        0
-      ]
-    },
-    "class_type": "CM_FloatBinaryOperation",
-    "_meta": {
-      "title": "FloatBinaryOperation"
-    }
-  },
-  "30:138": {
-    "inputs": {
-      "value": 1024
-    },
-    "class_type": "PrimitiveInt",
-    "_meta": {
-      "title": "generation height"
-    }
-  },
-  "30:139": {
-    "inputs": {
-      "value": 2327
-    },
-    "class_type": "PrimitiveInt",
-    "_meta": {
-      "title": "output width"
-    }
-  },
-  "30:140": {
-    "inputs": {
-      "value": 1309
-    },
-    "class_type": "PrimitiveInt",
-    "_meta": {
-      "title": "output height"
     }
   },
   "30:158": {
     "inputs": {
-      "preview": "1365.3007380881284",
+      "preview": "",
       "source": [
         "30:154",
         0
@@ -453,81 +566,91 @@
       "title": "Preview Any"
     }
   },
-  "30:164": {
+  "30:130:105": {
     "inputs": {
       "op": "Div",
       "a": [
-        "30:143",
+        "30:155",
         0
       ],
-      "b": 2
+      "b": 16
     },
     "class_type": "CM_FloatBinaryOperation",
     "_meta": {
       "title": "FloatBinaryOperation"
     }
   },
-  "30:137": {
+  "30:159": {
     "inputs": {
-      "value": 1024
-    },
-    "class_type": "PrimitiveInt",
-    "_meta": {
-      "title": "generation width"
-    }
-  },
-  "30:143": {
-    "inputs": {
-      "a": [
-        "30:139",
+      "preview": "",
+      "source": [
+        "30:155",
         0
       ]
     },
-    "class_type": "CM_IntToFloat",
+    "class_type": "PreviewAny",
     "_meta": {
-      "title": "IntToFloat"
+      "title": "Preview Any"
     }
   },
-  "30:142": {
+  "30:131:106": {
     "inputs": {
+      "op": "Round",
       "a": [
-        "30:140",
+        "30:131:105",
         0
       ]
     },
-    "class_type": "CM_IntToFloat",
+    "class_type": "CM_FloatUnaryOperation",
     "_meta": {
-      "title": "IntToFloat"
+      "title": "FloatUnaryOperation"
+    }
+  },
+  "30:130:106": {
+    "inputs": {
+      "op": "Round",
+      "a": [
+        "30:130:105",
+        0
+      ]
+    },
+    "class_type": "CM_FloatUnaryOperation",
+    "_meta": {
+      "title": "FloatUnaryOperation"
+    }
+  },
+  "30:131:107": {
+    "inputs": {
+      "op": "Mul",
+      "a": [
+        "30:131:106",
+        0
+      ],
+      "b": 16
+    },
+    "class_type": "CM_FloatBinaryOperation",
+    "_meta": {
+      "title": "FloatBinaryOperation"
+    }
+  },
+  "30:130:107": {
+    "inputs": {
+      "op": "Mul",
+      "a": [
+        "30:130:106",
+        0
+      ],
+      "b": 16
+    },
+    "class_type": "CM_FloatBinaryOperation",
+    "_meta": {
+      "title": "FloatBinaryOperation"
     }
   },
   "30:132": {
     "inputs": {
       "a": [
         "30:131:107",
-        0
-      ]
-    },
-    "class_type": "CM_FloatToInt",
-    "_meta": {
-      "title": "FloatToInt"
-    }
-  },
-  "30:128": {
-    "inputs": {
-      "a": [
-        "30:120:107",
-        0
-      ]
-    },
-    "class_type": "CM_FloatToInt",
-    "_meta": {
-      "title": "FloatToInt"
-    }
-  },
-  "30:127": {
-    "inputs": {
-      "a": [
-        "30:126:107",
         0
       ]
     },
@@ -548,16 +671,21 @@
       "title": "FloatToInt"
     }
   },
-  "30:121": {
+  "27:13": {
     "inputs": {
-      "a": [
-        "30:122:107",
+      "width": [
+        "30:132",
         0
-      ]
+      ],
+      "height": [
+        "30:129",
+        0
+      ],
+      "batch_size": 1
     },
-    "class_type": "CM_FloatToInt",
+    "class_type": "EmptySD3LatentImage",
     "_meta": {
-      "title": "FloatToInt"
+      "title": "EmptySD3LatentImage"
     }
   },
   "27:3": {
@@ -607,134 +735,6 @@
     "class_type": "VAEDecode",
     "_meta": {
       "title": "VAE Decode"
-    }
-  },
-  "27:13": {
-    "inputs": {
-      "width": [
-        "30:132",
-        0
-      ],
-      "height": [
-        "30:129",
-        0
-      ],
-      "batch_size": 1
-    },
-    "class_type": "EmptySD3LatentImage",
-    "_meta": {
-      "title": "EmptySD3LatentImage"
-    }
-  },
-  "27:26:23": {
-    "inputs": {
-      "value": "You are an assistant designed to generate high quality anime images based on textual prompts. <Prompt Start> "
-    },
-    "class_type": "PrimitiveStringMultiline",
-    "_meta": {
-      "title": "System prompt"
-    }
-  },
-  "27:26:24": {
-    "inputs": {
-      "value": "__POSITIVE_PROMPT__"
-    },
-    "class_type": "PrimitiveStringMultiline",
-    "_meta": {
-      "title": "Prompt"
-    }
-  },
-  "27:26:22": {
-    "inputs": {
-      "string_a": [
-        "27:26:23",
-        0
-      ],
-      "string_b": [
-        "27:26:24",
-        0
-      ],
-      "delimiter": ""
-    },
-    "class_type": "StringConcatenate",
-    "_meta": {
-      "title": "Concatenate"
-    }
-  },
-  "27:26:7": {
-    "inputs": {
-      "text": [
-        "27:26:22",
-        0
-      ],
-      "clip": [
-        "27:4",
-        1
-      ]
-    },
-    "class_type": "CLIPTextEncode",
-    "_meta": {
-      "title": "CLIP Text Encode (Positive Prompt)"
-    }
-  },
-  "27:25:22": {
-    "inputs": {
-      "string_a": [
-        "27:25:23",
-        0
-      ],
-      "string_b": [
-        "27:25:24",
-        0
-      ],
-      "delimiter": ""
-    },
-    "class_type": "StringConcatenate",
-    "_meta": {
-      "title": "Concatenate"
-    }
-  },
-  "27:25:23": {
-    "inputs": {
-      "value": "You are an assistant designed to generate high-quality images based on textual prompts <Prompt Start> "
-    },
-    "class_type": "PrimitiveStringMultiline",
-    "_meta": {
-      "title": "System prompt"
-    }
-  },
-  "27:25:24": {
-    "inputs": {
-      "value": ""
-    },
-    "class_type": "PrimitiveStringMultiline",
-    "_meta": {
-      "title": "System prompt"
-    }
-  },
-  "27:25:7": {
-    "inputs": {
-      "text": [
-        "27:25:22",
-        0
-      ],
-      "clip": [
-        "27:4",
-        1
-      ]
-    },
-    "class_type": "CLIPTextEncode",
-    "_meta": {
-      "title": "CLIP Text Encode (Negative Prompt)"
-    }
-  },
-  "27:4": {
-    "inputs": {
-      "ckpt_name": "uncannyValley_Noob3dV3.safetensors"
-    },
-    "class_type": "CheckpointLoaderSimple",
-    "_meta": {
-      "title": "Load Checkpoint"
     }
   },
   "29:108": {

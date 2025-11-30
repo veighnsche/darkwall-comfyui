@@ -25,7 +25,6 @@ from .dataclasses import (
     PerMonitorConfig,
     MonitorsConfig,
     ComfyUIConfig,
-    OutputConfig,
     PromptConfig,
     LoggingConfig,
     HistoryConfig,
@@ -54,7 +53,6 @@ class Config:
     comfyui: ComfyUIConfig = field(default_factory=ComfyUIConfig)
     monitors: MonitorsConfig = field(default_factory=MonitorsConfig)
     active_monitors: List[str] = field(default_factory=list)
-    output: OutputConfig = field(default_factory=OutputConfig)
     prompt: PromptConfig = field(default_factory=PromptConfig)
     logging: LoggingConfig = field(default_factory=LoggingConfig)
     history: HistoryConfig = field(default_factory=HistoryConfig)
@@ -421,7 +419,6 @@ class Config:
         
         # Parse other sections
         comfyui_config = ComfyUIConfig(**config_dict.get('comfyui', {}))
-        output_config = OutputConfig(**config_dict.get('output', {}))
         prompt_config = PromptConfig(**config_dict.get('prompt', {}))
         logging_config = LoggingConfig(**config_dict.get('logging', {}))
         
@@ -506,7 +503,6 @@ class Config:
             comfyui=comfyui_config,
             monitors=monitors_config,
             active_monitors=active_monitors,
-            output=output_config,
             prompt=prompt_config,
             logging=logging_config,
             themes=themes_dict,

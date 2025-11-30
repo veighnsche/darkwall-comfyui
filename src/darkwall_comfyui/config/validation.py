@@ -44,9 +44,6 @@ def validate_toml_structure(config_dict: Dict[str, Any], config_file: Path) -> N
             'headers': dict,  # Optional
         },
         'monitors': dict,  # Dynamic: [monitors.{name}] sections with per-monitor config
-        'output': {
-            'create_backup': bool,
-        },
         'prompt': {
             'time_slot_minutes': int,
             'theme': str,

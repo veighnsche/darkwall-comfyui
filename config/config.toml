@@ -102,13 +102,6 @@ night_themes = [
 # Blend duration for smooth transitions (minutes)
 blend_duration_minutes = 30
 
-# ============================================================================
-# Output Settings
-# ============================================================================
-
-[output]
-create_backup = true
-
 [prompt]
 time_slot_minutes = 30
 use_monitor_seed = true

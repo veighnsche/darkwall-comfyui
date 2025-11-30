@@ -175,7 +175,6 @@ class PerMonitorConfig:
     name: str  # Compositor output name (e.g., "DP-1")
     workflow: str = "default"  # Workflow ID (filename without .json) - DEPRECATED, use resolution + theme
     output: Optional[str] = None  # Output path (defaults to ~/Pictures/wallpapers/{name}.png)
-    backup: Optional[str] = None  # Backup path pattern
     templates: Optional[List[str]] = None  # Allowed templates for this monitor
     resolution: Optional[str] = None  # TEAM_006: e.g., "2327x1309", "1920x1080" - used with theme.workflow_prefix
     command: Optional[str] = None  # Per-monitor wallpaper setter override
@@ -185,12 +184,6 @@ class PerMonitorConfig:
         if self.output:
             return Path(self.output).expanduser()
         return Path(f"~/Pictures/wallpapers/{self.name}.png").expanduser()
-    
-    def get_backup_path(self, timestamp: str) -> Path:
-        """Get backup path for this monitor."""
-        if self.backup:
-            return Path(self.backup.format(name=self.name, timestamp=timestamp)).expanduser()
-        return Path(f"~/Pictures/wallpapers/backups/{self.name}_{timestamp}.png").expanduser()
     
     def get_workflow_path(self, config_dir: Path, theme: Optional['ThemeConfig'] = None) -> Path:
         """
@@ -264,7 +257,6 @@ class MonitorsConfig:
                     name=key,
                     workflow=value.get("workflow", "default"),
                     output=value.get("output"),
-                    backup=value.get("backup"),
                     templates=value.get("templates"),
                     resolution=value.get("resolution"),  # TEAM_006: For theme-based workflow
                     command=value.get("command"),  # Per-monitor wallpaper setter
@@ -281,12 +273,6 @@ class ComfyUIConfig:
     timeout: int = 300
     poll_interval: int = 5
     headers: Dict[str, str] = field(default_factory=dict)
-
-
-@dataclass
-class OutputConfig:
-    """Output settings."""
-    create_backup: bool = True
 
 
 @dataclass

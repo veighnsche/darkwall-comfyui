@@ -1,7 +1,7 @@
 {
   "83": {
     "inputs": {
-      "seed": -1
+      "seed": 0
     },
     "class_type": "Seed (rgthree)",
     "_meta": {
@@ -21,17 +21,157 @@
       "title": "Save Image"
     }
   },
-  "84:120:106": {
+  "75:38": {
     "inputs": {
-      "op": "Round",
-      "a": [
-        "84:120:105",
+      "clip_name": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+      "type": "qwen_image",
+      "device": "default"
+    },
+    "class_type": "CLIPLoader",
+    "_meta": {
+      "title": "Load CLIP"
+    }
+  },
+  "75:37": {
+    "inputs": {
+      "unet_name": "qwen_image_fp8_e4m3fn.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "Load Diffusion Model"
+    }
+  },
+  "75:39": {
+    "inputs": {
+      "vae_name": "qwen_image_vae.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "Load VAE"
+    }
+  },
+  "84:138": {
+    "inputs": {
+      "value": 1328
+    },
+    "class_type": "PrimitiveInt",
+    "_meta": {
+      "title": "generation height"
+    }
+  },
+  "84:139": {
+    "inputs": {
+      "value": 1920
+    },
+    "class_type": "PrimitiveInt",
+    "_meta": {
+      "title": "output width"
+    }
+  },
+  "84:140": {
+    "inputs": {
+      "value": 1080
+    },
+    "class_type": "PrimitiveInt",
+    "_meta": {
+      "title": "output height"
+    }
+  },
+  "84:137": {
+    "inputs": {
+      "value": 1328
+    },
+    "class_type": "PrimitiveInt",
+    "_meta": {
+      "title": "generation width"
+    }
+  },
+  "75:6": {
+    "inputs": {
+      "text": "__POSITIVE_PROMPT__",
+      "clip": [
+        "75:38",
         0
       ]
     },
-    "class_type": "CM_FloatUnaryOperation",
+    "class_type": "CLIPTextEncode",
     "_meta": {
-      "title": "FloatUnaryOperation"
+      "title": "CLIP Text Encode (Positive Prompt)"
+    }
+  },
+  "75:7": {
+    "inputs": {
+      "text": "__NEGATIVE_PROMPT__",
+      "clip": [
+        "75:38",
+        0
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (Negative Prompt)"
+    }
+  },
+  "75:66": {
+    "inputs": {
+      "shift": 3.1,
+      "model": [
+        "75:37",
+        0
+      ]
+    },
+    "class_type": "ModelSamplingAuraFlow",
+    "_meta": {
+      "title": "ModelSamplingAuraFlow"
+    }
+  },
+  "84:141": {
+    "inputs": {
+      "a": [
+        "84:138",
+        0
+      ]
+    },
+    "class_type": "CM_IntToFloat",
+    "_meta": {
+      "title": "IntToFloat"
+    }
+  },
+  "84:143": {
+    "inputs": {
+      "a": [
+        "84:139",
+        0
+      ]
+    },
+    "class_type": "CM_IntToFloat",
+    "_meta": {
+      "title": "IntToFloat"
+    }
+  },
+  "84:142": {
+    "inputs": {
+      "a": [
+        "84:140",
+        0
+      ]
+    },
+    "class_type": "CM_IntToFloat",
+    "_meta": {
+      "title": "IntToFloat"
+    }
+  },
+  "84:144": {
+    "inputs": {
+      "a": [
+        "84:137",
+        0
+      ]
+    },
+    "class_type": "CM_IntToFloat",
+    "_meta": {
+      "title": "IntToFloat"
     }
   },
   "84:120:105": {
@@ -48,11 +188,86 @@
       "title": "FloatBinaryOperation"
     }
   },
-  "84:120:107": {
+  "84:164": {
+    "inputs": {
+      "op": "Div",
+      "a": [
+        "84:143",
+        0
+      ],
+      "b": 2
+    },
+    "class_type": "CM_FloatBinaryOperation",
+    "_meta": {
+      "title": "FloatBinaryOperation"
+    }
+  },
+  "84:122:105": {
+    "inputs": {
+      "op": "Div",
+      "a": [
+        "84:142",
+        0
+      ],
+      "b": 16
+    },
+    "class_type": "CM_FloatBinaryOperation",
+    "_meta": {
+      "title": "FloatBinaryOperation"
+    }
+  },
+  "84:151": {
     "inputs": {
       "op": "Mul",
       "a": [
-        "84:120:106",
+        "84:143",
+        0
+      ],
+      "b": [
+        "84:142",
+        0
+      ]
+    },
+    "class_type": "CM_FloatBinaryOperation",
+    "_meta": {
+      "title": "FloatBinaryOperation"
+    }
+  },
+  "84:149": {
+    "inputs": {
+      "op": "Mul",
+      "a": [
+        "84:144",
+        0
+      ],
+      "b": [
+        "84:141",
+        0
+      ]
+    },
+    "class_type": "CM_FloatBinaryOperation",
+    "_meta": {
+      "title": "FloatBinaryOperation"
+    }
+  },
+  "84:120:106": {
+    "inputs": {
+      "op": "Round",
+      "a": [
+        "84:120:105",
+        0
+      ]
+    },
+    "class_type": "CM_FloatUnaryOperation",
+    "_meta": {
+      "title": "FloatUnaryOperation"
+    }
+  },
+  "84:126:105": {
+    "inputs": {
+      "op": "Div",
+      "a": [
+        "84:164",
         0
       ],
       "b": 16
@@ -75,39 +290,54 @@
       "title": "FloatUnaryOperation"
     }
   },
-  "84:122:105": {
+  "84:162": {
+    "inputs": {
+      "preview": "",
+      "source": [
+        "84:151",
+        0
+      ]
+    },
+    "class_type": "PreviewAny",
+    "_meta": {
+      "title": "Preview Any"
+    }
+  },
+  "84:152": {
     "inputs": {
       "op": "Div",
       "a": [
-        "84:142",
+        "84:149",
         0
       ],
-      "b": 16
+      "b": [
+        "84:151",
+        0
+      ]
     },
     "class_type": "CM_FloatBinaryOperation",
     "_meta": {
       "title": "FloatBinaryOperation"
     }
   },
-  "84:122:107": {
+  "84:163": {
+    "inputs": {
+      "preview": "",
+      "source": [
+        "84:149",
+        0
+      ]
+    },
+    "class_type": "PreviewAny",
+    "_meta": {
+      "title": "Preview Any"
+    }
+  },
+  "84:120:107": {
     "inputs": {
       "op": "Mul",
       "a": [
-        "84:122:106",
-        0
-      ],
-      "b": 16
-    },
-    "class_type": "CM_FloatBinaryOperation",
-    "_meta": {
-      "title": "FloatBinaryOperation"
-    }
-  },
-  "84:126:105": {
-    "inputs": {
-      "op": "Div",
-      "a": [
-        "84:164",
+        "84:120:106",
         0
       ],
       "b": 16
@@ -130,6 +360,58 @@
       "title": "FloatUnaryOperation"
     }
   },
+  "84:122:107": {
+    "inputs": {
+      "op": "Mul",
+      "a": [
+        "84:122:106",
+        0
+      ],
+      "b": 16
+    },
+    "class_type": "CM_FloatBinaryOperation",
+    "_meta": {
+      "title": "FloatBinaryOperation"
+    }
+  },
+  "84:153": {
+    "inputs": {
+      "op": "Sqrt",
+      "a": [
+        "84:152",
+        0
+      ]
+    },
+    "class_type": "CM_FloatUnaryOperation",
+    "_meta": {
+      "title": "FloatUnaryOperation"
+    }
+  },
+  "84:161": {
+    "inputs": {
+      "preview": "",
+      "source": [
+        "84:152",
+        0
+      ]
+    },
+    "class_type": "PreviewAny",
+    "_meta": {
+      "title": "Preview Any"
+    }
+  },
+  "84:128": {
+    "inputs": {
+      "a": [
+        "84:120:107",
+        0
+      ]
+    },
+    "class_type": "CM_FloatToInt",
+    "_meta": {
+      "title": "FloatToInt"
+    }
+  },
   "84:126:107": {
     "inputs": {
       "op": "Mul",
@@ -144,123 +426,16 @@
       "title": "FloatBinaryOperation"
     }
   },
-  "84:144": {
+  "84:121": {
     "inputs": {
       "a": [
-        "84:137",
+        "84:122:107",
         0
       ]
     },
-    "class_type": "CM_IntToFloat",
+    "class_type": "CM_FloatToInt",
     "_meta": {
-      "title": "IntToFloat"
-    }
-  },
-  "84:141": {
-    "inputs": {
-      "a": [
-        "84:138",
-        0
-      ]
-    },
-    "class_type": "CM_IntToFloat",
-    "_meta": {
-      "title": "IntToFloat"
-    }
-  },
-  "84:131:106": {
-    "inputs": {
-      "op": "Round",
-      "a": [
-        "84:131:105",
-        0
-      ]
-    },
-    "class_type": "CM_FloatUnaryOperation",
-    "_meta": {
-      "title": "FloatUnaryOperation"
-    }
-  },
-  "84:131:105": {
-    "inputs": {
-      "op": "Div",
-      "a": [
-        "84:154",
-        0
-      ],
-      "b": 16
-    },
-    "class_type": "CM_FloatBinaryOperation",
-    "_meta": {
-      "title": "FloatBinaryOperation"
-    }
-  },
-  "84:131:107": {
-    "inputs": {
-      "op": "Mul",
-      "a": [
-        "84:131:106",
-        0
-      ],
-      "b": 16
-    },
-    "class_type": "CM_FloatBinaryOperation",
-    "_meta": {
-      "title": "FloatBinaryOperation"
-    }
-  },
-  "84:130:106": {
-    "inputs": {
-      "op": "Round",
-      "a": [
-        "84:130:105",
-        0
-      ]
-    },
-    "class_type": "CM_FloatUnaryOperation",
-    "_meta": {
-      "title": "FloatUnaryOperation"
-    }
-  },
-  "84:130:105": {
-    "inputs": {
-      "op": "Div",
-      "a": [
-        "84:155",
-        0
-      ],
-      "b": 16
-    },
-    "class_type": "CM_FloatBinaryOperation",
-    "_meta": {
-      "title": "FloatBinaryOperation"
-    }
-  },
-  "84:130:107": {
-    "inputs": {
-      "op": "Mul",
-      "a": [
-        "84:130:106",
-        0
-      ],
-      "b": 16
-    },
-    "class_type": "CM_FloatBinaryOperation",
-    "_meta": {
-      "title": "FloatBinaryOperation"
-    }
-  },
-  "84:159": {
-    "inputs": {
-      "preview": "",
-      "source": [
-        "84:155",
-        0
-      ]
-    },
-    "class_type": "PreviewAny",
-    "_meta": {
-      "title": "Preview Any"
+      "title": "FloatToInt"
     }
   },
   "84:154": {
@@ -297,19 +472,6 @@
       "title": "FloatBinaryOperation"
     }
   },
-  "84:153": {
-    "inputs": {
-      "op": "Sqrt",
-      "a": [
-        "84:152",
-        0
-      ]
-    },
-    "class_type": "CM_FloatUnaryOperation",
-    "_meta": {
-      "title": "FloatUnaryOperation"
-    }
-  },
   "84:160": {
     "inputs": {
       "preview": "",
@@ -323,121 +485,30 @@
       "title": "Preview Any"
     }
   },
-  "84:152": {
+  "84:127": {
+    "inputs": {
+      "a": [
+        "84:126:107",
+        0
+      ]
+    },
+    "class_type": "CM_FloatToInt",
+    "_meta": {
+      "title": "FloatToInt"
+    }
+  },
+  "84:131:105": {
     "inputs": {
       "op": "Div",
       "a": [
-        "84:149",
+        "84:154",
         0
       ],
-      "b": [
-        "84:151",
-        0
-      ]
+      "b": 16
     },
     "class_type": "CM_FloatBinaryOperation",
     "_meta": {
       "title": "FloatBinaryOperation"
-    }
-  },
-  "84:161": {
-    "inputs": {
-      "preview": "",
-      "source": [
-        "84:152",
-        0
-      ]
-    },
-    "class_type": "PreviewAny",
-    "_meta": {
-      "title": "Preview Any"
-    }
-  },
-  "84:162": {
-    "inputs": {
-      "preview": "",
-      "source": [
-        "84:151",
-        0
-      ]
-    },
-    "class_type": "PreviewAny",
-    "_meta": {
-      "title": "Preview Any"
-    }
-  },
-  "84:151": {
-    "inputs": {
-      "op": "Mul",
-      "a": [
-        "84:143",
-        0
-      ],
-      "b": [
-        "84:142",
-        0
-      ]
-    },
-    "class_type": "CM_FloatBinaryOperation",
-    "_meta": {
-      "title": "FloatBinaryOperation"
-    }
-  },
-  "84:163": {
-    "inputs": {
-      "preview": "",
-      "source": [
-        "84:149",
-        0
-      ]
-    },
-    "class_type": "PreviewAny",
-    "_meta": {
-      "title": "Preview Any"
-    }
-  },
-  "84:149": {
-    "inputs": {
-      "op": "Mul",
-      "a": [
-        "84:144",
-        0
-      ],
-      "b": [
-        "84:141",
-        0
-      ]
-    },
-    "class_type": "CM_FloatBinaryOperation",
-    "_meta": {
-      "title": "FloatBinaryOperation"
-    }
-  },
-  "84:138": {
-    "inputs": {
-      "value": 1328
-    },
-    "class_type": "PrimitiveInt",
-    "_meta": {
-      "title": "generation height"
-    }
-  },
-  "84:139": {
-    "inputs": {
-      "value": 1920
-    },
-    "class_type": "PrimitiveInt",
-    "_meta": {
-      "title": "output width"
-    }
-  },
-  "84:140": {
-    "inputs": {
-      "value": 1080
-    },
-    "class_type": "PrimitiveInt",
-    "_meta": {
-      "title": "output height"
     }
   },
   "84:158": {
@@ -453,51 +524,85 @@
       "title": "Preview Any"
     }
   },
-  "84:164": {
+  "84:130:105": {
     "inputs": {
       "op": "Div",
       "a": [
-        "84:143",
+        "84:155",
         0
       ],
-      "b": 2
+      "b": 16
     },
     "class_type": "CM_FloatBinaryOperation",
     "_meta": {
       "title": "FloatBinaryOperation"
     }
   },
-  "84:137": {
+  "84:159": {
     "inputs": {
-      "value": 1328
-    },
-    "class_type": "PrimitiveInt",
-    "_meta": {
-      "title": "generation width"
-    }
-  },
-  "84:143": {
-    "inputs": {
-      "a": [
-        "84:139",
+      "preview": "",
+      "source": [
+        "84:155",
         0
       ]
     },
-    "class_type": "CM_IntToFloat",
+    "class_type": "PreviewAny",
     "_meta": {
-      "title": "IntToFloat"
+      "title": "Preview Any"
     }
   },
-  "84:142": {
+  "84:131:106": {
     "inputs": {
+      "op": "Round",
       "a": [
-        "84:140",
+        "84:131:105",
         0
       ]
     },
-    "class_type": "CM_IntToFloat",
+    "class_type": "CM_FloatUnaryOperation",
     "_meta": {
-      "title": "IntToFloat"
+      "title": "FloatUnaryOperation"
+    }
+  },
+  "84:130:106": {
+    "inputs": {
+      "op": "Round",
+      "a": [
+        "84:130:105",
+        0
+      ]
+    },
+    "class_type": "CM_FloatUnaryOperation",
+    "_meta": {
+      "title": "FloatUnaryOperation"
+    }
+  },
+  "84:131:107": {
+    "inputs": {
+      "op": "Mul",
+      "a": [
+        "84:131:106",
+        0
+      ],
+      "b": 16
+    },
+    "class_type": "CM_FloatBinaryOperation",
+    "_meta": {
+      "title": "FloatBinaryOperation"
+    }
+  },
+  "84:130:107": {
+    "inputs": {
+      "op": "Mul",
+      "a": [
+        "84:130:106",
+        0
+      ],
+      "b": 16
+    },
+    "class_type": "CM_FloatBinaryOperation",
+    "_meta": {
+      "title": "FloatBinaryOperation"
     }
   },
   "84:132": {
@@ -512,46 +617,10 @@
       "title": "FloatToInt"
     }
   },
-  "84:128": {
-    "inputs": {
-      "a": [
-        "84:120:107",
-        0
-      ]
-    },
-    "class_type": "CM_FloatToInt",
-    "_meta": {
-      "title": "FloatToInt"
-    }
-  },
-  "84:127": {
-    "inputs": {
-      "a": [
-        "84:126:107",
-        0
-      ]
-    },
-    "class_type": "CM_FloatToInt",
-    "_meta": {
-      "title": "FloatToInt"
-    }
-  },
   "84:129": {
     "inputs": {
       "a": [
         "84:130:107",
-        0
-      ]
-    },
-    "class_type": "CM_FloatToInt",
-    "_meta": {
-      "title": "FloatToInt"
-    }
-  },
-  "84:121": {
-    "inputs": {
-      "a": [
-        "84:122:107",
         0
       ]
     },
@@ -575,75 +644,6 @@
     "class_type": "EmptySD3LatentImage",
     "_meta": {
       "title": "EmptySD3LatentImage"
-    }
-  },
-  "75:66": {
-    "inputs": {
-      "shift": 3.1000000000000005,
-      "model": [
-        "75:37",
-        0
-      ]
-    },
-    "class_type": "ModelSamplingAuraFlow",
-    "_meta": {
-      "title": "ModelSamplingAuraFlow"
-    }
-  },
-  "75:38": {
-    "inputs": {
-      "clip_name": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
-      "type": "qwen_image",
-      "device": "default"
-    },
-    "class_type": "CLIPLoader",
-    "_meta": {
-      "title": "Load CLIP"
-    }
-  },
-  "75:37": {
-    "inputs": {
-      "unet_name": "qwen_image_fp8_e4m3fn.safetensors",
-      "weight_dtype": "default"
-    },
-    "class_type": "UNETLoader",
-    "_meta": {
-      "title": "Load Diffusion Model"
-    }
-  },
-  "75:6": {
-    "inputs": {
-      "text": "__POSITIVE_PROMPT__",
-      "clip": [
-        "75:38",
-        0
-      ]
-    },
-    "class_type": "CLIPTextEncode",
-    "_meta": {
-      "title": "CLIP Text Encode (Positive Prompt)"
-    }
-  },
-  "75:7": {
-    "inputs": {
-      "text": "__NEGATIVE_PROMPT__",
-      "clip": [
-        "75:38",
-        0
-      ]
-    },
-    "class_type": "CLIPTextEncode",
-    "_meta": {
-      "title": "CLIP Text Encode (Negative Prompt)"
-    }
-  },
-  "75:39": {
-    "inputs": {
-      "vae_name": "qwen_image_vae.safetensors"
-    },
-    "class_type": "VAELoader",
-    "_meta": {
-      "title": "Load VAE"
     }
   },
   "75:3": {
@@ -723,8 +723,8 @@
         "83",
         0
       ],
-      "steps": 9,
-      "cfg": 1,
+      "steps": 20,
+      "cfg": 2.5,
       "sampler_name": "euler",
       "scheduler": "simple",
       "denoise": 0.33,

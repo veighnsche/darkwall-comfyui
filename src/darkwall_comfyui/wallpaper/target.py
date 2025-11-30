@@ -6,12 +6,11 @@ Handles saving wallpapers to disk and coordinating with wallpaper setters.
 
 import logging
 import os
-import shutil
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
-from ..config import Config, MonitorsConfig, OutputConfig
+from ..config import Config, MonitorsConfig
 from ..exceptions import CommandError
 from .setters import get_setter, WallpaperSetter
 
@@ -27,13 +26,11 @@ class WallpaperTarget:
     Responsibilities:
     - Creating output directories
     - Saving downloaded images
-    - Creating backups before overwriting
     - Coordinating with wallpaper setters
     """
     
-    def __init__(self, monitors_config: MonitorsConfig, output_config: OutputConfig) -> None:
+    def __init__(self, monitors_config: MonitorsConfig) -> None:
         self.monitors_config = monitors_config
-        self.output_config = output_config
         self.logger = logging.getLogger(__name__)
         self._setter: Optional[WallpaperSetter] = None
     
@@ -70,10 +67,6 @@ class WallpaperTarget:
             # Check if directory is writable
             if not os.access(output_path.parent, os.W_OK):
                 raise CommandError(f"Output directory is not writable: {output_path.parent}")
-            
-            # Create backup if enabled and file exists
-            if self.output_config.create_backup and output_path.exists():
-                self._create_backup(output_path)
             
             # Write image data
             output_path.write_bytes(image_data)
@@ -130,42 +123,6 @@ class WallpaperTarget:
         """
         # Use index 0 as placeholder since we have the name
         return self.setter.set(wallpaper_path, 0, monitor_name)
-    
-    def _create_backup(self, current_path: Path) -> Optional[Path]:
-        """Create backup of existing wallpaper."""
-        try:
-            monitor_index = self._extract_monitor_index(current_path)
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            backup_path = self.monitor_config.get_backup_path(monitor_index, timestamp)
-            
-            # Ensure backup directory exists
-            backup_path.parent.mkdir(parents=True, exist_ok=True)
-            
-            # Check if backup directory is writable
-            if not os.access(backup_path.parent, os.W_OK):
-                self.logger.warning(f"Backup directory is not writable: {backup_path.parent}")
-                return None
-            
-            # Copy the file
-            shutil.copy2(current_path, backup_path)
-            
-            # Verify backup was created
-            if not backup_path.exists():
-                self.logger.error(f"Backup creation failed: {backup_path}")
-                return None
-            
-            self.logger.debug(f"Backup created: {backup_path}")
-            return backup_path
-            
-        except OSError as e:
-            self.logger.warning(f"Filesystem error creating backup: {e}")
-            return None
-        except shutil.Error as e:
-            self.logger.warning(f"Copy error creating backup: {e}")
-            return None
-        except Exception as e:
-            self.logger.warning(f"Unexpected error creating backup: {e}")
-            return None
     
     def _extract_monitor_index(self, path: Path) -> int:
         """Extract monitor index from filename like 'monitor_0.png'."""

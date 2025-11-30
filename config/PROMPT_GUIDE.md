@@ -1,214 +1,241 @@
-# DarkWall ComfyUI - Prompt Atom Guide
+# DarkWall ComfyUI - Theme Creation Guide
 
-This guide explains how to create and modify prompt atoms for each of the four pillars that generate deterministic dark-mode wallpapers.
-
-## Overview
-
-The prompt generator combines one atom from each of the four numbered files to create a complete wallpaper prompt. Each file serves a specific purpose in the composition:
-
-- **1_subject.txt** - The main focal point
-- **2_environment.txt** - The surrounding context  
-- **3_lighting.txt** - The illumination and color scheme
-- **4_style.txt** - The artistic approach and composition
+> **For LLM Theme Creators**: This guide defines the **fixed structure** that themes must follow. Content examples are suggestions only—you define your theme's aesthetic, atom categories, and prompt content.
 
 ---
 
-## 1_subject.txt - Main Focal Point
+## Theme Directory Structure (REQUIRED)
 
-**Purpose**: Defines the primary visual element that anchors your wallpaper composition.
+Every theme lives under `~/.config/darkwall-comfyui/themes/<theme_name>/`:
 
-### Design Principles
-- **Single focal point**: Each atom should describe one main subject, not multiple elements
-- **Silhouette-friendly**: Subjects should work well as dark shapes against darker backgrounds
-- **Scalable**: Must look good at wallpaper resolutions without becoming pixelated or losing impact
-- **Dark-mode compatible**: Avoid subjects that require bright, sunny environments to make sense
-
-### Good Examples
 ```
-lone city skyline at dusk
-solitary mountain peak
-twisted tree with glowing leaves
-abandoned lighthouse
+themes/<your_theme_name>/
+├── atoms/           # REQUIRED: Atom files for random substitution
+│   └── *.txt        # One atom per line, filename = atom name
+└── prompts/         # REQUIRED: Complete prompt templates
+    └── *.prompt     # Prompt files with placeholders
 ```
 
-### What to Avoid
-- ❌ "happy family picnic" (requires bright, cheerful lighting)
-- ❌ "busy market street" (too many focal points)
-- ❌ "colorful flower garden" (inherently bright and cheerful)
+### Atoms Directory
+- Each `.txt` file in `atoms/` becomes a substitutable atom
+- Filename (without extension) = atom name used in prompts
+- One option per line (blank lines and `#` comments ignored)
 
-### Tips for New Atoms
-- Think about what looks striking in silhouette or low light
-- Consider architectural elements, natural formations, or mystical objects
-- Keep descriptions concise but evocative
-- Focus on solitary or isolated elements
+### Prompts Directory  
+- Each `.prompt` file is a complete generation template
+- System randomly selects from available prompts
+- Prompts use atoms via `__atomname__` syntax
 
 ---
 
-## 2_environment.txt - Surrounding Context
+## Atom Files (atoms/*.txt)
 
-**Purpose**: Provides the setting and atmosphere that complements your subject.
+**Format**: One option per line. Blank lines ignored. `#` comments optional.
 
-### Design Principles
-- **Naturally dark**: Environments should inherently support dark-mode aesthetics
-- **Negative space**: Provide room for desktop icons and UI elements
-- **Depth creation**: Add sense of scale and distance to the composition
-- **Subject compatibility**: Must work well with the subjects from 1_subject.txt
+**Naming**: The filename determines the placeholder name:
+- `subject.txt` → use as `__subject__` in prompts
+- `lighting.txt` → use as `__lighting__` in prompts
+- `my_custom_category.txt` → use as `__my_custom_category__` in prompts
 
-### Good Examples
+**You define what atoms your theme needs.** Common patterns:
+
+| Suggested Atom | Purpose |
+|---------------|---------|
+| `subject.txt` | Main subject/character |
+| `environment.txt` | Location/setting |
+| `lighting.txt` | Lighting conditions |
+| `style.txt` | Artistic style |
+| `pose.txt` | Character poses |
+| `expression.txt` | Facial expressions |
+| `outfit.txt` | Clothing/attire |
+| `hair.txt` | Hair styles/colors |
+
+**Example atom file** (`atoms/lighting.txt`):
 ```
-above a dark ocean
-in a misty valley
-against star-filled sky
-within canyon walls
+dramatic side lighting with deep shadows
+soft golden hour glow through window
+harsh fluorescent overhead
+neon signs reflecting off wet surfaces
 ```
-
-### What to Avoid
-- ❌ "sunny beach paradise" (bright, cheerful environment)
-- ❌ "colorful flower meadow" (inherently bright setting)
-- ❌ "bustling city square" (too busy, no negative space)
-
-### Tips for New Atoms
-- Think about locations that are naturally dark or can be rendered darkly
-- Consider atmospheric conditions (fog, mist, night, space)
-- Include spatial relationships (above, within, beside, through)
-- Ensure environments don't compete with subjects for attention
 
 ---
 
-## 3_lighting.txt - Illumination & Color
+## Prompt Files (prompts/*.prompt)
 
-**Purpose**: Defines the lighting scheme and color palette for dark-mode compatibility.
-
-### Design Principles
-- **Dark dominance**: >70% of the image should be dark areas
-- **Limited accents**: Small amounts of bright color for visual interest
-- **Cool temperature**: Prefer blues, purples, and cool tones over warm yellows
-- **High contrast**: Ensure sufficient contrast for UI element visibility
-
-### Good Examples
+**Format**:
 ```
-low-key lighting
-navy and charcoal palette
-moonlit blues
-neon blue accents
-dramatic contrast
+<positive prompt with __atoms__ and {variants}>
+---negative---
+<negative prompt>
 ```
 
-### What to Avoid
-- ❌ "bright sunny day" (completely opposite of dark mode)
-- ❌ "rainbow colors everywhere" (too many bright colors)
-- ❌ "pastel pink and yellow" (warm, cheerful palette)
+### Placeholder Syntax
 
-### Tips for New Atoms
-- Focus on lighting techniques (low-key, backlighting, rim lighting)
-- Describe color palettes rather than specific colors
-- Include contrast and atmosphere descriptors
-- Think about how lighting affects mood and usability
+| Syntax | Function | Example |
+|--------|----------|---------|
+| `__atomname__` | Random line from `atoms/atomname.txt` | `__lighting__` |
+| `{a\|b\|c}` | Random choice from inline options | `{red\|blue\|green}` |
+| `{0.5::rare\|2::common}` | Weighted random choice | 0.5 weight vs 2.0 weight |
+
+### Example Prompt File
+
+```
+masterpiece, best quality, __subject__, __environment__, __expression__, __lighting__
+---negative---
+lowres, blurry, deformed, ugly, extra limbs, bad anatomy, watermark, text
+```
+
+When resolved, each `__placeholder__` gets replaced with a random line from the corresponding atom file.
+
+### Naming Prompts
+
+Prompt filenames are arbitrary. Suggested patterns:
+- Numbered: `01_scenario_name.prompt`, `02_another_scene.prompt`
+- Descriptive: `office_scene.prompt`, `outdoor_night.prompt`
+- Simple: `default.prompt`
 
 ---
 
-## 4_style.txt - Artistic Approach & Composition
+## How Generation Works
 
-**Purpose**: Defines the artistic style and compositional guidelines for wallpaper use.
+1. System picks a random `.prompt` file from your theme's `prompts/` directory
+2. For each `__atomname__` placeholder, picks a random line from `atoms/atomname.txt`
+3. For each `{variant|syntax}`, picks a random option
+4. Resolves all placeholders deterministically based on time-slot seed
+5. Sends positive prompt and negative prompt to ComfyUI
 
-### Design Principles
-- **Wallpaper optimization**: Explicit references to 16:9 format and wallpaper use
-- **Icon space**: Provide negative space for desktop elements
-- **High quality**: Emphasize detail and resolution suitable for wallpapers
-- **No text**: Explicitly avoid watermarks, signatures, or text elements
-
-### Good Examples
-```
-cinematic 16:9 wide shot
-lots of negative space for icons
-minimalist composition
-high contrast edges
-professional photography style
-```
-
-### What to Avoid
-- ❌ "portrait orientation" (wrong aspect ratio for wallpapers)
-- ❌ "text overlay with title" (interferes with desktop use)
-- ❌ "busy detailed background" (no room for icons)
-
-### Tips for New Atoms
-- Include aspect ratio references (16:9, wide shot, cinematic)
-- Mention negative space or composition explicitly
-- Focus on artistic styles that scale well to high resolutions
-- Consider photography vs digital art aesthetics
+**Determinism**: Same time slot + same monitor = same prompt (until atoms/prompts change).
 
 ---
 
-## Creating New Atoms
+## Creating a New Theme
 
-### File Format
-- Each line in the numbered files is a separate atom
-- Empty lines are ignored
-- Lines starting with # are treated as comments (optional)
-- Use simple, descriptive text without complex punctuation
-
-### Adding New Atoms
-1. Open the appropriate numbered file (1-4) in `config/atoms/`
-2. Add your new atom on a new line
-3. Ensure it follows the design principles for that pillar
-4. Save the file
-5. Test the new combination by running the generator
-
-### Testing New Atoms
+### 1. Create Theme Directory
 ```bash
-# Test with verbose output to see the generated prompt
-./result/bin/generate-wallpaper-once --verbose
-
-# The output will show you exactly how your new atom combines with others
+mkdir -p ~/.config/darkwall-comfyui/themes/<your_theme>/atoms
+mkdir -p ~/.config/darkwall-comfyui/themes/<your_theme>/prompts
 ```
 
-### Theme Variations
-You can create theme-specific atom directories:
-```
-config/atoms/
-├── 1_subject.txt
-├── 2_environment.txt  
-├── 3_lighting.txt
-├── 4_style.txt
-└── themes/
-    ├── cyberpunk/
-    │   ├── 1_subject.txt
-    │   ├── 2_environment.txt
-    │   ├── 3_lighting.txt
-    │   └── 4_style.txt
-    └── nature/
-        ├── 1_subject.txt
-        ├── 2_environment.txt
-        ├── 3_lighting.txt
-        └── 4_style.txt
+### 2. Define Your Atoms
+Create `.txt` files in `atoms/` for each category your theme needs:
+
+```bash
+# Example: Create subject atoms
+cat > atoms/subject.txt << 'EOF'
+your first subject option
+your second subject option
+your third subject option
+EOF
 ```
 
-Then specify the theme in `config.toml`:
+### 3. Create Prompt Templates
+Create `.prompt` files using your atoms:
+
+```bash
+cat > prompts/01_example.prompt << 'EOF'
+best quality, __subject__, __environment__, __lighting__, __style__
+---negative---
+lowres, blurry, watermark, text
+EOF
+```
+
+### 4. Register in config.toml
 ```toml
-[prompt]
-theme = "cyberpunk"
+[themes.your_theme]
+workflow_prefix = "your-workflow"
+default_template = "default.prompt"
 ```
 
-## Best Practices
-
-1. **Consistency**: Keep atom descriptions similar in length and complexity within each file
-2. **Variety**: Ensure diverse options across all four pillars for interesting combinations
-3. **Dark-mode first**: Always test how atoms look in dark wallpaper contexts
-4. **Combinations matter**: Some atoms work better together than others
-5. **Iterate**: Start with a few atoms per file, then expand based on results
-
-## Example Combinations
-
-Here's how atoms combine to create complete prompts:
-
-**Subject**: `lone city skyline at dusk`  
-**Environment**: `above a dark ocean`  
-**Lighting**: `neon blue accents`  
-**Style**: `cinematic 16:9 wide shot`
-
-**Final Prompt**:
-```
-lone city skyline at dusk above a dark ocean, neon blue accents, cinematic 16:9 wide shot, 16:9 wallpaper, dark mode friendly, no text, no watermark, no signature, high quality, detailed
+### 5. Test
+```bash
+darkwall-comfyui generate --theme your_theme --dry-run
 ```
 
-This structured approach ensures consistent, high-quality dark-mode wallpapers while allowing for creative variety through controlled randomization.
+---
+
+## Design Guidelines (Suggestions)
+
+These are recommendations, not requirements:
+
+### Atom Guidelines
+- **Consistent length**: Keep atoms in a file similar in complexity
+- **Self-contained**: Each atom should work independently
+- **Theme-coherent**: All atoms should fit your theme's aesthetic
+- **Variety**: More atoms = more variation in outputs
+
+### Prompt Guidelines
+- **Quality tags**: Start with quality boosters (`masterpiece, best quality`)
+- **Negative prompt**: Always include common artifacts to avoid
+- **Balance specificity**: Too vague = generic; too specific = repetitive
+
+### Practical Tips
+- Start with 20-50 atoms per category
+- Create 5-10 prompt templates for variety
+- Test combinations before finalizing
+- Use `{weighted|options}` for rare variations
+
+---
+
+## Reference: Existing Theme Structure
+
+Example from an actual theme showing the flexibility of atom categories:
+
+```
+themes/example_theme/
+├── atoms/
+│   ├── environment.txt    # 54 location options
+│   ├── expression.txt     # 40 expression options
+│   ├── hair.txt           # 40 hair style options
+│   ├── lighting.txt       # 51 lighting options
+│   ├── outfit.txt         # 40 outfit options
+│   ├── pose.txt           # 40 pose options
+│   ├── style.txt          # 40 style options
+│   └── subject.txt        # 40 subject options
+└── prompts/
+    ├── 01_scene_one.prompt
+    ├── 02_scene_two.prompt
+    └── ... (8 prompt templates)
+```
+
+**Key insight**: You choose what atoms exist. The system only requires:
+1. `atoms/` directory with at least one `.txt` file
+2. `prompts/` directory with at least one `.prompt` file
+3. Prompts reference atoms that exist
+
+---
+
+## Quick Reference
+
+| Component | Location | Format |
+|-----------|----------|--------|
+| Theme root | `~/.config/darkwall-comfyui/themes/<name>/` | Directory |
+| Atoms | `themes/<name>/atoms/*.txt` | One per line |
+| Prompts | `themes/<name>/prompts/*.prompt` | Positive + `---negative---` + Negative |
+
+| Syntax | Meaning |
+|--------|---------|
+| `__name__` | Random from `atoms/name.txt` |
+| `{a\|b}` | Random from inline list |
+| `{0.5::a\|2::b}` | Weighted random |
+| `---negative---` | Section separator |
+| `# comment` | Ignored line (in atoms) |
+
+---
+
+## Workflow Integration
+
+Themes can specify which ComfyUI workflow to use:
+
+```toml
+[themes.your_theme]
+# Single workflow
+workflow_prefix = "your-workflow"
+
+# OR weighted multiple workflows
+workflows = [
+    { prefix = "workflow-a", weight = 0.7 },
+    { prefix = "workflow-b", weight = 0.3 }
+]
+```
+
+Workflow files live in `~/.config/darkwall-comfyui/workflows/` as `<prefix>-<resolution>.json`se a

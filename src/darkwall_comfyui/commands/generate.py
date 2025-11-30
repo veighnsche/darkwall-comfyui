@@ -305,7 +305,7 @@ def generate_for_monitor(
     logger.info(f"Generated: {result.filename}")
     
     # TEAM_006: Use MonitorsConfig directly (no legacy wrapper)
-    target = WallpaperTarget(config.monitors, config.output)
+    target = WallpaperTarget(config.monitors)
     saved_path = target.save_wallpaper(result.image_data, output_path)
     
     # Save to history
@@ -551,7 +551,7 @@ def retry_last(
     logger.info(f"Generated: {result.filename}")
     
     # Save wallpaper
-    target = WallpaperTarget(config.monitors, config.output)
+    target = WallpaperTarget(config.monitors)
     saved_path = target.save_wallpaper(result.image_data, output_path)
     
     # Save to history

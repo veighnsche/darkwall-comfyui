@@ -11,7 +11,6 @@ from .dataclasses import (
     PerMonitorConfig,
     MonitorsConfig,
     ComfyUIConfig,
-    OutputConfig,
     PromptConfig,
     HistoryConfig,
 )
