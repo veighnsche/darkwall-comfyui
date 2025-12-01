@@ -1,7 +1,22 @@
 # Uncanny Valley Default Prompt
 # High quality anime girl wallpapers
 
-masterpiece, best quality, amazing quality, very aesthetic, absurdres, 1girl, __subject__, __hair__, __expression__, __pose__, __environment__, __lighting__, __style__
+$$environment$$
+masterpiece, best quality, amazing quality, very aesthetic, absurdres,
+__environment__, __lighting__, __style__, detailed anime background,
+cinematic composition, high quality
 
----negative---
+$$environment:negative$$
+low quality, worst quality, blurry, watermark, signature, text, logo,
+jpeg artifacts, cropped
 
+$$subject$$
+masterpiece, best quality, amazing quality, very aesthetic, absurdres,
+1girl, __subject__, __hair__, __expression__, __pose__,
+positioned on right side of frame, looking at viewer,
+detailed face, detailed anime illustration
+
+$$subject:negative$$
+bad anatomy, extra limbs, deformed, mutated,
+poorly drawn face, extra fingers, missing fingers,
+out of frame, cropped

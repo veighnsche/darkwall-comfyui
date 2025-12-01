@@ -1,7 +1,23 @@
 # Artistic Figure Study Prompt
 # Fine art aesthetic with classical influences
 
-{elegant|graceful|artistic|sculptural|classical} __artistic_figure__, __environment__, dramatic __lighting__, __artistic_style__, __artistic_mood__, __colors__, fine art __composition__, dark mode wallpaper, museum quality, tasteful artistic nude, renaissance master aesthetic, high quality
+$$environment$$
+__environment__, dramatic __lighting__, __artistic_style__,
+__artistic_mood__, __colors__, fine art __composition__, dark mode wallpaper,
+museum quality, renaissance master aesthetic, detailed background, high quality
 
----negative---
-pornographic, explicit genitalia, spread legs, penetration, vulgar, cheap, trashy, low quality, blurry, watermark, signature, text, logo, cropped, worst quality, jpeg artifacts, ugly, deformed, bad anatomy
+$$environment:negative$$
+pornographic, explicit, vulgar, cheap, trashy,
+low quality, blurry, watermark, signature, text, logo,
+worst quality, jpeg artifacts
+
+$$subject$$
+{elegant|graceful|artistic|sculptural|classical} __artistic_figure__,
+positioned on right side of frame, tasteful artistic nude,
+classical pose, museum quality, renaissance aesthetic,
+detailed, high quality
+
+$$subject:negative$$
+explicit genitalia, spread legs, penetration, vulgar,
+cropped, out of frame, ugly, deformed, bad anatomy,
+mutated, extra limbs

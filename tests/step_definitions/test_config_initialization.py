@@ -57,7 +57,7 @@ prompts_dir = "prompts"
         (atoms_dir / "subject.txt").write_text("mountain landscape\nocean sunset\nforest path\n")
         
         # Create sample prompt file
-        (prompts_dir / "default.prompt").write_text("__subject__, beautiful scenery\n---negative---\nblurry\n")
+        (prompts_dir / "default.prompt").write_text("__subject__, beautiful scenery\n$$negative$$\nblurry\n")
     
     # Create workflows directory
     workflows_dir = templates_dir / "workflows"

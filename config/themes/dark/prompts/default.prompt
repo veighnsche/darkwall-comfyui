@@ -1,7 +1,21 @@
 # Dark Theme Default Prompt
 # Moody, atmospheric wallpapers for nighttime use
 
-__subject__, __environment__, __lighting__, __style__, __mood__, __colors__, __composition__, dark mode wallpaper, moody atmosphere, high quality, detailed, cinematic
+$$environment$$
+__environment__, __lighting__, __style__, __mood__, __colors__,
+cinematic __composition__, dark mode wallpaper, moody atmosphere,
+detailed background, atmospheric depth, high quality
 
----negative---
-bright, sunny, daylight, cheerful, happy, colorful rainbow, oversaturated, low quality, blurry, watermark, signature, text, logo, banner, cropped, out of frame, worst quality, low resolution, jpeg artifacts, ugly, duplicate, poorly drawn
+$$environment:negative$$
+bright, sunny, daylight, cheerful, happy, colorful rainbow, oversaturated,
+low quality, blurry, watermark, signature, text, logo, banner,
+worst quality, low resolution, jpeg artifacts
+
+$$subject$$
+__subject__, positioned on right side of frame,
+dramatic silhouette, mysterious presence, __mood__,
+detailed, cinematic lighting, high quality
+
+$$subject:negative$$
+cropped, out of frame, ugly, duplicate, poorly drawn,
+bad anatomy, deformed, mutated, extra limbs

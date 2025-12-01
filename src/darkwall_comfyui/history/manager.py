@@ -130,6 +130,26 @@ class WallpaperHistory:
             if file_size != len(image_data):
                 raise HistoryStorageError(f"Size mismatch for saved wallpaper: expected {len(image_data)} bytes, got {file_size}")
             
+            # TEAM_007: Format prompts for storage (handles multi-section prompts)
+            sections = prompt_result.sections()
+            if 'positive' in sections:
+                # Legacy single-section format
+                positive_text = prompt_result.positive
+                negative_text = prompt_result.negative
+            else:
+                # Multi-section format: combine all sections with labels
+                positive_parts = []
+                negative_parts = []
+                for section in sections:
+                    prompt = prompt_result.get_prompt(section)
+                    negative = prompt_result.get_negative(section)
+                    if prompt:
+                        positive_parts.append(f"[{section.upper()}]\n{prompt}")
+                    if negative:
+                        negative_parts.append(f"[{section.upper()}]\n{negative}")
+                positive_text = "\n\n".join(positive_parts)
+                negative_text = "\n\n".join(negative_parts)
+            
             # Create history entry
             entry = HistoryEntry(
                 timestamp=timestamp_str,
@@ -137,8 +157,8 @@ class WallpaperHistory:
                 path=str(image_path.relative_to(self.history_dir)),
                 monitor_index=monitor_index,
                 prompt_id=generation_result.prompt_id,
-                positive_prompt=prompt_result.positive,
-                negative_prompt=prompt_result.negative,
+                positive_prompt=positive_text,
+                negative_prompt=negative_text,
                 template=template,
                 workflow=workflow,
                 seed=seed,

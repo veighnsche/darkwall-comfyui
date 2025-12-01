@@ -1,7 +1,23 @@
 # Dark Theme Cinematic Prompt
 # Movie-like dramatic scenes
 
-{epic|dramatic|intense|powerful|breathtaking} __subject__, __environment__, {dramatic|cinematic|theatrical} __lighting__, film __style__, __mood__, __colors__, anamorphic __composition__, movie poster quality, dark mode wallpaper, blockbuster aesthetic, high quality, 8k resolution
+$$environment$$
+__environment__, {dramatic|cinematic|theatrical} __lighting__, film __style__,
+__mood__, __colors__, anamorphic __composition__, movie poster quality,
+dark mode wallpaper, blockbuster aesthetic, detailed background,
+high quality, 8k resolution
 
----negative---
-bright, cheerful, cartoon, anime, low budget, amateur, low quality, blurry, watermark, signature, text, logo, cropped, worst quality, jpeg artifacts
+$$environment:negative$$
+bright, cheerful, cartoon, anime, low budget, amateur,
+low quality, blurry, watermark, signature, text, logo,
+worst quality, jpeg artifacts
+
+$$subject$$
+{epic|dramatic|intense|powerful|breathtaking} __subject__,
+positioned on right side of frame, cinematic framing,
+dramatic pose, movie poster composition, detailed,
+high quality
+
+$$subject:negative$$
+cropped, out of frame, ugly, poorly drawn,
+bad anatomy, deformed, mutated, extra limbs

@@ -1,7 +1,22 @@
 # Artistic Dark Fantasy Prompt
 # Mythological and supernatural sensuality
 
-{mythical|supernatural|enchanted|divine|otherworldly} __artistic_figure__, fantasy __environment__, magical __lighting__, __artistic_style__, __artistic_mood__, __colors__, epic __composition__, dark mode wallpaper, dark fantasy aesthetic, goddess beauty, high quality
+$$environment$$
+fantasy __environment__, magical __lighting__, __artistic_style__,
+__artistic_mood__, __colors__, epic __composition__, dark mode wallpaper,
+dark fantasy aesthetic, mystical atmosphere, detailed background, high quality
 
----negative---
-pornographic, explicit, vulgar, modern, mundane, low quality, blurry, watermark, signature, text, logo, cropped, worst quality, jpeg artifacts, ugly, deformed, bad anatomy
+$$environment:negative$$
+pornographic, explicit, vulgar, modern, mundane,
+low quality, blurry, watermark, signature, text, logo,
+worst quality, jpeg artifacts
+
+$$subject$$
+{mythical|supernatural|enchanted|divine|otherworldly} __artistic_figure__,
+positioned on right side of frame, goddess beauty,
+{flowing ethereal gown|mystical aura|divine radiance},
+detailed, high quality
+
+$$subject:negative$$
+cropped, out of frame, ugly, deformed, bad anatomy,
+mutated, extra limbs, vulgar, mundane

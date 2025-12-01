@@ -3,11 +3,43 @@
 import argparse
 import logging
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Tuple
 
 from ..config import Config
 from ..prompt_generator import PromptGenerator, PromptResult
 from ..exceptions import PromptError
+
+
+def format_prompt_result(result: PromptResult) -> Tuple[str, str]:
+    """
+    Format a PromptResult for display, handling both legacy and multi-section formats.
+    
+    TEAM_007: For multi-section prompts (environment/subject), combines all sections.
+    For legacy single-section prompts, uses .positive/.negative properties.
+    
+    Returns:
+        Tuple of (all_positives, all_negatives) as formatted strings
+    """
+    sections = result.sections()
+    
+    # Legacy format: single 'positive' section
+    if sections == ['positive'] or (len(sections) == 1 and 'positive' in sections):
+        return result.positive, result.negative
+    
+    # Multi-section format: combine all sections with labels
+    positives = []
+    negatives = []
+    
+    for section in sections:
+        prompt = result.get_prompt(section)
+        negative = result.get_negative(section)
+        
+        if prompt:
+            positives.append(f"[{section.upper()}]\n{prompt}")
+        if negative:
+            negatives.append(f"[{section.upper()}]\n{negative}")
+    
+    return "\n\n".join(positives), "\n\n".join(negatives)
 
 
 def add_parser(subparsers) -> argparse.ArgumentParser:
@@ -164,8 +196,10 @@ def handle_generate_command(args, config: Optional[Config]) -> None:
                 default_template="default.prompt"
             )
         
-        # Get template name
+        # Get template name (add .prompt extension if missing)
         template_name = args.template or theme_config.default_template
+        if template_name and not template_name.endswith('.prompt'):
+            template_name = f"{template_name}.prompt"
         
         # Create prompt config (use from config if available, else defaults)
         prompt_config = config.prompt if config else PromptConfig()
@@ -190,36 +224,39 @@ def handle_generate_command(args, config: Optional[Config]) -> None:
             seed=seed
         )
         
+        # TEAM_007: Format result for display (handles multi-section prompts)
+        positive_text, negative_text = format_prompt_result(result)
+        
         # Output based on flags
         if args.raw:
             # Raw output for scripting
             if args.positive_only:
-                print(result.positive)
+                print(positive_text)
             elif args.negative_only:
-                print(result.negative)
+                print(negative_text)
             else:
-                print(result.positive)
+                print(positive_text)
                 print("---")
-                print(result.negative)
+                print(negative_text)
         else:
             # Formatted output for humans
             if args.positive_only:
-                print(result.positive)
+                print(positive_text)
             elif args.negative_only:
-                print(result.negative)
+                print(negative_text)
             else:
                 print()
                 print("=" * 60)
                 print("POSITIVE PROMPT (copy this):")
                 print("=" * 60)
                 print()
-                print(result.positive)
+                print(positive_text)
                 print()
                 print("=" * 60)
                 print("NEGATIVE PROMPT (copy this):")
                 print("=" * 60)
                 print()
-                print(result.negative)
+                print(negative_text)
                 print()
                 print("-" * 60)
                 print(f"Theme: {theme_name} | Template: {template_name} | Seed: {seed}")
@@ -240,8 +277,10 @@ def handle_preview_command(args, config: Config) -> None:
     logger = logging.getLogger(__name__)
     
     try:
-        # Get template name
+        # Get template name (add .prompt extension if missing)
         template_name = args.template or config.prompt.default_template
+        if template_name and not template_name.endswith('.prompt'):
+            template_name = f"{template_name}.prompt"
         
         # Create prompt generator
         prompt_gen = PromptGenerator(config.prompt, config.get_config_dir())
@@ -259,14 +298,17 @@ def handle_preview_command(args, config: Config) -> None:
             seed=seed
         )
         
+        # TEAM_007: Format result for display (handles multi-section prompts)
+        positive_text, negative_text = format_prompt_result(result)
+        
         # Display results
         print(f"\n📝 Template: {template_name}")
         print(f"🎲 Seed: {seed}")
         print(f"🖥️  Monitor: {args.monitor}")
         print("\n✨ Positive Prompt:")
-        print(f"   {result.positive}")
+        print(f"   {positive_text}")
         print("\n🚫 Negative Prompt:")
-        print(f"   {result.negative}")
+        print(f"   {negative_text}")
         
     except PromptError as e:
         logger.error(f"Prompt error: {e}")
@@ -382,7 +424,9 @@ def handle_interactive_command(args, config: Optional[Config]) -> None:
                 raise
     
     def generate_prompt(theme: str, template: str, new_seed: bool = True) -> tuple:
-        """Generate a prompt and return (positive, negative, seed).
+        """Generate a prompt and return (result, seed).
+        
+        TEAM_007: Returns PromptResult object for section-level clipboard access.
         
         Args:
             theme: Theme name
@@ -413,7 +457,7 @@ def handle_interactive_command(args, config: Optional[Config]) -> None:
             seed=seed
         )
         
-        return result.positive, result.negative, seed
+        return result, seed
     
     def copy_to_clipboard(text: str) -> bool:
         """Copy text to clipboard using wl-copy."""
@@ -425,20 +469,21 @@ def handle_interactive_command(args, config: Optional[Config]) -> None:
         except Exception:
             return False
     
-    def display_prompt(positive: str, negative: str, theme: str, template: str, seed: int):
-        """Display generated prompt."""
+    def display_prompt(result, theme: str, template: str, seed: int):
+        """Display generated prompt with section labels."""
+        positive_text, negative_text = format_prompt_result(result)
         print()
         print("=" * 60)
         print("POSITIVE PROMPT:")
         print("=" * 60)
         print()
-        print(positive)
+        print(positive_text)
         print()
         print("=" * 60)
         print("NEGATIVE PROMPT:")
         print("=" * 60)
         print()
-        print(negative)
+        print(negative_text)
         print()
         print("-" * 60)
         print(f"Theme: {theme} | Template: {template} | Seed: {seed}")
@@ -471,8 +516,8 @@ def handle_interactive_command(args, config: Optional[Config]) -> None:
             # Generate
             print(f"\n{BOLD}Generating prompt...{NC}")
             try:
-                positive, negative, seed = generate_prompt(theme, template)
-                display_prompt(positive, negative, theme, template, seed)
+                result, seed = generate_prompt(theme, template)
+                display_prompt(result, theme, template, seed)
             except Exception as e:
                 print(f"{YELLOW}Error generating prompt: {e}{NC}")
                 continue
@@ -482,15 +527,22 @@ def handle_interactive_command(args, config: Optional[Config]) -> None:
                 print(f"\n{BOLD}═══════════════════════════════════════════════════════════{NC}")
                 print(f"{YELLOW}What next?{NC}")
                 
+                # TEAM_007: Build dynamic clipboard options based on sections
+                sections = result.sections()
+                
                 actions = [
                     "Generate another (same settings)",
                     "Generate another (new settings)",
                 ]
+                clipboard_actions = []  # (label, text_to_copy)
                 if clipboard_enabled:
-                    actions.extend([
-                        "Copy positive to clipboard",
-                        "Copy negative to clipboard",
-                    ])
+                    for section in sections:
+                        actions.append(f"Copy {section} prompt")
+                        clipboard_actions.append((section, result.get_prompt(section)))
+                    for section in sections:
+                        if result.get_negative(section):
+                            actions.append(f"Copy {section} negative")
+                            clipboard_actions.append((f"{section}:negative", result.get_negative(section)))
                 actions.append("Exit")
                 
                 for i, action in enumerate(actions, 1):
@@ -501,23 +553,20 @@ def handle_interactive_command(args, config: Optional[Config]) -> None:
                     idx = int(choice) - 1
                     
                     if idx == 0:  # Same settings
-                        positive, negative, seed = generate_prompt(theme, template)
-                        display_prompt(positive, negative, theme, template, seed)
+                        result, seed = generate_prompt(theme, template)
+                        display_prompt(result, theme, template, seed)
                     elif idx == 1:  # New settings
                         break
-                    elif clipboard_enabled and idx == 2:  # Copy positive
-                        if copy_to_clipboard(positive):
-                            print(f"{GREEN}✓ Positive prompt copied to clipboard!{NC}")
-                        else:
-                            print(f"{YELLOW}Failed to copy to clipboard{NC}")
-                    elif clipboard_enabled and idx == 3:  # Copy negative
-                        if copy_to_clipboard(negative):
-                            print(f"{GREEN}✓ Negative prompt copied to clipboard!{NC}")
-                        else:
-                            print(f"{YELLOW}Failed to copy to clipboard{NC}")
-                    elif idx == len(actions) - 1:  # Exit
+                    elif idx == len(actions) - 1:  # Exit (always last)
                         print(f"\n{GREEN}Goodbye! 🎨{NC}\n")
                         return
+                    elif clipboard_enabled and 2 <= idx < 2 + len(clipboard_actions):
+                        # Clipboard action
+                        label, text = clipboard_actions[idx - 2]
+                        if copy_to_clipboard(text):
+                            print(f"{GREEN}✓ {label} copied to clipboard!{NC}")
+                        else:
+                            print(f"{YELLOW}Failed to copy to clipboard{NC}")
                     else:
                         print(f"{YELLOW}Invalid choice{NC}")
                 except (ValueError, EOFError):

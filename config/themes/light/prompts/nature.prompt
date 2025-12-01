@@ -1,7 +1,21 @@
 # Light Theme Nature Prompt
 # Flora, fauna, and natural details
 
-{beautiful|delicate|vibrant|lush|pristine} __subject__, close-up nature detail, __lighting__, macro photography style, __mood__, __colors__, shallow depth of field, botanical illustration quality, light mode wallpaper, organic textures, high quality
+$$environment$$
+close-up nature detail, __lighting__, macro photography style,
+__mood__, __colors__, shallow depth of field, botanical illustration quality,
+light mode wallpaper, organic textures, detailed background, high quality
 
----negative---
-dark, artificial, synthetic, industrial, urban, nsfw, nude, low quality, blurry, watermark, signature, text, logo, cropped, worst quality
+$$environment:negative$$
+dark, artificial, synthetic, industrial, urban,
+nsfw, nude, low quality, blurry, watermark, signature, text, logo,
+worst quality
+
+$$subject$$
+{beautiful|delicate|vibrant|lush|pristine} __subject__,
+positioned on right side of frame, natural detail,
+macro photography, organic beauty, detailed, high quality
+
+$$subject:negative$$
+cropped, out of frame, ugly, poorly drawn,
+artificial, synthetic

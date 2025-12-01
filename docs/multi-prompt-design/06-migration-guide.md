@@ -9,14 +9,14 @@ If you have templates like this:
 ```
 beautiful landscape, mountains
 
----negative---
+$$negative$$
 ugly, blurry
 ```
 
 **No changes needed.** This is automatically parsed as:
 
 | Section | Content |
-|---------|---------|
+|$$$$---|$$$$---|
 | `positive` | "beautiful landscape, mountains" |
 | `positive:negative` | "ugly, blurry" |
 
@@ -50,10 +50,10 @@ Change your ComfyUI workflow to use named placeholders:
 ```json
 {
   "10": {
-    "inputs": { "text": "__PROMPT:environment__" }
+    "inputs": { "text": "$$environment$$" }
   },
   "20": {
-    "inputs": { "text": "__PROMPT:subject__" }
+    "inputs": { "text": "$$subject$$" }
   }
 }
 ```
@@ -66,22 +66,22 @@ Add named sections to your `.prompt` file:
 ```
 beautiful woman in forest, sunset lighting
 
----negative---
+$$negative$$
 ugly, blurry
 ```
 
 **After:**
 ```
----environment---
+$$environment$$
 dense forest, golden sunset, volumetric lighting, cinematic
 
----environment:negative---
+$$environment:negative$$
 ugly, blurry, low quality
 
----subject---
+$$subject$$
 beautiful woman, standing on right side of frame, elegant pose
 
----subject:negative---
+$$subject:negative$$
 bad anatomy, deformed, extra limbs
 ```
 
@@ -96,15 +96,15 @@ Check that prompts are injected correctly.
 ## Workflow Placeholder Reference
 
 | Placeholder | Template Section |
-|-------------|------------------|
-| `__PROMPT:positive__` | `---positive---` or content before first section |
-| `__NEGATIVE:positive__` | `---positive:negative---` or `---negative---` |
-| `__PROMPT:environment__` | `---environment---` |
-| `__NEGATIVE:environment__` | `---environment:negative---` |
-| `__PROMPT:subject__` | `---subject---` |
-| `__NEGATIVE:subject__` | `---subject:negative---` |
-| `__POSITIVE_PROMPT__` | Same as `__PROMPT:positive__` (legacy) |
-| `__NEGATIVE_PROMPT__` | Same as `__NEGATIVE:positive__` (legacy) |
+|$$____$$-|$$________$$|
+| `$$positive$$` | `$$positive$$` or content before first section |
+| `$$positive:negative$$` | `$$positive:negative$$` or `$$negative$$` |
+| `$$environment$$` | `$$environment$$` |
+| `$$environment:negative$$` | `$$environment:negative$$` |
+| `$$subject$$` | `$$subject$$` |
+| `$$subject:negative$$` | `$$subject:negative$$` |
+| `__POSITIVE_PROMPT__` | Same as `$$positive$$` (legacy) |
+| `__NEGATIVE_PROMPT__` | Same as `$$positive:negative$$` (legacy) |
 
 ## Common Patterns
 
@@ -113,18 +113,18 @@ Check that prompts are injected correctly.
 For Niri compositor where apps occupy left 60%:
 
 ```
----environment---
-__environment__, wide landscape, detailed background,
+$$environment$$
+$$environment$$, wide landscape, detailed background,
 left side focus, {morning|afternoon|evening} lighting
 
----environment:negative---
+$$environment:negative$$
 subject in center, person in center, ugly, blurry
 
----subject---
-__character__, positioned on right third of frame,
-looking left, __pose__, __expression__
+$$subject$$
+$$character$$, positioned on right third of frame,
+looking left, $$pose$$, $$expression$$
 
----subject:negative---
+$$subject:negative$$
 centered subject, bad anatomy, deformed
 ```
 
@@ -133,16 +133,16 @@ centered subject, bad anatomy, deformed
 For workflows that generate different content per area:
 
 ```
----left---
+$$left$$
 abstract geometric patterns, cool colors
 
----right---
+$$right$$
 organic flowing shapes, warm colors
 
----left:negative---
+$$left:negative$$
 realistic, photographic
 
----right:negative---
+$$right:negative$$
 geometric, angular
 ```
 
@@ -158,12 +158,12 @@ Your workflow uses `__PROMPT:X__` but your template doesn't have a `---X---` sec
 
 Your workflow doesn't have any recognized placeholders.
 
-**Fix**: Add `__PROMPT:name__` placeholders to your workflow's text nodes.
+**Fix**: Add `$$name$$` placeholders to your workflow's text nodes.
 
 ### "Template has sections but workflow uses legacy placeholders"
 
 You updated your template to multi-section but workflow still uses `__POSITIVE_PROMPT__`.
 
 **Fix**: Either:
-1. Update workflow to use `__PROMPT:section__` format
-2. Or keep a `---positive---` section in your template for backwards compat
+1. Update workflow to use `$$section$$` format
+2. Or keep a `$$positive$$` section in your template for backwards compat

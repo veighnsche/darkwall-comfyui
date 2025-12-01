@@ -42,7 +42,7 @@ def temp_config_dir() -> Generator[Path, None, None]:
         (prompts_dir / "default.prompt").write_text(
             "__subject__, __environment__, __lighting__, __style__, "
             "dark mode friendly, high quality\n\n"
-            "---negative---\n"
+            "$$negative$$\n"
             "blurry, low quality\n"
         )
         

@@ -3,7 +3,7 @@
 ## File Locations
 
 | Component | Path |
-|-----------|------|
+|$$$$-----|$$$$|
 | Prompt Generator | `src/darkwall_comfyui/prompt_generator.py` |
 | ComfyUI Client | `src/darkwall_comfyui/comfy/client.py` |
 | Prompt Templates | `config/themes/{theme}/prompts/*.prompt` |
@@ -14,9 +14,9 @@
 ```
 # Comments start with #
 
-positive prompt content here with __wildcards__ and {variants|syntax}
+positive prompt content here with $$wildcards$$ and {variants|syntax}
 
----negative---
+$$negative$$
 negative prompt content here
 ```
 
@@ -24,8 +24,8 @@ negative prompt content here
 
 ```python
 def _parse_template_sections(self, template: str) -> Tuple[str, str]:
-    # Split on ---negative--- separator
-    separator = '---negative---'
+    # Split on $$negative$$ separator
+    separator = '$$negative$$'
     if separator in content:
         parts = content.split(separator, 1)
         positive = parts[0].strip()
@@ -90,6 +90,6 @@ def _inject_prompts(self, workflow: dict, prompts: PromptResult) -> dict:
 ## What Needs to Change
 
 1. **PromptResult** — Support arbitrary named prompts
-2. **_parse_template_sections** — Parse multiple `---name---` sections
-3. **_inject_prompts** — Match `__PROMPT:name__` patterns dynamically
+2. **_parse_template_sections** — Parse multiple `$$name$$` sections
+3. **_inject_prompts** — Match `$$name$$` patterns dynamically
 4. **Backwards compatibility** — Old templates and workflows must still work

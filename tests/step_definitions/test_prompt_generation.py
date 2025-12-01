@@ -68,17 +68,17 @@ def create_theme_structure(config_dir: Path, theme: str, prompts: list):
     # Create prompt files
     for prompt_name in prompts:
         if prompt_name == "default":
-            content = "__subject__, __environment__, __lighting__, __style__, __mood__, __colors__, __composition__\n---negative---\nblurry, low quality, watermark\n"
+            content = "__subject__, __environment__, __lighting__, __style__, __mood__, __colors__, __composition__\n$$negative$$\nblurry, low quality, watermark\n"
         elif prompt_name == "cyberpunk":
-            content = "cyberpunk __subject__, neon __lighting__, __environment__, futuristic __style__\n---negative---\nnature, daylight, blurry\n"
+            content = "cyberpunk __subject__, neon __lighting__, __environment__, futuristic __style__\n$$negative$$\nnature, daylight, blurry\n"
         elif prompt_name == "noir":
-            content = "film noir __subject__, dramatic __lighting__, __mood__, black and white\n---negative---\ncolorful, bright, cheerful\n"
+            content = "film noir __subject__, dramatic __lighting__, __mood__, black and white\n$$negative$$\ncolorful, bright, cheerful\n"
         elif prompt_name == "landscape":
-            content = "beautiful __subject__ landscape, __environment__, __lighting__, nature photography\n---negative---\nurban, people, blurry\n"
+            content = "beautiful __subject__ landscape, __environment__, __lighting__, nature photography\n$$negative$$\nurban, people, blurry\n"
         elif prompt_name == "nature":
-            content = "nature __subject__, __environment__, __lighting__, wildlife photography\n---negative---\ncity, buildings, blurry\n"
+            content = "nature __subject__, __environment__, __lighting__, wildlife photography\n$$negative$$\ncity, buildings, blurry\n"
         else:
-            content = f"__subject__, {prompt_name} style\n---negative---\nblurry\n"
+            content = f"__subject__, {prompt_name} style\n$$negative$$\nblurry\n"
         
         (prompts_dir / f"{prompt_name}.prompt").write_text(content)
 

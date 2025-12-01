@@ -57,7 +57,7 @@ def test_atom_selection(prompt_config, config_dir):
 
 
 def test_wildcard_resolution(prompt_config, config_dir):
-    """Test __wildcard__ syntax resolution."""
+    """Test $$wildcard$$ syntax resolution."""
     gen = PromptGenerator(prompt_config, config_dir)
     
     # Test loading atom file
@@ -104,7 +104,7 @@ def test_template_sections(prompt_config, config_dir):
     # Comment line
     positive prompt here
     
-    ---negative---
+    $$negative$$
     negative prompt here
     """
     
@@ -124,16 +124,16 @@ def test_template_sections_multi(prompt_config, config_dir):
     template = """
     # Multi-section template
     
-    ---environment---
+    $$environment$$
     mountain landscape, golden hour
     
-    ---environment:negative---
+    $$environment:negative$$
     ugly, blurry
     
-    ---subject---
+    $$subject$$
     woman standing on right
     
-    ---subject:negative---
+    $$subject:negative$$
     bad anatomy
     """
     

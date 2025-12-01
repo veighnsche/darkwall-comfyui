@@ -1,7 +1,23 @@
 # Dark Theme Gothic Prompt
 # Dark fantasy and gothic horror
 
-{ancient|haunted|mysterious|forbidden|cursed} __subject__, gothic __environment__, candlelight __lighting__, dark fantasy __style__, __mood__, __colors__, dramatic __composition__, dark mode wallpaper, victorian gothic aesthetic, romantic darkness, high quality
+$$environment$$
+gothic __environment__, candlelight __lighting__, dark fantasy __style__,
+__mood__, __colors__, dramatic __composition__, dark mode wallpaper,
+victorian gothic aesthetic, romantic darkness, ancient architecture,
+detailed background, high quality
 
----negative---
-modern, bright, cheerful, cute, cartoon, anime, low quality, blurry, watermark, signature, text, logo, cropped, worst quality, jpeg artifacts
+$$environment:negative$$
+modern, bright, cheerful, cute, cartoon, anime,
+low quality, blurry, watermark, signature, text, logo,
+worst quality, jpeg artifacts
+
+$$subject$$
+{ancient|haunted|mysterious|forbidden|cursed} __subject__,
+positioned on right side of frame, gothic silhouette,
+{flowing robes|dark cloak|victorian attire}, candlelit,
+dramatic pose, detailed, high quality
+
+$$subject:negative$$
+cropped, out of frame, ugly, poorly drawn,
+bad anatomy, deformed, mutated, extra limbs

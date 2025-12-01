@@ -1,7 +1,23 @@
 # Artistic Silhouette Prompt
 # Suggestive shadow and silhouette art
 
-{mysterious|shadowy|suggestive|implied|abstract} __artistic_figure__, backlit __environment__, rim __lighting__, silhouette __artistic_style__, __artistic_mood__, {black and deep purple|black and red|black and blue} palette, dramatic __composition__, dark mode wallpaper, artistic shadow play, elegant suggestion, high quality
+$$environment$$
+backlit __environment__, rim __lighting__, silhouette __artistic_style__,
+__artistic_mood__, {black and deep purple|black and red|black and blue} palette,
+dramatic __composition__, dark mode wallpaper, artistic shadow play,
+detailed background, high quality
 
----negative---
-explicit, fully visible, harsh light, flat lighting, low quality, blurry, watermark, signature, text, logo, cropped, worst quality, jpeg artifacts
+$$environment:negative$$
+explicit, fully visible, harsh light, flat lighting,
+low quality, blurry, watermark, signature, text, logo,
+worst quality, jpeg artifacts
+
+$$subject$$
+{mysterious|shadowy|suggestive|implied|abstract} __artistic_figure__,
+positioned on right side of frame, elegant silhouette,
+backlit rim lighting, artistic shadow play,
+detailed, high quality
+
+$$subject:negative$$
+explicit, fully visible, cropped, out of frame,
+ugly, deformed, bad anatomy, flat lighting

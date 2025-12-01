@@ -25,7 +25,7 @@ Design an **arbitrary named prompt system** that:
 ## Design Documents
 
 | Document | Description |
-|----------|-------------|
+|$$$$----|$$____$$-|
 | [01-current-state.md](./01-current-state.md) | Analysis of current implementation |
 | [02-new-prompt-format.md](./02-new-prompt-format.md) | New `.prompt` file format specification |
 | [03-workflow-placeholders.md](./03-workflow-placeholders.md) | New workflow placeholder syntax |
@@ -39,29 +39,29 @@ Design an **arbitrary named prompt system** that:
 ```
 beautiful landscape, mountains, sunset
 
----negative---
+$$negative$$
 ugly, blurry
 ```
 
 **After** (multiple named prompts):
 ```
----environment---
+$$environment$$
 mountain landscape, golden hour lighting, cinematic atmosphere
 
----environment:negative---
+$$environment:negative$$
 ugly, blurry, low quality
 
----subject---
+$$subject$$
 elegant woman in flowing dress, standing on right side of frame
 
----subject:negative---
+$$subject:negative$$
 bad anatomy, extra limbs, deformed face
 ```
 
 **Workflow placeholders**:
 ```
-__PROMPT:environment__    →  injects environment section
-__PROMPT:subject__        →  injects subject section
-__NEGATIVE:environment__  →  injects environment:negative section
-__NEGATIVE:subject__      →  injects subject:negative section
+$$environment$$    →  injects environment section
+$$subject$$        →  injects subject section
+$$environment:negative$$  →  injects environment:negative section
+$$subject:negative$$      →  injects subject:negative section
 ```

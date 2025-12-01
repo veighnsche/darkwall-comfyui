@@ -3,8 +3,8 @@
 ## New Placeholder Format
 
 ```
-__PROMPT:section_name__     →  Positive prompt for section
-__NEGATIVE:section_name__   →  Negative prompt for section
+$$section_name$$     →  Positive prompt for section
+$$section_name:negative$$   →  Negative prompt for section
 ```
 
 ### Examples
@@ -15,7 +15,7 @@ __NEGATIVE:section_name__   →  Negative prompt for section
     "class_type": "CLIPTextEncode",
     "_meta": { "title": "Environment Positive" },
     "inputs": {
-      "text": "__PROMPT:environment__",
+      "text": "$$environment$$",
       "clip": ["4", 0]
     }
   },
@@ -23,7 +23,7 @@ __NEGATIVE:section_name__   →  Negative prompt for section
     "class_type": "CLIPTextEncode",
     "_meta": { "title": "Environment Negative" },
     "inputs": {
-      "text": "__NEGATIVE:environment__",
+      "text": "$$environment:negative$$",
       "clip": ["4", 0]
     }
   },
@@ -31,7 +31,7 @@ __NEGATIVE:section_name__   →  Negative prompt for section
     "class_type": "CLIPTextEncode",
     "_meta": { "title": "Subject Positive" },
     "inputs": {
-      "text": "__PROMPT:subject__",
+      "text": "$$subject$$",
       "clip": ["4", 0]
     }
   },
@@ -39,36 +39,38 @@ __NEGATIVE:section_name__   →  Negative prompt for section
     "class_type": "CLIPTextEncode",
     "_meta": { "title": "Subject Negative" },
     "inputs": {
-      "text": "__NEGATIVE:subject__",
+      "text": "$$subject:negative$$",
       "clip": ["4", 0]
     }
   }
 }
 ```
 
-## Backwards Compatibility
+## Unified Syntax
 
-Old placeholders are aliased to new format:
+The same `$$section$$` syntax is used in both `.prompt` files and workflow JSON:
 
-| Old Placeholder | Equivalent New Placeholder |
-|-----------------|---------------------------|
-| `__POSITIVE_PROMPT__` | `__PROMPT:positive__` |
-| `__NEGATIVE_PROMPT__` | `__NEGATIVE:positive__` |
+| `.prompt` file | Workflow JSON | Description |
+|----------------|---------------|-------------|
+| `$$environment$$` | `"$$environment$$"` | Environment positive prompt |
+| `$$environment:negative$$` | `"$$environment:negative$$"` | Environment negative prompt |
+| `$$subject$$` | `"$$subject$$"` | Subject positive prompt |
+| `$$subject:negative$$` | `"$$subject:negative$$"` | Subject negative prompt |
 
-Both formats work. Old workflows don't need changes.
+Section names are arbitrary - use whatever makes sense for your workflow.
 
 ## Injection Algorithm
 
 ```python
 import re
 
-PROMPT_PATTERN = re.compile(r'__PROMPT:([a-z0-9_]+)__')
-NEGATIVE_PATTERN = re.compile(r'__NEGATIVE:([a-z0-9_]+)__')
+# Matches $$section_name$$ for positive prompts
+SECTION_PATTERN = re.compile(r'^__([a-z0-9_]+)__$')
+# Matches $$section_name:negative$$ for negative prompts
+NEGATIVE_SECTION_PATTERN = re.compile(r'^__([a-z0-9_]+):negative__$')
 
-def _inject_prompts(self, workflow: dict, prompts: PromptResult) -> dict:
+def inject_prompts(workflow: dict, prompts: PromptResult) -> dict:
     workflow = json.loads(json.dumps(workflow))  # Deep copy
-    
-    injected = set()
     
     for node_id, node in workflow.items():
         if not isinstance(node, dict):
@@ -80,31 +82,20 @@ def _inject_prompts(self, workflow: dict, prompts: PromptResult) -> dict:
             if not isinstance(value, str):
                 continue
             
-            # Check for new format: __PROMPT:name__
-            match = PROMPT_PATTERN.match(value)
+            # Check for negative section first: $$name:negative$$
+            match = NEGATIVE_SECTION_PATTERN.match(value)
+            if match:
+                section = match.group(1)
+                inputs[field] = prompts.negatives.get(section, "")
+                continue
+            
+            # Check for positive section: $$name$$
+            match = SECTION_PATTERN.match(value)
             if match:
                 section = match.group(1)
                 if section in prompts.prompts:
                     inputs[field] = prompts.prompts[section]
-                    injected.add(f"PROMPT:{section}")
                 continue
-            
-            # Check for new format: __NEGATIVE:name__
-            match = NEGATIVE_PATTERN.match(value)
-            if match:
-                section = match.group(1)
-                if section in prompts.negatives:
-                    inputs[field] = prompts.negatives[section]
-                    injected.add(f"NEGATIVE:{section}")
-                continue
-            
-            # Backwards compat: old placeholders
-            if value == "__POSITIVE_PROMPT__":
-                inputs[field] = prompts.prompts.get("positive", "")
-                injected.add("PROMPT:positive")
-            elif value == "__NEGATIVE_PROMPT__":
-                inputs[field] = prompts.negatives.get("positive", "")
-                injected.add("NEGATIVE:positive")
     
     return workflow
 ```
@@ -115,19 +106,16 @@ def _inject_prompts(self, workflow: dict, prompts: PromptResult) -> dict:
 
 The workflow declares what it needs via placeholders. The template provides sections.
 
-**Strict mode** (recommended for new workflows):
-- Error if workflow has `__PROMPT:X__` but template lacks `---X---`
-
-**Lenient mode** (for migration):
-- Warn if section missing
-- Fall back to `positive` section if available
-- Use empty string as last resort
+**Behavior**:
+- Error if workflow has `__X__` but template lacks `__X__` section
+- Missing negative sections use empty string (lenient)
+- Logs warning for missing sections
 
 ### Logging
 
 ```
-INFO: Injected prompts: PROMPT:environment, PROMPT:subject, NEGATIVE:environment, NEGATIVE:subject
-WARN: Workflow requests PROMPT:style but template has no ---style--- section
+INFO: Injected prompts: environment, subject, environment:negative, subject:negative
+WARN: Workflow requests $$style$$ but template has no matching section
 ```
 
 ## Workflow Discovery
@@ -146,8 +134,8 @@ Required prompt sections:
   - subject (positive + negative)
 
 Template sections needed:
-  ---environment---
-  ---environment:negative---
-  ---subject---
-  ---subject:negative---
+  $$environment$$
+  $$environment:negative$$
+  $$subject$$
+  $$subject:negative$$
 ```

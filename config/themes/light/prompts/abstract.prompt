@@ -1,7 +1,21 @@
 # Light Theme Abstract Prompt
 # Geometric patterns and artistic compositions
 
-{flowing|geometric|organic|minimalist|ethereal} abstract composition, __colors__, soft __lighting__, modern art style, __mood__, clean lines and shapes, __composition__, light mode wallpaper, contemporary design, high quality, vector art quality
+$$environment$$
+abstract background, __colors__, soft __lighting__, modern art style,
+__mood__, clean lines and shapes, __composition__, light mode wallpaper,
+contemporary design, detailed background, high quality, vector art quality
 
----negative---
-dark, gloomy, chaotic, cluttered, nsfw, nude, realistic photo, low quality, blurry, watermark, signature, text, logo, cropped, worst quality
+$$environment:negative$$
+dark, gloomy, chaotic, cluttered, nsfw, nude, realistic photo,
+low quality, blurry, watermark, signature, text, logo,
+worst quality
+
+$$subject$$
+{flowing|geometric|organic|minimalist|ethereal} abstract composition,
+positioned on right side of frame, focal element,
+clean design, contemporary aesthetic, detailed, high quality
+
+$$subject:negative$$
+cropped, out of frame, chaotic, cluttered,
+busy, overwhelming

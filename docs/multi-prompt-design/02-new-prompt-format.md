@@ -2,16 +2,16 @@
 
 ## Section Syntax
 
-Sections are marked with `---name---` on their own line:
+Sections are marked with `$$name$$` on their own line:
 
 ```
----section_name---
+$$section_name$$
 content for this section
 
----another_section---
+$$another_section$$
 content for another section
 
----section_name:negative---
+$$section_name:negative$$
 negative content for section_name
 ```
 
@@ -19,7 +19,7 @@ negative content for section_name
 
 - Lowercase alphanumeric + underscores: `[a-z0-9_]+`
 - Negative sections use `:negative` suffix
-- First section without a marker is implicitly `---positive---`
+- First section without a marker is implicitly `$$positive$$`
 
 ## Full Example
 
@@ -27,23 +27,25 @@ negative content for section_name
 # Multi-prompt template for Niri compositor layout
 # Environment on left, subject on right 40% of screen
 
----environment---
+$$environment$$
 __environment__, __lighting__, __weather__, 
 cinematic composition, detailed background,
 {morning light|golden hour|blue hour|night scene}
 
----environment:negative---
+$$environment:negative$$
 ugly, blurry, low quality, watermark, text, logo
 
----subject---
+$$subject$$
 __character__, standing on right side of frame,
 __pose__, __expression__, __clothing__,
 looking at viewer, detailed face
 
----subject:negative---
+$$subject:negative$$
 bad anatomy, extra limbs, deformed, mutated,
 poorly drawn face, extra fingers
 ```
+
+Note: `$$section$$` marks section boundaries, `__wildcard__` references atom files.
 
 ## Backwards Compatibility
 
@@ -52,14 +54,14 @@ poorly drawn face, extra fingers
 ```
 some positive prompt here
 
----negative---
+$$negative$$
 some negative prompt here
 ```
 
 This is parsed as:
 
 | Section | Content |
-|---------|---------|
+|$$$$---|$$$$---|
 | `positive` | "some positive prompt here" |
 | `positive:negative` | "some negative prompt here" |
 
@@ -72,7 +74,7 @@ just a prompt with no sections
 This is parsed as:
 
 | Section | Content |
-|---------|---------|
+|$$$$---|$$$$---|
 | `positive` | "just a prompt with no sections" |
 
 ## Parsing Algorithm
@@ -112,7 +114,7 @@ def _parse_template_sections(self, template: str) -> dict[str, str]:
 ## Section Naming Convention
 
 | Workflow Need | Prompt Section | Negative Section |
-|---------------|----------------|------------------|
+|$$____$$---|$$____$$----|$$________$$|
 | Main prompt | `positive` | `positive:negative` or `negative` |
 | Environment/background | `environment` | `environment:negative` |
 | Subject/foreground | `subject` | `subject:negative` |

@@ -1,7 +1,22 @@
 # Light Theme Minimal Prompt
 # Clean, simple, uncluttered designs
 
-{single|solitary|lone|simple|clean} __subject__, vast negative space, soft __lighting__, minimalist style, __mood__, {white|cream|soft grey|pale blue} background, __composition__, light mode wallpaper, zen aesthetic, breathing room for icons, high quality
+$$environment$$
+vast negative space, soft __lighting__, minimalist style, __mood__,
+{white|cream|soft grey|pale blue} background, __composition__,
+light mode wallpaper, zen aesthetic, breathing room for icons,
+detailed background, high quality
 
----negative---
-busy, cluttered, complex, detailed, dark, nsfw, nude, low quality, blurry, watermark, signature, text, logo, cropped, worst quality
+$$environment:negative$$
+busy, cluttered, complex, dark, nsfw, nude,
+low quality, blurry, watermark, signature, text, logo,
+worst quality
+
+$$subject$$
+{single|solitary|lone|simple|clean} __subject__,
+positioned on right side of frame, minimalist focal point,
+clean design, zen aesthetic, detailed, high quality
+
+$$subject:negative$$
+cropped, out of frame, busy, cluttered,
+complex, overwhelming

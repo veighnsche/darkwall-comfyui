@@ -1,7 +1,22 @@
 # Artistic Boudoir Prompt
 # Intimate sensual photography aesthetic
 
-{sensual|intimate|alluring|seductive|romantic} __artistic_figure__, boudoir __environment__, soft candlelight __lighting__, __artistic_style__, __artistic_mood__, __colors__, intimate __composition__, dark mode wallpaper, luxury aesthetic, silk and shadow, high quality
+$$environment$$
+boudoir __environment__, soft candlelight __lighting__, __artistic_style__,
+__artistic_mood__, __colors__, intimate __composition__, dark mode wallpaper,
+luxury aesthetic, silk and shadow, detailed background, high quality
 
----negative---
-pornographic, explicit, vulgar, cheap, harsh lighting, unflattering, low quality, blurry, watermark, signature, text, logo, cropped, worst quality, jpeg artifacts, ugly, deformed
+$$environment:negative$$
+pornographic, explicit, vulgar, cheap, harsh lighting,
+low quality, blurry, watermark, signature, text, logo,
+worst quality, jpeg artifacts
+
+$$subject$$
+{sensual|intimate|alluring|seductive|romantic} __artistic_figure__,
+positioned on right side of frame, elegant pose,
+soft lighting on skin, tasteful composition,
+detailed, high quality
+
+$$subject:negative$$
+unflattering, cropped, out of frame, ugly, deformed,
+bad anatomy, mutated, extra limbs, vulgar pose

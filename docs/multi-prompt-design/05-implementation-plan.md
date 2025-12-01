@@ -39,8 +39,8 @@ def _parse_template_sections(self, template: str) -> dict[str, str]:
 ```
 
 **Backwards compat**: 
-- Content before first `---name---` goes to `positive`
-- `---negative---` alone maps to `positive:negative`
+- Content before first `$$name$$` goes to `positive`
+- `$$negative$$` alone maps to `positive:negative`
 
 ## Phase 2: Prompt Generation
 
@@ -60,7 +60,7 @@ def generate_prompt_pair(self, monitor_index: int = None, ...) -> PromptResult:
             base_name = section_name[:-9]  # Remove ':negative'
             negatives[base_name] = self._resolve_template(content, seed + hash(section_name))
         elif section_name == 'negative':
-            # Legacy: ---negative--- maps to positive:negative
+            # Legacy: $$negative$$ maps to positive:negative
             negatives['positive'] = self._resolve_template(content, seed + 50000)
         else:
             prompts[section_name] = self._resolve_template(content, seed + hash(section_name))
@@ -81,8 +81,8 @@ NEGATIVE_PATTERN = re.compile(r'^__NEGATIVE:([a-z0-9_]+)__$')
 ```
 
 Update injection logic to:
-1. Match new `__PROMPT:name__` format
-2. Match new `__NEGATIVE:name__` format  
+1. Match new `$$name$$` format
+2. Match new `$$name:negative$$` format  
 3. Fall back to old `__POSITIVE_PROMPT__` / `__NEGATIVE_PROMPT__`
 
 ### 3.2 Add Validation
@@ -97,7 +97,7 @@ Update injection logic to:
 - `test_parse_sections_legacy` — old format still works
 - `test_parse_sections_multi` — new multi-section format
 - `test_prompt_result_backwards_compat` — .positive/.negative properties
-- `test_inject_new_placeholders` — __PROMPT:name__ injection
+- `test_inject_new_placeholders` — $$name$$ injection
 - `test_inject_legacy_placeholders` — __POSITIVE_PROMPT__ still works
 
 ### 4.2 Integration Tests
@@ -135,7 +135,7 @@ Add example multi-section templates to `config/themes/*/prompts/`.
 ## Estimated Changes
 
 | File | Lines Changed |
-|------|---------------|
+|$$$$|$$____$$---|
 | `prompt_generator.py` | ~80 |
 | `comfy/client.py` | ~40 |
 | `tests/test_prompt_generator.py` | ~60 |

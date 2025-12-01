@@ -366,17 +366,17 @@ def test_download_image_not_found(comfyui_config):
 # TEAM_007: Tests for multi-prompt placeholder injection
 
 def test_inject_prompts_legacy_placeholders(comfyui_config):
-    """Test legacy __POSITIVE_PROMPT__ and __NEGATIVE_PROMPT__ placeholders."""
+    """Test legacy __positive__ and __positive:negative__ placeholders."""
     client = ComfyClient(comfyui_config)
     
     workflow = {
         "1": {
             "class_type": "CLIPTextEncode",
-            "inputs": {"text": "__POSITIVE_PROMPT__", "clip": ["2", 0]}
+            "inputs": {"text": "$$positive$$", "clip": ["2", 0]}
         },
         "2": {
             "class_type": "CLIPTextEncode",
-            "inputs": {"text": "__NEGATIVE_PROMPT__", "clip": ["2", 0]}
+            "inputs": {"text": "$$positive:negative$$", "clip": ["2", 0]}
         }
     }
     
@@ -392,17 +392,17 @@ def test_inject_prompts_legacy_placeholders(comfyui_config):
 
 
 def test_inject_prompts_new_format_single_section(comfyui_config):
-    """Test new __PROMPT:name__ format with single section."""
+    """Test new __name__ format with single section."""
     client = ComfyClient(comfyui_config)
     
     workflow = {
         "1": {
             "class_type": "CLIPTextEncode",
-            "inputs": {"text": "__PROMPT:positive__", "clip": ["2", 0]}
+            "inputs": {"text": "$$positive$$", "clip": ["2", 0]}
         },
         "2": {
             "class_type": "CLIPTextEncode",
-            "inputs": {"text": "__NEGATIVE:positive__", "clip": ["2", 0]}
+            "inputs": {"text": "$$positive:negative$$", "clip": ["2", 0]}
         }
     }
     
@@ -425,22 +425,22 @@ def test_inject_prompts_multi_section(comfyui_config):
         "10": {
             "class_type": "CLIPTextEncode",
             "_meta": {"title": "Environment Positive"},
-            "inputs": {"text": "__PROMPT:environment__", "clip": ["4", 0]}
+            "inputs": {"text": "$$environment$$", "clip": ["4", 0]}
         },
         "11": {
             "class_type": "CLIPTextEncode",
             "_meta": {"title": "Environment Negative"},
-            "inputs": {"text": "__NEGATIVE:environment__", "clip": ["4", 0]}
+            "inputs": {"text": "$$environment:negative$$", "clip": ["4", 0]}
         },
         "20": {
             "class_type": "CLIPTextEncode",
             "_meta": {"title": "Subject Positive"},
-            "inputs": {"text": "__PROMPT:subject__", "clip": ["4", 0]}
+            "inputs": {"text": "$$subject$$", "clip": ["4", 0]}
         },
         "21": {
             "class_type": "CLIPTextEncode",
             "_meta": {"title": "Subject Negative"},
-            "inputs": {"text": "__NEGATIVE:subject__", "clip": ["4", 0]}
+            "inputs": {"text": "$$subject:negative$$", "clip": ["4", 0]}
         }
     }
     
@@ -470,11 +470,11 @@ def test_inject_prompts_missing_negative_uses_empty(comfyui_config):
     workflow = {
         "1": {
             "class_type": "CLIPTextEncode",
-            "inputs": {"text": "__PROMPT:environment__", "clip": ["2", 0]}
+            "inputs": {"text": "$$environment$$", "clip": ["2", 0]}
         },
         "2": {
             "class_type": "CLIPTextEncode",
-            "inputs": {"text": "__NEGATIVE:environment__", "clip": ["2", 0]}
+            "inputs": {"text": "$$environment:negative$$", "clip": ["2", 0]}
         }
     }
     
@@ -521,7 +521,7 @@ def test_inject_prompts_deep_copy(comfyui_config):
     workflow = {
         "1": {
             "class_type": "CLIPTextEncode",
-            "inputs": {"text": "__POSITIVE_PROMPT__", "clip": ["2", 0]}
+            "inputs": {"text": "$$positive$$", "clip": ["2", 0]}
         }
     }
     
@@ -530,6 +530,6 @@ def test_inject_prompts_deep_copy(comfyui_config):
     result = client._inject_prompts(workflow, prompts)
     
     # Original should be unchanged
-    assert workflow["1"]["inputs"]["text"] == "__POSITIVE_PROMPT__"
+    assert workflow["1"]["inputs"]["text"] == "$$positive$$"
     # Result should have new value
     assert result["1"]["inputs"]["text"] == "new prompt"

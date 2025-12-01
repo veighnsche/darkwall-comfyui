@@ -1,6 +1,21 @@
 # Elegant dress prompt
 
-masterpiece, best quality, amazing quality, very aesthetic, absurdres, 1girl, {backless dress|plunging neckline dress|side-slit gown|strapless evening dress}, __hair__, __expression__, __pose__, {elegant ballroom|penthouse|moonlit garden|luxury restaurant}, __lighting__, detailed anime illustration
+$$environment$$
+masterpiece, best quality, amazing quality, very aesthetic, absurdres,
+{elegant ballroom|penthouse|moonlit garden|luxury restaurant}, __lighting__,
+detailed anime background, sophisticated atmosphere, high quality
 
----negative---
+$$environment:negative$$
+low quality, worst quality, blurry, watermark, signature, text, logo,
+jpeg artifacts, cropped
 
+$$subject$$
+masterpiece, best quality, amazing quality, very aesthetic, absurdres,
+1girl, {backless dress|plunging neckline dress|side-slit gown|strapless evening dress},
+__hair__, __expression__, __pose__, positioned on right side of frame,
+looking at viewer, detailed face, detailed anime illustration
+
+$$subject:negative$$
+bad anatomy, extra limbs, deformed, mutated,
+poorly drawn face, extra fingers, missing fingers,
+out of frame, cropped

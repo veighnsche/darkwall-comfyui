@@ -17,9 +17,12 @@ from ..prompt_generator import PromptResult
 
 logger = logging.getLogger(__name__)
 
-# TEAM_007: Regex patterns for multi-prompt placeholder format
-_PROMPT_PATTERN = re.compile(r'^__PROMPT:([a-z0-9_]+)__$')
-_NEGATIVE_PATTERN = re.compile(r'^__NEGATIVE:([a-z0-9_]+)__$')
+# TEAM_007: Regex patterns for $$section$$ placeholder format
+# Uses $$ to avoid conflict with __wildcard__ atom syntax
+# Matches $$section_name$$ for positive prompts
+# Matches $$section_name:negative$$ for negative prompts
+_SECTION_PATTERN = re.compile(r'^\$\$([a-z0-9_]+)\$\$$')
+_NEGATIVE_SECTION_PATTERN = re.compile(r'^\$\$([a-z0-9_]+):negative\$\$$')
 
 
 def inject_prompt(workflow: dict[str, Any], prompt: str) -> dict[str, Any]:
@@ -62,13 +65,11 @@ def inject_prompts(workflow: dict[str, Any], prompts: PromptResult) -> dict[str,
     """
     Inject prompts into workflow nodes using placeholders.
     
-    TEAM_007: Supports arbitrary named sections.
+    TEAM_007: Uses $$section$$ syntax to avoid conflict with __wildcard__ atoms.
     
     Placeholder formats:
-        __PROMPT:section_name__   -> prompts.prompts["section_name"]
-        __NEGATIVE:section_name__ -> prompts.negatives["section_name"]
-        __POSITIVE_PROMPT__       -> prompts.prompts["positive"] (legacy)
-        __NEGATIVE_PROMPT__       -> prompts.negatives["positive"] (legacy)
+        $$section_name$$          -> prompts.prompts["section_name"]
+        $$section_name:negative$$ -> prompts.negatives["section_name"]
     
     Args:
         workflow: ComfyUI workflow dict (API format)
@@ -95,62 +96,46 @@ def inject_prompts(workflow: dict[str, Any], prompts: PromptResult) -> dict[str,
             if not isinstance(value, str):
                 continue
             
-            # Check for new format: __PROMPT:name__
-            match = _PROMPT_PATTERN.match(value)
-            if match:
-                section = match.group(1)
-                if section in prompts.prompts:
-                    inputs[field] = prompts.prompts[section]
-                    logger.debug(f"Injected PROMPT:{section} into node {node_id}.{field}")
-                    injected.add(f"PROMPT:{section}")
-                else:
-                    missing_sections.add(f"PROMPT:{section}")
-                continue
-            
-            # Check for new format: __NEGATIVE:name__
-            match = _NEGATIVE_PATTERN.match(value)
+            # Check for negative section first: __name:negative__
+            match = _NEGATIVE_SECTION_PATTERN.match(value)
             if match:
                 section = match.group(1)
                 if section in prompts.negatives:
                     inputs[field] = prompts.negatives[section]
-                    logger.debug(f"Injected NEGATIVE:{section} into node {node_id}.{field}")
-                    injected.add(f"NEGATIVE:{section}")
+                    logger.debug(f"Injected {section}:negative into node {node_id}.{field}")
+                    injected.add(f"{section}:negative")
                 else:
                     # For negatives, use empty string if missing (lenient mode)
                     inputs[field] = ""
-                    logger.debug(f"No NEGATIVE:{section} in template, using empty string")
-                    missing_sections.add(f"NEGATIVE:{section}")
+                    logger.debug(f"No {section}:negative in template, using empty string")
+                    missing_sections.add(f"{section}:negative")
                 continue
             
-            # Legacy: __POSITIVE_PROMPT__ -> prompts["positive"]
-            if value == "__POSITIVE_PROMPT__":
-                inputs[field] = prompts.prompts.get("positive", "")
-                logger.debug(f"Injected legacy positive prompt into node {node_id}.{field}")
-                injected.add("PROMPT:positive")
-                continue
-            
-            # Legacy: __NEGATIVE_PROMPT__ -> negatives["positive"]
-            if value == "__NEGATIVE_PROMPT__":
-                neg = prompts.negatives.get("positive", "")
-                if neg:
-                    inputs[field] = neg
-                    logger.debug(f"Injected legacy negative prompt into node {node_id}.{field}")
-                    injected.add("NEGATIVE:positive")
+            # Check for positive section: __name__
+            match = _SECTION_PATTERN.match(value)
+            if match:
+                section = match.group(1)
+                if section in prompts.prompts:
+                    inputs[field] = prompts.prompts[section]
+                    logger.debug(f"Injected {section} into node {node_id}.{field}")
+                    injected.add(section)
+                else:
+                    missing_sections.add(section)
                 continue
     
     # Validate: at least one prompt was injected
-    prompt_injections = [i for i in injected if i.startswith("PROMPT:")]
+    prompt_injections = [i for i in injected if not i.endswith(':negative')]
     if not prompt_injections:
         raise WorkflowError(
             "Workflow missing prompt placeholders. "
-            "Use __PROMPT:section__ or __POSITIVE_PROMPT__ placeholders. "
+            "Use $$section$$ placeholders (e.g., $$environment$$, $$subject$$). "
             "See docs/workflow-migration.md for migration guide."
         )
     
     # Log warnings for missing sections
     for missing in missing_sections:
-        if missing.startswith("PROMPT:"):
-            logger.warning(f"Workflow requests {missing} but template has no matching section")
+        if not missing.endswith(':negative'):
+            logger.warning(f"Workflow requests $${missing}$$ but template has no matching section")
     
     # Log summary
     logger.info(f"Injected prompts: {', '.join(sorted(injected))}")

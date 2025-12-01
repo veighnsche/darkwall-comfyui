@@ -400,12 +400,12 @@ class PromptGenerator:
         """
         Parse template into named sections.
         
-        TEAM_007: Updated to support arbitrary named sections.
+        TEAM_007: Uses $$section$$ syntax to avoid conflict with __wildcard__ atoms.
         
         Section syntax:
-            ---section_name---      -> prompts["section_name"]
-            ---section_name:negative--- -> negatives["section_name"]
-            ---negative---          -> negatives["positive"] (legacy)
+            $$section_name$$          -> prompts["section_name"]
+            $$section_name:negative$$ -> negatives["section_name"]
+            $$negative$$              -> negatives["positive"] (legacy)
         
         Content before first section marker goes to "positive".
         
@@ -426,19 +426,24 @@ class PromptGenerator:
             if stripped.startswith('#'):
                 continue
             
-            # Check for section marker: ---name--- or ---name:negative---
-            if stripped.startswith('---') and stripped.endswith('---') and len(stripped) > 6:
-                # Save previous section if it has content
-                if current_content:
-                    content = '\n'.join(current_content).strip()
-                    if content:
-                        sections[current_section] = content
-                
-                # Start new section
-                current_section = stripped[3:-3]  # Remove --- from both ends
-                current_content = []
-            else:
-                current_content.append(line)
+            # Check for section marker: $$name$$ or $$name:negative$$ (must be alone on line)
+            if stripped.startswith('$$') and stripped.endswith('$$') and len(stripped) > 4:
+                # Verify it's a section marker (contains only valid section name chars)
+                inner = stripped[2:-2]  # Remove $$ from both ends
+                # Section names: lowercase alphanumeric, underscores, and optional :negative suffix
+                if inner and all(c.isalnum() or c in '_:' for c in inner):
+                    # Save previous section if it has content
+                    if current_content:
+                        content = '\n'.join(current_content).strip()
+                        if content:
+                            sections[current_section] = content
+                    
+                    # Start new section
+                    current_section = inner
+                    current_content = []
+                    continue
+            
+            current_content.append(line)
         
         # Save final section
         if current_content:
@@ -452,6 +457,8 @@ class PromptGenerator:
         """
         Generate a complete deterministic prompt (positive only, for backwards compatibility).
         
+        TEAM_007: For multi-section templates, combines all positive sections.
+        
         Args:
             monitor_index: Optional monitor index for variation
             template_path: Optional path to template file
@@ -463,7 +470,14 @@ class PromptGenerator:
             PromptError: If prompt generation fails
         """
         result = self.generate_prompt_pair(monitor_index, template_path)
-        return result.positive
+        
+        # For legacy single-section templates, use .positive
+        sections = result.sections()
+        if 'positive' in sections:
+            return result.positive
+        
+        # For multi-section templates, combine all positive prompts
+        return "\n\n".join(result.get_prompt(s) for s in sections if result.get_prompt(s))
     
     def generate_prompt_pair(self, monitor_index: int = None, template_path: str = None, seed: int = None) -> PromptResult:
         """

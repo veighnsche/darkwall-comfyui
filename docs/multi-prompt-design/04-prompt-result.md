@@ -90,7 +90,7 @@ negative = result.negative  # Gets "positive:negative" section
 For logging and debugging:
 
 ```python
-def __str__(self) -> str:
+def $$str$$(self) -> str:
     sections = []
     for name in sorted(self.prompts.keys()):
         sections.append(f"[{name}] {self.prompts[name][:50]}...")
