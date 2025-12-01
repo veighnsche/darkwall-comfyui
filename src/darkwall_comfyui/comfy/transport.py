@@ -303,6 +303,15 @@ class ComfyTransport:
                         break
                     else:
                         logger.debug(f"WebSocket executing node {node} for {prompt_id}")
+                elif event_type == "execution_error":
+                    payload = data.get("data", {})
+                    event_prompt_id = payload.get("prompt_id")
+                    if event_prompt_id == prompt_id:
+                        error_msg = payload.get("exception_message", "Unknown error")
+                        node_id = payload.get("node_id", "unknown")
+                        node_type = payload.get("node_type", "unknown")
+                        logger.error(f"ComfyUI execution error in node {node_id} ({node_type}): {error_msg}")
+                        raise ComfyGenerationError(f"ComfyUI error in {node_type}: {error_msg}")
                 elif event_type is not None:
                     logger.debug(f"WebSocket event {event_type} for {prompt_id}: {data}")
             else:
@@ -327,39 +336,82 @@ class ComfyTransport:
         if not history:
             raise ComfyGenerationError(f"No history found for completed prompt {prompt_id}")
 
+        logger.debug(f"History for {prompt_id}: {list(history.keys())}")
+        logger.debug(f"Full history: {history}")
         outputs = history.get('outputs', {})
+        
+        # Check for errors in status
+        status = history.get('status', {})
+        if status.get('status_str') == 'error' or status.get('messages'):
+            messages = status.get('messages', [])
+            for msg in messages:
+                if isinstance(msg, (list, tuple)) and len(msg) >= 2:
+                    if msg[0] == 'execution_error':
+                        error_data = msg[1] if isinstance(msg[1], dict) else {}
+                        node_id = error_data.get('node_id', 'unknown')
+                        node_type = error_data.get('node_type', 'unknown')
+                        exception_msg = error_data.get('exception_message', 'Unknown error')
+                        logger.error(f"Execution error in node {node_id} ({node_type}): {exception_msg}")
+                        raise ComfyGenerationError(f"ComfyUI error in {node_type}: {exception_msg}")
+        
         if not outputs:
-            raise ComfyGenerationError(f"No outputs found for {prompt_id}")
+            # Log full history for debugging
+            logger.error(f"No outputs in history for {prompt_id}. History keys: {list(history.keys())}")
+            if status:
+                logger.error(f"Status: {status}")
+            # Include status in exception for visibility
+            status_str = status.get('status_str', 'unknown') if status else 'no status'
+            completed = status.get('completed', False) if status else False
+            raise ComfyGenerationError(
+                f"No outputs found for {prompt_id} (status: {status_str}, completed: {completed}). "
+                f"This may indicate workflow caching or an execution error. "
+                f"Run with --log-level DEBUG for full history."
+            )
 
+        # Collect all candidate images, preferring type='output' over type='temp'
+        output_images: list[dict[str, Any]] = []
+        temp_images: list[dict[str, Any]] = []
+        
         for node_id, output in outputs.items():
             if not isinstance(output, dict):
                 continue
 
             images = output.get('images', [])
-            if not images:
-                continue
-
-            image = images[0]
-            if not isinstance(image, dict):
-                continue
-
-            filename = image.get('filename')
-            if not filename:
-                continue
-
-            result = {
-                "filename": filename,
-                "subfolder": image.get('subfolder', ''),
-                "type": image.get('type', 'output'),
-            }
-
-            elapsed = time.time() - start
-            logger.debug(
-                f"Generation complete: {prompt_id} -> {filename} in {elapsed:.1f}s (via WebSocket)"
-            )
-            return result
-
-        raise ComfyGenerationError(f"No images in output for {prompt_id}")
+            for image in images:
+                if not isinstance(image, dict):
+                    continue
+                
+                filename = image.get('filename')
+                if not filename:
+                    continue
+                
+                img_type = image.get('type', 'output')
+                candidate = {
+                    "filename": filename,
+                    "subfolder": image.get('subfolder', ''),
+                    "type": img_type,
+                    "node_id": node_id,
+                }
+                
+                if img_type == 'output':
+                    output_images.append(candidate)
+                else:
+                    temp_images.append(candidate)
+        
+        # Prefer final output images, fall back to temp if none
+        candidates = output_images if output_images else temp_images
+        if not candidates:
+            raise ComfyGenerationError(f"No images in output for {prompt_id}")
+        
+        # Use the last output image (typically the final SaveImage node)
+        result = candidates[-1]
+        
+        elapsed = time.time() - start
+        logger.debug(
+            f"Generation complete: {prompt_id} -> {result['filename']} "
+            f"(type={result['type']}, node={result['node_id']}) in {elapsed:.1f}s"
+        )
+        return result
     
     def get_history(self, prompt_id: str) -> Optional[dict[str, Any]]:
         """Get generation history for prompt_id."""

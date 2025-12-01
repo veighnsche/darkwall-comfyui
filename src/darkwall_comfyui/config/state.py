@@ -125,8 +125,8 @@ class NamedStateManager:
         theme_name: str,
         workflow_id: str,
         template: str,
-        prompt: str,
-        negative_prompt: Optional[str],
+        prompts: Dict[str, str],
+        negatives: Dict[str, str],
         seed: int,
         output_path: str,
         history_path: Optional[str] = None,
@@ -135,6 +135,7 @@ class NamedStateManager:
         Save details of the last generation for retry functionality.
         
         TEAM_006: Enables retry with same prompt but different seed.
+        TEAM_007: Updated to store full prompts/negatives dicts for multi-prompt support.
         """
         state = self.get_state()
         state['last_generation'] = {
@@ -142,8 +143,8 @@ class NamedStateManager:
             'theme_name': theme_name,
             'workflow_id': workflow_id,
             'template': template,
-            'prompt': prompt,
-            'negative_prompt': negative_prompt,
+            'prompts': prompts,
+            'negatives': negatives,
             'seed': seed,
             'output_path': output_path,
             'history_path': history_path,

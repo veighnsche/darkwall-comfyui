@@ -22,23 +22,24 @@ from darkwall_comfyui.config import (
 
 @pytest.fixture
 def temp_config_dir() -> Generator[Path, None, None]:
-    """Create a temporary config directory with test files."""
+    """Create a temporary config directory with test files using theme structure."""
     with tempfile.TemporaryDirectory() as temp_dir:
         config_dir = Path(temp_dir)
         
-        # Create atoms directory with test files
-        atoms_dir = config_dir / "atoms"
-        atoms_dir.mkdir()
+        # Create theme structure: themes/default/atoms/ and themes/default/prompts/
+        theme_dir = config_dir / "themes" / "default"
+        atoms_dir = theme_dir / "atoms"
+        prompts_dir = theme_dir / "prompts"
+        atoms_dir.mkdir(parents=True)
+        prompts_dir.mkdir(parents=True)
         
-        # Create test atom files (no numbered prefixes!)
+        # Create test atom files
         (atoms_dir / "subject.txt").write_text("mountain\nocean\nforest\n")
         (atoms_dir / "environment.txt").write_text("misty\nsunset\nnight\n")
         (atoms_dir / "lighting.txt").write_text("soft light\ndramatic\nambient\n")
         (atoms_dir / "style.txt").write_text("photorealistic\nartistic\nminimalist\n")
         
-        # Create prompts directory with default template
-        prompts_dir = config_dir / "prompts"
-        prompts_dir.mkdir()
+        # Create default template
         (prompts_dir / "default.prompt").write_text(
             "__subject__, __environment__, __lighting__, __style__, "
             "dark mode friendly, high quality\n\n"
@@ -51,7 +52,7 @@ def temp_config_dir() -> Generator[Path, None, None]:
         workflows_dir.mkdir()
         (workflows_dir / "default.json").write_text('{"1": {"class_type": "Test"}}')
         
-        # Create test config file using NEW per-monitor format
+        # Create test config file with theme configuration
         config_file = config_dir / "config.toml"
         config_file.write_text("""
 [comfyui]
@@ -60,7 +61,6 @@ workflow_path = "test_workflow.json"
 timeout = 300
 poll_interval = 2
 
-# TEAM_003: New per-monitor format
 [monitors.DP-1]
 workflow = "default"
 output = "~/Pictures/wallpapers/DP-1.png"
@@ -70,11 +70,16 @@ workflow = "default"
 output = "~/Pictures/wallpapers/HDMI-A-1.png"
 
 [prompt]
-atoms_dir = "atoms"
+theme = "default"
 time_slot_minutes = 60
 
 [logging]
 level = "INFO"
+
+[themes.default]
+atoms_dir = "atoms"
+prompts_dir = "prompts"
+default_template = "default.prompt"
 """)
         
         yield config_dir
@@ -120,6 +125,13 @@ def prompt_config(test_config: Config) -> PromptConfig:
 def config_dir(temp_config_dir: Path) -> Path:
     """Get the config directory path for tests."""
     return temp_config_dir
+
+
+@pytest.fixture
+def prompt_generator(test_config: Config):
+    """Create a PromptGenerator using the factory method."""
+    from darkwall_comfyui.prompt_generator import PromptGenerator
+    return PromptGenerator.from_config(test_config)
 
 
 @pytest.fixture

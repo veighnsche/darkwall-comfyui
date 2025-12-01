@@ -130,25 +130,19 @@ class WallpaperHistory:
             if file_size != len(image_data):
                 raise HistoryStorageError(f"Size mismatch for saved wallpaper: expected {len(image_data)} bytes, got {file_size}")
             
-            # TEAM_007: Format prompts for storage (handles multi-section prompts)
+            # Format prompts for storage (combines all sections with labels)
             sections = prompt_result.sections()
-            if 'positive' in sections:
-                # Legacy single-section format
-                positive_text = prompt_result.positive
-                negative_text = prompt_result.negative
-            else:
-                # Multi-section format: combine all sections with labels
-                positive_parts = []
-                negative_parts = []
-                for section in sections:
-                    prompt = prompt_result.get_prompt(section)
-                    negative = prompt_result.get_negative(section)
-                    if prompt:
-                        positive_parts.append(f"[{section.upper()}]\n{prompt}")
-                    if negative:
-                        negative_parts.append(f"[{section.upper()}]\n{negative}")
-                positive_text = "\n\n".join(positive_parts)
-                negative_text = "\n\n".join(negative_parts)
+            positive_parts = []
+            negative_parts = []
+            for section in sections:
+                prompt = prompt_result.get_prompt(section)
+                negative = prompt_result.get_negative(section)
+                if prompt:
+                    positive_parts.append(f"[{section.upper()}]\n{prompt}")
+                if negative:
+                    negative_parts.append(f"[{section.upper()}]\n{negative}")
+            positive_text = "\n\n".join(positive_parts)
+            negative_text = "\n\n".join(negative_parts)
             
             # Create history entry
             entry = HistoryEntry(

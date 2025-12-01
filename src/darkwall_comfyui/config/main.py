@@ -143,60 +143,41 @@ class Config:
         """
         Get theme configuration by name.
         
-        TEAM_001: Returns ThemeConfig for the specified theme, or creates
-        a default one based on legacy atoms_dir if no themes are configured.
-        
         Args:
             theme_name: Theme name to look up (defaults to prompt.theme)
             
         Returns:
             ThemeConfig for the requested theme
+            
+        Raises:
+            ConfigError: If no themes are configured or theme not found
         """
         name = theme_name or self.prompt.theme
         
-        # If themes are explicitly configured, use them
-        if self.themes:
-            if name in self.themes:
-                return self.themes[name]
-            # Fallback to first available theme
-            return next(iter(self.themes.values()))
+        if not self.themes:
+            raise ConfigError(
+                "No themes configured. Add [themes.{name}] sections to config.toml"
+            )
         
-        # TEAM_001: Legacy mode - create ThemeConfig from flat structure
-        # This supports existing configs with atoms/ and prompts/ at root level
-        return ThemeConfig(
-            name=name,
-            atoms_dir=self.prompt.atoms_dir,
-            prompts_dir="prompts",
-            default_template=self.prompt.default_template,
+        if name in self.themes:
+            return self.themes[name]
+        
+        # Fallback to first available theme with warning
+        first_theme = next(iter(self.themes.values()))
+        logging.getLogger(__name__).warning(
+            f"Theme '{name}' not found, using '{first_theme.name}'"
         )
+        return first_theme
     
     def get_theme_atoms_path(self, theme_name: Optional[str] = None) -> Path:
         """Get atoms directory path for a theme."""
         theme = self.get_theme(theme_name)
-        config_dir = self.get_config_dir()
-        
-        # TEAM_001: Check if themes/ structure exists, otherwise use legacy flat structure
-        theme_path = theme.get_atoms_path(config_dir)
-        if theme_path.exists():
-            return theme_path
-        
-        # Legacy fallback: atoms/ at config root
-        legacy_path = config_dir / self.prompt.atoms_dir
-        return legacy_path
+        return theme.get_atoms_path(self.get_config_dir())
     
     def get_theme_prompts_path(self, theme_name: Optional[str] = None) -> Path:
         """Get prompts directory path for a theme."""
         theme = self.get_theme(theme_name)
-        config_dir = self.get_config_dir()
-        
-        # TEAM_001: Check if themes/ structure exists, otherwise use legacy flat structure
-        theme_path = theme.get_prompts_path(config_dir)
-        if theme_path.exists():
-            return theme_path
-        
-        # Legacy fallback: prompts/ at config root
-        legacy_path = config_dir / "prompts"
-        return legacy_path
+        return theme.get_prompts_path(self.get_config_dir())
     
     @classmethod
     def get_config_dir(cls) -> Path:
@@ -418,7 +399,13 @@ class Config:
         
         # Parse other sections
         comfyui_config = ComfyUIConfig(**config_dict.get('comfyui', {}))
-        prompt_config = PromptConfig(**config_dict.get('prompt', {}))
+        
+        # Filter prompt config to only known fields (ignore deprecated atoms_dir)
+        prompt_dict = config_dict.get('prompt', {})
+        prompt_fields = {'time_slot_minutes', 'theme', 'use_monitor_seed', 'default_template', 'variations_per_monitor'}
+        filtered_prompt = {k: v for k, v in prompt_dict.items() if k in prompt_fields}
+        prompt_config = PromptConfig(**filtered_prompt)
+        
         logging_config = LoggingConfig(**config_dict.get('logging', {}))
         
         # Parse themes

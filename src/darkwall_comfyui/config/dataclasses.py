@@ -279,12 +279,10 @@ class ComfyUIConfig:
 class PromptConfig:
     """Prompt generation settings."""
     time_slot_minutes: int = 30
-    theme: str = "default"  # TEAM_001: Now references themes/<name>/ directory
+    theme: str = "default"  # References themes/<name>/ directory
     use_monitor_seed: bool = True
-    default_template: str = "default.prompt"  # Default prompt template
+    default_template: str = "default.prompt"
     variations_per_monitor: int = 1
-    # TEAM_001: Deprecated - kept for backwards compatibility, ignored if themes/ exists
-    atoms_dir: str = "atoms"
 
 
 @dataclass

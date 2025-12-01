@@ -40,13 +40,32 @@ class ComfyClient:
         self.config = comfyui_config
         self._transport = ComfyTransport(comfyui_config)
         self.logger = logging.getLogger(__name__)
+    
+    @property
+    def base_url(self) -> str:
+        """Base URL for ComfyUI API."""
+        return self._transport.base_url
+    
+    @property
+    def timeout(self) -> int:
+        """Request timeout in seconds."""
+        return self._transport.timeout
+    
+    @property
+    def poll_interval(self) -> int:
+        """Polling interval in seconds."""
+        return self._transport.poll_interval
+    
+    @property
+    def client_id(self) -> str:
+        """Unique client identifier."""
+        return self._transport.client_id
+    
+    @property
+    def session(self):
+        """HTTP session for requests."""
+        return self._transport.session
         
-        # Expose transport properties for backwards compatibility
-        self.base_url = self._transport.base_url
-        self.timeout = self._transport.timeout
-        self.poll_interval = self._transport.poll_interval
-        self.client_id = self._transport.client_id
-        self.session = self._transport.session
     
     def generate(
         self,
@@ -84,8 +103,12 @@ class ComfyClient:
         # Wait for completion
         result = self._transport.wait_for_result(prompt_id, on_event=on_event)
         
-        # Download image
-        image_data = self._transport.download_image(result["filename"])
+        # Download image (use type/subfolder from result for correct path)
+        image_data = self._transport.download_image(
+            result["filename"],
+            subfolder=result.get("subfolder", ""),
+            type_=result.get("type", "output"),
+        )
         
         return GenerationResult(
             prompt_id=prompt_id,
@@ -111,7 +134,7 @@ class ComfyClient:
         """
         return self._transport.detailed_health_check()
     
-    # Backwards compatibility: expose private methods that delegate to modules
+    # Private methods delegating to transport/injection (used by tests)
     def _inject_prompt(self, workflow: dict[str, Any], prompt: str) -> dict[str, Any]:
         """Inject prompt into workflow nodes."""
         return inject_prompt(workflow, prompt)
@@ -128,10 +151,6 @@ class ComfyClient:
         """Submit workflow and return prompt_id."""
         return self._transport.submit(workflow)
     
-    def _build_ws_url(self) -> str:
-        """Build WebSocket URL."""
-        return self._transport._build_ws_url()
-    
     def _wait_for_result(
         self,
         prompt_id: str,
@@ -147,3 +166,7 @@ class ComfyClient:
     def _download_image(self, filename: str, subfolder: str = "", type_: str = "output") -> bytes:
         """Download generated image."""
         return self._transport.download_image(filename, subfolder, type_)
+    
+    def _build_ws_url(self) -> str:
+        """Build WebSocket URL."""
+        return self._transport._build_ws_url()

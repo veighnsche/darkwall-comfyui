@@ -47,33 +47,43 @@ class TestDependencyInjection:
         
         assert workflow_mgr.config == comfyui_config
     
-    def test_prompt_generator_accepts_prompt_config_and_config_dir(self):
-        """Test PromptGenerator accepts PromptConfig and config_dir."""
+    def test_prompt_generator_requires_explicit_paths(self):
+        """Test PromptGenerator requires atoms_dir and prompts_dir."""
         import tempfile
+        from darkwall_comfyui.exceptions import PromptError
         
         prompt_config = PromptConfig(
             time_slot_minutes=30,
             theme="default",
-            atoms_dir="atoms",
             use_monitor_seed=True
         )
         
-        # Create a temporary config directory with atoms
+        # Create a temporary config directory with theme structure
         with tempfile.TemporaryDirectory() as temp_dir:
             config_dir = Path(temp_dir)
-            atoms_dir = config_dir / "atoms"
-            atoms_dir.mkdir()
+            atoms_dir = config_dir / "themes" / "default" / "atoms"
+            prompts_dir = config_dir / "themes" / "default" / "prompts"
+            atoms_dir.mkdir(parents=True)
+            prompts_dir.mkdir(parents=True)
             
             # Create test atom files
-            (atoms_dir / "1_subject.txt").write_text("test\n")
-            (atoms_dir / "2_environment.txt").write_text("test\n")
-            (atoms_dir / "3_lighting.txt").write_text("test\n")
-            (atoms_dir / "4_style.txt").write_text("test\n")
+            (atoms_dir / "subject.txt").write_text("test\n")
             
-            prompt_gen = PromptGenerator(prompt_config, config_dir)
+            # Create test prompt template
+            (prompts_dir / "default.prompt").write_text("Test __subject__\n")
+            
+            # Direct construction requires explicit paths
+            prompt_gen = PromptGenerator(prompt_config, config_dir, atoms_dir=atoms_dir, prompts_dir=prompts_dir)
             
             assert prompt_gen.config == prompt_config
             assert prompt_gen.config_dir == config_dir
+            assert prompt_gen._atoms_dir == atoms_dir
+            assert prompt_gen._prompts_dir == prompts_dir
+            
+            # Without paths, should raise error
+            with pytest.raises(Exception) as exc_info:
+                PromptGenerator(prompt_config, config_dir)
+            assert "atoms_dir and prompts_dir are required" in str(exc_info.value)
     
     def test_wallpaper_target_accepts_monitors_config(self):
         """Test WallpaperTarget accepts MonitorsConfig."""

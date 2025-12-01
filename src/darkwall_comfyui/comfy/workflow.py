@@ -6,11 +6,46 @@ Handles loading and validating workflow JSON files.
 
 import json
 import logging
+import re
 from pathlib import Path
 from typing import Any
 
 from ..config import Config, ComfyUIConfig
 from ..exceptions import WorkflowError
+
+# Regex patterns for $$section$$ placeholder format (same as injection.py)
+# No anchors - matches placeholders anywhere in string
+_SECTION_PATTERN = re.compile(r'\$\$([a-z0-9_]+)\$\$')
+_NEGATIVE_SECTION_PATTERN = re.compile(r'\$\$([a-z0-9_]+):negative\$\$')
+
+
+def _is_web_format(workflow: dict[str, Any]) -> bool:
+    """Detect if workflow is in web/Litegraph format vs API format."""
+    return 'nodes' in workflow and isinstance(workflow.get('nodes'), list)
+
+
+def _iter_text_fields(workflow: dict[str, Any]):
+    """Iterate over text fields in workflow, auto-detecting format.
+    
+    Yields: (node_id, value)
+    """
+    if _is_web_format(workflow):
+        # Web format: nodes array with widgets_values
+        for node in workflow.get('nodes', []):
+            if not isinstance(node, dict):
+                continue
+            node_id = node.get('id', 'unknown')
+            for value in node.get('widgets_values', []):
+                if isinstance(value, str):
+                    yield node_id, value
+    else:
+        # API format: node_id keys with inputs dict
+        for node_id, node in workflow.items():
+            if not isinstance(node, dict):
+                continue
+            for value in node.get('inputs', {}).values():
+                if isinstance(value, str):
+                    yield node_id, value
 
 
 class WorkflowManager:
@@ -102,43 +137,48 @@ class WorkflowManager:
         return workflow
     
     def _validate_placeholders(self, workflow: dict[str, Any], workflow_path: Path) -> None:
-        """Validate workflow contains proper prompt placeholders (REQUIRED)."""
-        has_positive_placeholder = False
-        has_negative_placeholder = False
+        """Validate workflow contains proper prompt placeholders (REQUIRED).
+        
+        TEAM_007: Updated to check for $$section$$ format instead of legacy __POSITIVE_PROMPT__.
+        Supports both API format and web/Litegraph format workflows.
+        """
+        found_sections: set[str] = set()
+        found_negatives: set[str] = set()
         has_text_fields = False
         
-        # Check for placeholders and text fields
-        for node_id, node in workflow.items():
-            if not isinstance(node, dict):
-                continue
+        is_web = _is_web_format(workflow)
+        self.logger.debug(f"Workflow format: {'web/Litegraph' if is_web else 'API'}")
+        
+        # Check for placeholders and text fields using format-aware iterator
+        for node_id, value in _iter_text_fields(workflow):
+            has_text_fields = True
             
-            inputs = node.get('inputs', {})
-            for field, value in inputs.items():
-                if isinstance(value, str):
-                    has_text_fields = True
-                    if value == "__POSITIVE_PROMPT__":
-                        has_positive_placeholder = True
-                    elif value == "__NEGATIVE_PROMPT__":
-                        has_negative_placeholder = True
+            # Find all $$section:negative$$ placeholders
+            for match in _NEGATIVE_SECTION_PATTERN.finditer(value):
+                found_negatives.add(match.group(1))
+            
+            # Find all $$section$$ placeholders
+            for match in _SECTION_PATTERN.finditer(value):
+                found_sections.add(match.group(1))
         
         # Provide validation feedback
         if not has_text_fields:
             self.logger.error(f"Workflow {workflow_path.name} has no text fields for prompt injection")
         
-        if has_positive_placeholder:
-            self.logger.info(f"Workflow {workflow_path.name} uses placeholder-based prompt injection")
-            if has_negative_placeholder:
-                self.logger.info(f"Workflow {workflow_path.name} supports negative prompts")
-            else:
-                self.logger.info(f"Workflow {workflow_path.name} doesn't support negative prompts (no __NEGATIVE_PROMPT__ placeholder)")
+        if found_sections:
+            self.logger.debug(f"Workflow {workflow_path.name} has section placeholders: {', '.join(sorted(found_sections))}")
+            if found_negatives:
+                self.logger.debug(f"Workflow {workflow_path.name} has negative placeholders: {', '.join(sorted(found_negatives))}")
         else:
-            self.logger.error(f"Workflow {workflow_path.name} doesn't use placeholder-based prompt injection")
-            self.logger.error(f"Please update workflow to use __POSITIVE_PROMPT__ and __NEGATIVE_PROMPT__ placeholders")
-            self.logger.error(f"See workflow migration guide for instructions")
+            self.logger.error(f"Workflow {workflow_path.name} has no $$section$$ placeholders for prompt injection")
+            self.logger.error(f"Please add $$environment$$, $$subject$$ etc. to CLIPTextEncode nodes")
+            self.logger.error(f"See docs/workflow-migration.md for instructions")
     
     def validate(self, workflow_path: Path = None, config_dir: Path = None) -> list[str]:
         """
         Validate workflow file and return list of errors/warnings.
+        
+        TEAM_007: Updated to check for $$section$$ format.
         
         Args:
             workflow_path: Path to workflow file
@@ -152,22 +192,16 @@ class WorkflowManager:
         try:
             workflow = self.load(workflow_path, config_dir)
             
-            # Check for required placeholders
-            has_positive_placeholder = False
-            for node_id, node in workflow.items():
-                if isinstance(node, dict):
-                    inputs = node.get('inputs', {})
-                    for field, value in inputs.items():
-                        if isinstance(value, str) and value == "__POSITIVE_PROMPT__":
-                            has_positive_placeholder = True
-                            break
-                    if has_positive_placeholder:
-                        break
+            # Check for required placeholders ($$section$$ format)
+            found_sections: set[str] = set()
+            for node_id, value in _iter_text_fields(workflow):
+                for match in _SECTION_PATTERN.finditer(value):
+                    found_sections.add(match.group(1))
             
-            if not has_positive_placeholder:
-                errors.append("CRITICAL: Workflow missing __POSITIVE_PROMPT__ placeholder - prompt injection will fail")
-                errors.append("Solution: Add __POSITIVE_PROMPT__ to a CLIPTextEncode node text field")
-                errors.append("See workflow migration guide for detailed instructions")
+            if not found_sections:
+                errors.append("CRITICAL: Workflow missing $$section$$ placeholders - prompt injection will fail")
+                errors.append("Solution: Add $$environment$$, $$subject$$ etc. to CLIPTextEncode node text fields")
+                errors.append("See docs/workflow-migration.md for detailed instructions")
             
         except WorkflowError as e:
             errors.append(f"Workflow validation failed: {e}")

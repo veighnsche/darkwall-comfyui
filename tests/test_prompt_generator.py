@@ -4,9 +4,9 @@ import pytest
 from darkwall_comfyui.prompt_generator import PromptGenerator, PromptResult
 
 
-def test_prompt_generator_initialization(prompt_config, config_dir):
+def test_prompt_generator_initialization(prompt_generator, prompt_config, config_dir):
     """Test that PromptGenerator initializes correctly."""
-    gen = PromptGenerator(prompt_config, config_dir)
+    gen = prompt_generator
     
     assert gen.config == prompt_config
     assert gen.config_dir == config_dir
@@ -20,9 +20,9 @@ def test_prompt_generator_initialization(prompt_config, config_dir):
     assert "misty" in environment_atoms
 
 
-def test_time_slot_seed_generation(prompt_config, config_dir):
+def test_time_slot_seed_generation(prompt_generator):
     """Test deterministic seed generation."""
-    gen = PromptGenerator(prompt_config, config_dir)
+    gen = prompt_generator
     
     # Test seed generation is deterministic
     seed1 = gen.get_time_slot_seed()
@@ -35,9 +35,9 @@ def test_time_slot_seed_generation(prompt_config, config_dir):
     assert seed_monitor_0 != seed_monitor_1
 
 
-def test_atom_selection(prompt_config, config_dir):
+def test_atom_selection(prompt_generator):
     """Test atom selection based on seed."""
-    gen = PromptGenerator(prompt_config, config_dir)
+    gen = prompt_generator
     
     atoms = ["mountain", "ocean", "forest"]
     
@@ -56,9 +56,9 @@ def test_atom_selection(prompt_config, config_dir):
     assert empty_selected == ""
 
 
-def test_wildcard_resolution(prompt_config, config_dir):
+def test_wildcard_resolution(prompt_generator):
     """Test $$wildcard$$ syntax resolution."""
-    gen = PromptGenerator(prompt_config, config_dir)
+    gen = prompt_generator
     
     # Test loading atom file
     atoms = gen._load_atom_file("subject")
@@ -70,9 +70,9 @@ def test_wildcard_resolution(prompt_config, config_dir):
     assert atoms is atoms2  # Same object from cache
 
 
-def test_variant_resolution(prompt_config, config_dir):
+def test_variant_resolution(prompt_generator):
     """Test {variant|syntax} resolution."""
-    gen = PromptGenerator(prompt_config, config_dir)
+    gen = prompt_generator
     
     # Test parsing weighted options
     options = gen._parse_weighted_options("0.5::rare|2::common|normal")
@@ -82,9 +82,9 @@ def test_variant_resolution(prompt_config, config_dir):
     assert options[2] == (1.0, "normal")
 
 
-def test_template_resolution(prompt_config, config_dir):
+def test_template_resolution(prompt_generator):
     """Test full template resolution."""
-    gen = PromptGenerator(prompt_config, config_dir)
+    gen = prompt_generator
     
     # Simple variant
     result = gen._resolve_template("{red|blue|green}", seed=42)
@@ -95,9 +95,9 @@ def test_template_resolution(prompt_config, config_dir):
     assert result == result2
 
 
-def test_template_sections(prompt_config, config_dir):
+def test_template_sections(prompt_generator):
     """Test parsing positive/negative sections."""
-    gen = PromptGenerator(prompt_config, config_dir)
+    gen = prompt_generator
     
     # TEAM_007: Test legacy format (content before first marker -> "positive")
     template = """
@@ -117,9 +117,9 @@ def test_template_sections(prompt_config, config_dir):
     assert "Comment" not in sections["positive"]
 
 
-def test_template_sections_multi(prompt_config, config_dir):
+def test_template_sections_multi(prompt_generator):
     """Test parsing multi-section templates (TEAM_007)."""
-    gen = PromptGenerator(prompt_config, config_dir)
+    gen = prompt_generator
     
     template = """
     # Multi-section template
@@ -150,21 +150,24 @@ def test_template_sections_multi(prompt_config, config_dir):
     assert "bad anatomy" in sections["subject:negative"]
 
 
-def test_prompt_pair_generation(prompt_config, config_dir):
+def test_prompt_pair_generation(prompt_generator):
     """Test generate_prompt_pair returns both prompts."""
-    gen = PromptGenerator(prompt_config, config_dir)
+    gen = prompt_generator
     
     result = gen.generate_prompt_pair(monitor_index=0)
     
-    assert isinstance(result, PromptResult)
-    assert isinstance(result.positive, str)
-    assert isinstance(result.negative, str)
-    assert len(result.positive) > 10
+    # Check type by name to avoid module identity issues
+    assert type(result).__name__ == "PromptResult"
+    assert len(result.sections()) > 0
+    # Check that at least one section has content
+    first_section = result.sections()[0]
+    assert isinstance(result.get_prompt(first_section), str)
+    assert len(result.get_prompt(first_section)) > 10
 
 
-def test_full_prompt_generation(prompt_config, config_dir):
+def test_full_prompt_generation(prompt_generator):
     """Test complete prompt generation workflow."""
-    gen = PromptGenerator(prompt_config, config_dir)
+    gen = prompt_generator
     
     prompt = gen.generate_prompt(monitor_index=0)
     
@@ -180,9 +183,9 @@ def test_full_prompt_generation(prompt_config, config_dir):
     # The seeding mechanism is tested in test_time_slot_seed_generation.
 
 
-def test_missing_template_error(prompt_config, config_dir):
+def test_missing_template_error(prompt_generator):
     """Test error when template file is missing."""
-    gen = PromptGenerator(prompt_config, config_dir)
+    gen = prompt_generator
     
     # Should raise an exception when template doesn't exist
     # Use Exception to avoid module identity issues between installed/local package
@@ -194,9 +197,9 @@ def test_missing_template_error(prompt_config, config_dir):
     assert "Template not found" in str(exc_info.value)
 
 
-def test_missing_wildcard_handling(prompt_config, config_dir):
+def test_missing_wildcard_handling(prompt_generator):
     """Test graceful handling of missing wildcard files."""
-    gen = PromptGenerator(prompt_config, config_dir)
+    gen = prompt_generator
     
     # Missing file returns empty list
     atoms = gen._load_atom_file("nonexistent/file")
@@ -207,20 +210,7 @@ def test_missing_wildcard_handling(prompt_config, config_dir):
     assert "[missing:nonexistent]" in result
 
 
-# TEAM_007: Tests for new multi-prompt functionality
-
-def test_prompt_result_backwards_compat():
-    """Test PromptResult backwards compatibility properties."""
-    result = PromptResult(
-        prompts={"positive": "a beautiful landscape"},
-        negatives={"positive": "ugly, blurry"},
-        seed=12345
-    )
-    # Old API still works
-    assert result.positive == "a beautiful landscape"
-    assert result.negative == "ugly, blurry"
-    assert result.seed == 12345
-
+# Tests for multi-prompt functionality
 
 def test_prompt_result_multi_section():
     """Test PromptResult with multiple sections."""
@@ -236,30 +226,24 @@ def test_prompt_result_multi_section():
         seed=12345
     )
     
-    # New API
     assert result.get_prompt("environment") == "mountain landscape"
     assert result.get_prompt("subject") == "woman standing right"
     assert result.get_negative("environment") == "ugly"
     assert result.get_negative("subject") == "bad anatomy"
     assert set(result.sections()) == {"environment", "subject"}
-    
-    # Backwards compat returns empty for missing "positive"
-    assert result.positive == ""
-    assert result.negative == ""
+    assert result.seed == 12345
 
 
-def test_prompt_result_from_legacy():
-    """Test PromptResult.from_legacy factory method."""
-    result = PromptResult.from_legacy(
-        positive="test prompt",
-        negative="test negative",
-        seed=42
+def test_prompt_result_missing_section():
+    """Test PromptResult returns empty string for missing sections."""
+    result = PromptResult(
+        prompts={"environment": "test"},
+        negatives={}
     )
     
-    assert result.positive == "test prompt"
-    assert result.negative == "test negative"
-    assert result.prompts == {"positive": "test prompt"}
-    assert result.negatives == {"positive": "test negative"}
+    assert result.get_prompt("environment") == "test"
+    assert result.get_prompt("nonexistent") == ""
+    assert result.get_negative("environment") == ""
 
 
 def test_prompt_result_str():

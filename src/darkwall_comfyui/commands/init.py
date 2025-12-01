@@ -5,7 +5,6 @@ import os
 from pathlib import Path
 
 from ..config import Config, NamedStateManager
-from ..prompt_generator import PromptGenerator
 from ..comfy import ComfyClient
 
 
@@ -112,34 +111,46 @@ def validate_config(config: Config) -> None:
         errors.append(f"Workflow error: {e}")
         print(f"  ✗ Workflow error: {e}")
     
-    # Validate prompt atoms
-    print("\nChecking prompt atoms...")
-    try:
-        prompt_gen = PromptGenerator(config.prompt, Config.get_config_dir())
-        for pillar, atoms in prompt_gen.atoms.items():
-            if not atoms:
-                warnings.append(f"No atoms found for {pillar}")
-                print(f"  ⚠ {pillar}: no atoms found")
+    # Validate themes
+    print("\nChecking themes...")
+    if config.themes:
+        for theme_name, theme_config in config.themes.items():
+            atoms_path = theme_config.get_atoms_path(Config.get_config_dir())
+            prompts_path = theme_config.get_prompts_path(Config.get_config_dir())
+            
+            if atoms_path.exists():
+                atom_count = len(list(atoms_path.glob('*.txt')))
+                print(f"  ✓ {theme_name}: {atom_count} atom files in {atoms_path.name}/")
             else:
-                print(f"  ✓ {pillar}: {len(atoms)} atoms")
-    except Exception as e:
-        errors.append(f"Prompt atoms error: {e}")
-        print(f"  ✗ Prompt atoms error: {e}")
+                warnings.append(f"Theme '{theme_name}': atoms directory not found")
+                print(f"  ⚠ {theme_name}: atoms directory not found at {atoms_path}")
+            
+            if prompts_path.exists():
+                prompt_count = len(list(prompts_path.glob('*.prompt')))
+                print(f"  ✓ {theme_name}: {prompt_count} prompt templates")
+            else:
+                warnings.append(f"Theme '{theme_name}': prompts directory not found")
+                print(f"  ⚠ {theme_name}: prompts directory not found at {prompts_path}")
+    else:
+        errors.append("No themes configured")
+        print("  ✗ No themes configured in config.toml")
     
     # Validate output directories
     print("\nChecking output directories...")
-    for i in range(config.monitors.count):
-        output_path = config.monitors.get_output_path(i)
-        try:
-            output_path.parent.mkdir(parents=True, exist_ok=True)
-            if os.access(output_path.parent, os.W_OK):
-                print(f"  ✓ Monitor {i}: {output_path.parent} is writable")
-            else:
-                errors.append(f"Monitor {i}: output directory is not writable")
-                print(f"  ✗ Monitor {i}: {output_path.parent} is not writable")
-        except Exception as e:
-            errors.append(f"Monitor {i}: cannot create output directory: {e}")
-            print(f"  ✗ Monitor {i}: cannot create output directory: {e}")
+    for monitor_name in config.get_active_monitor_names():
+        monitor_config = config.get_monitor_config(monitor_name)
+        if monitor_config:
+            output_path = monitor_config.get_output_path()
+            try:
+                output_path.parent.mkdir(parents=True, exist_ok=True)
+                if os.access(output_path.parent, os.W_OK):
+                    print(f"  ✓ {monitor_name}: {output_path.parent} is writable")
+                else:
+                    errors.append(f"{monitor_name}: output directory is not writable")
+                    print(f"  ✗ {monitor_name}: {output_path.parent} is not writable")
+            except Exception as e:
+                errors.append(f"{monitor_name}: cannot create output directory: {e}")
+                print(f"  ✗ {monitor_name}: cannot create output directory: {e}")
     
     # Validate wallpaper command
     print("\nChecking wallpaper command...")

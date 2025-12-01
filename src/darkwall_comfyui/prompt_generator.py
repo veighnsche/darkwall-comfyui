@@ -29,23 +29,12 @@ class PromptResult:
     """
     Result of prompt generation with named prompt sections.
     
-    TEAM_007: Updated to support arbitrary named sections for multi-prompt workflows.
-    Backwards compatible via .positive and .negative properties.
+    Supports arbitrary named sections for multi-prompt workflows
+    (e.g., environment, subject, style).
     """
-    prompts: Dict[str, str]      # {"positive": "...", "environment": "...", "subject": "..."}
-    negatives: Dict[str, str]    # {"positive": "...", "environment": "...", "subject": "..."}
+    prompts: Dict[str, str]      # {"environment": "...", "subject": "..."}
+    negatives: Dict[str, str]    # {"environment": "...", "subject": "..."}
     seed: Optional[int] = None
-    
-    # Backwards compatibility properties
-    @property
-    def positive(self) -> str:
-        """Get the 'positive' section for backwards compatibility."""
-        return self.prompts.get("positive", "")
-    
-    @property
-    def negative(self) -> str:
-        """Get the 'positive:negative' section for backwards compatibility."""
-        return self.negatives.get("positive", "")
     
     def get_prompt(self, section: str) -> str:
         """Get a named prompt section."""
@@ -58,15 +47,6 @@ class PromptResult:
     def sections(self) -> List[str]:
         """List all available prompt sections."""
         return list(self.prompts.keys())
-    
-    @classmethod
-    def from_legacy(cls, positive: str, negative: str = "", seed: int = None) -> 'PromptResult':
-        """Create from legacy positive/negative format."""
-        return cls(
-            prompts={"positive": positive},
-            negatives={"positive": negative} if negative else {},
-            seed=seed
-        )
     
     def __str__(self) -> str:
         """String representation for logging."""
@@ -110,9 +90,14 @@ class PromptGenerator:
         self.config_dir = config_dir
         self.logger = logging.getLogger(__name__)
         
-        # TEAM_001: Theme-aware paths (fall back to legacy if not provided)
-        self._atoms_dir = atoms_dir or (config_dir / prompt_config.atoms_dir)
-        self._prompts_dir = prompts_dir or (config_dir / "prompts")
+        # Theme-aware paths (must be provided via from_config factory)
+        if atoms_dir is None or prompts_dir is None:
+            raise PromptError(
+                "atoms_dir and prompts_dir are required. "
+                "Use PromptGenerator.from_config() to create instances."
+            )
+        self._atoms_dir = atoms_dir
+        self._prompts_dir = prompts_dir
         
         # Cache for loaded atom files
         self._atom_cache: Dict[str, List[str]] = {}
@@ -471,12 +456,8 @@ class PromptGenerator:
         """
         result = self.generate_prompt_pair(monitor_index, template_path)
         
-        # For legacy single-section templates, use .positive
+        # Combine all positive prompts from all sections
         sections = result.sections()
-        if 'positive' in sections:
-            return result.positive
-        
-        # For multi-section templates, combine all positive prompts
         return "\n\n".join(result.get_prompt(s) for s in sections if result.get_prompt(s))
     
     def generate_prompt_pair(self, monitor_index: int = None, template_path: str = None, seed: int = None) -> PromptResult:

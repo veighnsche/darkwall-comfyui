@@ -12,21 +12,14 @@ from ..exceptions import PromptError
 
 def format_prompt_result(result: PromptResult) -> Tuple[str, str]:
     """
-    Format a PromptResult for display, handling both legacy and multi-section formats.
+    Format a PromptResult for display.
     
-    TEAM_007: For multi-section prompts (environment/subject), combines all sections.
-    For legacy single-section prompts, uses .positive/.negative properties.
+    Combines all sections with labels for multi-section prompts.
     
     Returns:
         Tuple of (all_positives, all_negatives) as formatted strings
     """
     sections = result.sections()
-    
-    # Legacy format: single 'positive' section
-    if sections == ['positive'] or (len(sections) == 1 and 'positive' in sections):
-        return result.positive, result.negative
-    
-    # Multi-section format: combine all sections with labels
     positives = []
     negatives = []
     
@@ -282,8 +275,8 @@ def handle_preview_command(args, config: Config) -> None:
         if template_name and not template_name.endswith('.prompt'):
             template_name = f"{template_name}.prompt"
         
-        # Create prompt generator
-        prompt_gen = PromptGenerator(config.prompt, config.get_config_dir())
+        # Create prompt generator using factory method
+        prompt_gen = PromptGenerator.from_config(config)
         
         # Generate seed
         if args.seed is not None:
@@ -391,8 +384,13 @@ def handle_interactive_command(args, config: Optional[Config]) -> None:
             return sorted([f.stem for f in prompts_dir.glob("*.prompt")])
         return ["default"]
     
-    def select_option(prompt_text: str, options: list, allow_random: bool = True) -> str:
-        """Interactive selection menu."""
+    def select_option(prompt_text: str, options: list, allow_random: bool = True) -> tuple:
+        """Interactive selection menu.
+        
+        Returns:
+            Tuple of (selected_value, is_random). If is_random is True, the value
+            should be re-randomized on each use.
+        """
         print(f"{YELLOW}{prompt_text}{NC}")
         
         display_options = options.copy()
@@ -407,16 +405,14 @@ def handle_interactive_command(args, config: Optional[Config]) -> None:
                 choice = input(f"Enter number (1-{len(display_options)}): ").strip().lower()
                 
                 if choice == 'r' and allow_random:
-                    import random
-                    return random.choice(options)
+                    return ("random", True)
                 
                 idx = int(choice) - 1
                 if 0 <= idx < len(display_options):
                     selected = display_options[idx]
                     if selected == "random":
-                        import random
-                        return random.choice(options)
-                    return selected
+                        return ("random", True)
+                    return (selected, False)
                 print(f"{YELLOW}Invalid choice, try again{NC}")
             except (ValueError, KeyboardInterrupt):
                 if isinstance(choice, str) and choice == '':
@@ -489,9 +485,16 @@ def handle_interactive_command(args, config: Optional[Config]) -> None:
         print(f"Theme: {theme} | Template: {template} | Seed: {seed}")
         print("-" * 60)
     
+    def resolve_selection(selection: str, is_random: bool, options: list) -> str:
+        """Resolve a selection, picking a random value if needed."""
+        import random as rand_module
+        if is_random:
+            return rand_module.choice(options)
+        return selection
+    
     # Main loop
-    last_theme = None
-    last_template = None
+    last_theme_selection = None  # (value, is_random)
+    last_template_selection = None  # (value, is_random)
     
     try:
         while True:
@@ -500,18 +503,25 @@ def handle_interactive_command(args, config: Optional[Config]) -> None:
             # Theme selection
             print(f"{BOLD}Step 1: Select Theme{NC}")
             themes = get_themes()
-            if last_theme:
-                print(f"{GREEN}(Last: {last_theme}){NC}")
-            theme = select_option("Choose theme:", themes)
-            last_theme = theme
+            if last_theme_selection:
+                label = "random" if last_theme_selection[1] else last_theme_selection[0]
+                print(f"{GREEN}(Last: {label}){NC}")
+            theme_selection, theme_is_random = select_option("Choose theme:", themes)
+            last_theme_selection = (theme_selection, theme_is_random)
+            theme = resolve_selection(theme_selection, theme_is_random, themes)
             
             # Template selection
             print(f"\n{BOLD}Step 2: Select Prompt Template{NC}")
             prompts = get_prompts(theme)
-            if last_template and last_template in prompts:
-                print(f"{GREEN}(Last: {last_template}){NC}")
-            template = select_option("Choose template:", prompts)
-            last_template = template
+            if last_template_selection:
+                label = "random" if last_template_selection[1] else last_template_selection[0]
+                if not last_template_selection[1] and last_template_selection[0] in prompts:
+                    print(f"{GREEN}(Last: {label}){NC}")
+                elif last_template_selection[1]:
+                    print(f"{GREEN}(Last: {label}){NC}")
+            template_selection, template_is_random = select_option("Choose template:", prompts)
+            last_template_selection = (template_selection, template_is_random)
+            template = resolve_selection(template_selection, template_is_random, prompts)
             
             # Generate
             print(f"\n{BOLD}Generating prompt...{NC}")
@@ -552,7 +562,15 @@ def handle_interactive_command(args, config: Optional[Config]) -> None:
                     choice = input("Choose: ").strip()
                     idx = int(choice) - 1
                     
-                    if idx == 0:  # Same settings
+                    if idx == 0:  # Same settings - re-resolve random selections
+                        # Re-resolve theme if it was random
+                        if last_theme_selection and last_theme_selection[1]:
+                            theme = resolve_selection(last_theme_selection[0], True, themes)
+                            # Also re-fetch prompts for new theme
+                            prompts = get_prompts(theme)
+                        # Re-resolve template if it was random
+                        if last_template_selection and last_template_selection[1]:
+                            template = resolve_selection(last_template_selection[0], True, prompts)
                         result, seed = generate_prompt(theme, template)
                         display_prompt(result, theme, template, seed)
                     elif idx == 1:  # New settings

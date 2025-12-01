@@ -380,9 +380,9 @@ def test_inject_prompts_legacy_placeholders(comfyui_config):
         }
     }
     
-    prompts = PromptResult.from_legacy(
-        positive="beautiful landscape",
-        negative="ugly, blurry"
+    prompts = PromptResult(
+        prompts={"positive": "beautiful landscape"},
+        negatives={"positive": "ugly, blurry"}
     )
     
     result = client._inject_prompts(workflow, prompts)
@@ -525,7 +525,7 @@ def test_inject_prompts_deep_copy(comfyui_config):
         }
     }
     
-    prompts = PromptResult.from_legacy(positive="new prompt")
+    prompts = PromptResult(prompts={"positive": "new prompt"}, negatives={})
     
     result = client._inject_prompts(workflow, prompts)
     

@@ -6,16 +6,12 @@ Handles saving wallpapers to disk and coordinating with wallpaper setters.
 
 import logging
 import os
-from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Optional
 
-from ..config import Config, MonitorsConfig
+from ..config import MonitorsConfig
 from ..exceptions import CommandError
 from .setters import get_setter, WallpaperSetter
-
-# TEAM_006: MonitorConfig deleted - using MonitorsConfig
-
 
 class WallpaperTarget:
     """
@@ -90,24 +86,6 @@ class WallpaperTarget:
         except Exception as e:
             raise CommandError(f"Unexpected error saving wallpaper to {output_path}: {e}")
     
-    def set_wallpaper(self, wallpaper_path: Path, monitor_index: int) -> bool:
-        """
-        Set wallpaper using configured command.
-        
-        Args:
-            wallpaper_path: Path to wallpaper image
-            monitor_index: Monitor index
-            
-        Returns:
-            True if successful
-        """
-        # Prefer an explicit monitor output name from configuration (e.g. "eDP-1",
-        # "HDMI-A-1") so setters don't have to guess based on index.
-        monitor_name = None
-        if hasattr(self.monitor_config, "get_monitor_name"):
-            monitor_name = self.monitor_config.get_monitor_name(monitor_index)
-        return self.setter.set(wallpaper_path, monitor_index, monitor_name)
-    
     def set_wallpaper_by_name(self, wallpaper_path: Path, monitor_name: str) -> bool:
         """
         Set wallpaper using monitor name directly.
@@ -124,33 +102,3 @@ class WallpaperTarget:
         # Use index 0 as placeholder since we have the name
         return self.setter.set(wallpaper_path, 0, monitor_name)
     
-    def _extract_monitor_index(self, path: Path) -> int:
-        """Extract monitor index from filename like 'monitor_0.png'."""
-        stem = path.stem
-        if "monitor_" in stem:
-            try:
-                return int(stem.split("monitor_")[1].split("_")[0])
-            except (ValueError, IndexError):
-                pass
-        return 0
-    
-    def get_info(self, monitor_index: int) -> dict[str, Any]:
-        """Get info about wallpaper for a specific monitor."""
-        path = self.monitor_config.get_output_path(monitor_index)
-        
-        if not path.exists():
-            return {"exists": False, "path": str(path), "monitor_index": monitor_index}
-        
-        stat = path.stat()
-        return {
-            "exists": True,
-            "path": str(path),
-            "monitor_index": monitor_index,
-            "size_bytes": stat.st_size,
-            "size_mb": round(stat.st_size / (1024 * 1024), 2),
-            "modified": datetime.fromtimestamp(stat.st_mtime).isoformat(),
-        }
-    
-    def list_all(self) -> list[dict[str, Any]]:
-        """List wallpaper info for all monitors."""
-        return [self.get_info(i) for i in range(self.monitor_config.count)]

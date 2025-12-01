@@ -17,12 +17,69 @@ from ..prompt_generator import PromptResult
 
 logger = logging.getLogger(__name__)
 
+
+def _is_web_format(workflow: dict[str, Any]) -> bool:
+    """Detect if workflow is in web/Litegraph format vs API format."""
+    # Web format has 'nodes' array, API format has node IDs as keys
+    return 'nodes' in workflow and isinstance(workflow.get('nodes'), list)
+
+
+def _iter_text_fields_api(workflow: dict[str, Any]):
+    """Iterate over text fields in API format workflow.
+    
+    Yields: (node_id, node, field_name, value, setter_func)
+    """
+    for node_id, node in workflow.items():
+        if not isinstance(node, dict):
+            continue
+        
+        inputs = node.get('inputs', {})
+        for field, value in inputs.items():
+            if isinstance(value, str):
+                def setter(new_val, inp=inputs, f=field):
+                    inp[f] = new_val
+                yield node_id, node, field, value, setter
+
+
+def _iter_text_fields_web(workflow: dict[str, Any]):
+    """Iterate over text fields in web/Litegraph format workflow.
+    
+    Web format stores values in widgets_values array.
+    
+    Yields: (node_id, node, field_name, value, setter_func)
+    """
+    nodes = workflow.get('nodes', [])
+    for node in nodes:
+        if not isinstance(node, dict):
+            continue
+        
+        node_id = node.get('id', 'unknown')
+        widgets_values = node.get('widgets_values', [])
+        
+        for idx, value in enumerate(widgets_values):
+            if isinstance(value, str):
+                def setter(new_val, wv=widgets_values, i=idx):
+                    wv[i] = new_val
+                yield node_id, node, f'widgets_values[{idx}]', value, setter
+
+
+def _iter_text_fields(workflow: dict[str, Any]):
+    """Iterate over text fields in workflow, auto-detecting format.
+    
+    Yields: (node_id, node, field_name, value, setter_func)
+    """
+    if _is_web_format(workflow):
+        yield from _iter_text_fields_web(workflow)
+    else:
+        yield from _iter_text_fields_api(workflow)
+
+
 # TEAM_007: Regex patterns for $$section$$ placeholder format
 # Uses $$ to avoid conflict with __wildcard__ atom syntax
-# Matches $$section_name$$ for positive prompts
-# Matches $$section_name:negative$$ for negative prompts
-_SECTION_PATTERN = re.compile(r'^\$\$([a-z0-9_]+)\$\$$')
-_NEGATIVE_SECTION_PATTERN = re.compile(r'^\$\$([a-z0-9_]+):negative\$\$$')
+# Matches $$section_name$$ for positive prompts (anywhere in string)
+# Matches $$section_name:negative$$ for negative prompts (anywhere in string)
+_SECTION_PATTERN = re.compile(r'\$\$([a-z0-9_]+)\$\$')
+_NEGATIVE_SECTION_PATTERN = re.compile(r'\$\$([a-z0-9_]+):negative\$\$')
 
 
 def inject_prompt(workflow: dict[str, Any], prompt: str) -> dict[str, Any]:
@@ -66,13 +123,14 @@ def inject_prompts(workflow: dict[str, Any], prompts: PromptResult) -> dict[str,
     Inject prompts into workflow nodes using placeholders.
     
     TEAM_007: Uses $$section$$ syntax to avoid conflict with __wildcard__ atoms.
+    Supports both API format and web/Litegraph format workflows.
     
     Placeholder formats:
         $$section_name$$          -> prompts.prompts["section_name"]
         $$section_name:negative$$ -> prompts.negatives["section_name"]
     
     Args:
-        workflow: ComfyUI workflow dict (API format)
+        workflow: ComfyUI workflow dict (API or web format)
         prompts: PromptResult with named sections
         
     Returns:
@@ -86,42 +144,40 @@ def inject_prompts(workflow: dict[str, Any], prompts: PromptResult) -> dict[str,
     injected: set[str] = set()
     missing_sections: set[str] = set()
     
-    for node_id, node in workflow.items():
-        if not isinstance(node, dict):
-            continue
+    is_web = _is_web_format(workflow)
+    logger.debug(f"Workflow format: {'web/Litegraph' if is_web else 'API'}")
+    
+    for node_id, node, field, value, setter in _iter_text_fields(workflow):
+        new_value = value
         
-        inputs = node.get('inputs', {})
+        # Find and replace all negative section placeholders: $$name:negative$$
+        for match in _NEGATIVE_SECTION_PATTERN.finditer(value):
+            section = match.group(1)
+            placeholder = match.group(0)
+            if section in prompts.negatives:
+                new_value = new_value.replace(placeholder, prompts.negatives[section])
+                logger.debug(f"Injected {section}:negative into node {node_id}.{field}")
+                injected.add(f"{section}:negative")
+            else:
+                # For negatives, use empty string if missing (lenient mode)
+                new_value = new_value.replace(placeholder, "")
+                logger.debug(f"No {section}:negative in template, using empty string")
+                missing_sections.add(f"{section}:negative")
         
-        for field, value in inputs.items():
-            if not isinstance(value, str):
-                continue
-            
-            # Check for negative section first: __name:negative__
-            match = _NEGATIVE_SECTION_PATTERN.match(value)
-            if match:
-                section = match.group(1)
-                if section in prompts.negatives:
-                    inputs[field] = prompts.negatives[section]
-                    logger.debug(f"Injected {section}:negative into node {node_id}.{field}")
-                    injected.add(f"{section}:negative")
-                else:
-                    # For negatives, use empty string if missing (lenient mode)
-                    inputs[field] = ""
-                    logger.debug(f"No {section}:negative in template, using empty string")
-                    missing_sections.add(f"{section}:negative")
-                continue
-            
-            # Check for positive section: __name__
-            match = _SECTION_PATTERN.match(value)
-            if match:
-                section = match.group(1)
-                if section in prompts.prompts:
-                    inputs[field] = prompts.prompts[section]
-                    logger.debug(f"Injected {section} into node {node_id}.{field}")
-                    injected.add(section)
-                else:
-                    missing_sections.add(section)
-                continue
+        # Find and replace all positive section placeholders: $$name$$
+        for match in _SECTION_PATTERN.finditer(new_value):
+            section = match.group(1)
+            placeholder = match.group(0)
+            if section in prompts.prompts:
+                new_value = new_value.replace(placeholder, prompts.prompts[section])
+                logger.debug(f"Injected {section} into node {node_id}.{field}")
+                injected.add(section)
+            else:
+                missing_sections.add(section)
+        
+        # Update value if changed
+        if new_value != value:
+            setter(new_value)
     
     # Validate: at least one prompt was injected
     prompt_injections = [i for i in injected if not i.endswith(':negative')]

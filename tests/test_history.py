@@ -101,10 +101,9 @@ class TestWallpaperHistory:
     @pytest.fixture
     def mock_prompt_result(self):
         """Create mock prompt result."""
-        # TEAM_007: Use new PromptResult format with prompts/negatives dicts
-        return PromptResult.from_legacy(
-            positive="test positive prompt",
-            negative="test negative prompt"
+        return PromptResult(
+            prompts={"environment": "test positive prompt"},
+            negatives={"environment": "test negative prompt"}
         )
     
     def test_init_creates_directory(self, history_config):
@@ -136,8 +135,10 @@ class TestWallpaperHistory:
         assert entry.filename.endswith(".png")
         assert entry.monitor_index == 0
         assert entry.prompt_id == "test-prompt-id"
-        assert entry.positive_prompt == "test positive prompt"
-        assert entry.negative_prompt == "test negative prompt"
+        assert "[ENVIRONMENT]" in entry.positive_prompt
+        assert "test positive prompt" in entry.positive_prompt
+        assert "[ENVIRONMENT]" in entry.negative_prompt
+        assert "test negative prompt" in entry.negative_prompt
         assert entry.template == "test.prompt"
         assert entry.workflow == "test.json"
         assert entry.seed == 12345

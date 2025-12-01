@@ -10,10 +10,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional, Union
 
 from ..config import Config, NamedStateManager
-from ..prompt_generator import PromptGenerator
 from ..comfy import ComfyClient
-
-# TEAM_006: ConfigV2 deleted - merged into Config
 
 
 def _get_comfyui_status(config: Config) -> Dict[str, Any]:
@@ -189,11 +186,15 @@ def show_status(config: Config, json_output: bool = False) -> None:
         else:
             print(f"  {active} {name}: not generated")
     
-    # Atom counts
-    print(f"\nPrompt Atoms")
-    try:
-        prompt_gen = PromptGenerator(config.prompt, Config.get_config_dir())
-        for pillar, atoms in prompt_gen.atoms.items():
-            print(f"  {pillar:12} {len(atoms)} atoms")
-    except FileNotFoundError as e:
-        print(f"  ERROR: {e}")
+    # Theme info
+    print(f"\nThemes")
+    if config.themes:
+        for theme_name, theme_config in config.themes.items():
+            atoms_path = theme_config.get_atoms_path(Config.get_config_dir())
+            if atoms_path.exists():
+                atom_count = len(list(atoms_path.glob('*.txt')))
+                print(f"  {theme_name:12} {atom_count} atom files")
+            else:
+                print(f"  {theme_name:12} (atoms not found)")
+    else:
+        print("  No themes configured")

@@ -12,7 +12,7 @@ import logging
 import random
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional
+from typing import Callable, List, Optional
 
 from tqdm import tqdm
 
@@ -33,6 +33,85 @@ from ..exceptions import ConfigError, WorkflowError, GenerationError, PromptErro
 logger = logging.getLogger(__name__)
 
 _progress_bars = {}
+
+
+def _make_ws_event_handler(workflow: dict) -> Callable[[object], None]:
+    """
+    Create a WebSocket event handler with workflow context for node name lookup.
+    
+    Args:
+        workflow: The ComfyUI workflow dict for looking up node metadata
+        
+    Returns:
+        Event handler function that prints node execution progress
+    """
+    def handler(event: object) -> None:
+        """Forward ComfyUI websocket events to stdout with node names."""
+        try:
+            if isinstance(event, dict):
+                event_type = event.get("type")
+                data = event.get("data", {})
+
+                if event_type == "executing" and isinstance(data, dict):
+                    node = data.get("node")
+
+                    if node is None:
+                        prompt_id = data.get("prompt_id")
+                        bar = _progress_bars.pop(prompt_id, None)
+                        if bar is not None:
+                            bar.close()
+                        print("[comfy] done", flush=True)
+                    else:
+                        # Look up node name from workflow
+                        node_info = workflow.get(str(node), {})
+                        meta = node_info.get("_meta", {})
+                        title = meta.get("title")
+                        class_type = node_info.get("class_type", "")
+                        
+                        if title:
+                            node_display = f"{node} ({title})"
+                        elif class_type:
+                            node_display = f"{node} ({class_type})"
+                        else:
+                            node_display = str(node)
+                        
+                        print(f"[comfy] executing node={node_display}", flush=True)
+                    return
+
+                if event_type == "progress" and isinstance(data, dict):
+                    prompt_id = data.get("prompt_id")
+                    node = data.get("node")
+                    value = data.get("value")
+                    max_value = data.get("max")
+
+                    if prompt_id and isinstance(value, (int, float)) and isinstance(max_value, (int, float)):
+                        # Look up node name for progress bar description
+                        node_info = workflow.get(str(node), {})
+                        meta = node_info.get("_meta", {})
+                        title = meta.get("title")
+                        class_type = node_info.get("class_type", "")
+                        desc = title or class_type or f"node {node}"
+                        
+                        bar = _progress_bars.get(prompt_id)
+                        if bar is None or bar.total != max_value:
+                            if bar is not None:
+                                bar.close()
+                            bar = tqdm(total=max_value, desc=desc, leave=False)
+                            _progress_bars[prompt_id] = bar
+
+                        if value < bar.n:
+                            bar.close()
+                            bar = tqdm(total=max_value, desc=desc, leave=False)
+                            _progress_bars[prompt_id] = bar
+
+                        delta = value - bar.n
+                        if delta > 0:
+                            bar.update(delta)
+                    return
+        except Exception:
+            pass
+    
+    return handler
 
 
 def _get_available_prompts(config: Config, theme_name: Optional[str] = None) -> List[str]:
@@ -101,55 +180,6 @@ def _select_template_for_workflow(
     
     logger.debug(f"Selected template '{selected}' for workflow '{workflow_id}' (from {len(eligible)} eligible)")
     return selected
-
-
-def _proxy_ws_event_to_stdout(event: object) -> None:
-    """Forward ComfyUI websocket events to stdout."""
-    try:
-        if isinstance(event, dict):
-            event_type = event.get("type")
-            data = event.get("data", {})
-
-            if event_type == "executing" and isinstance(data, dict):
-                prompt_id = data.get("prompt_id")
-                node = data.get("node")
-
-                if node is None:
-                    bar = _progress_bars.pop(prompt_id, None)
-                    if bar is not None:
-                        bar.close()
-                    msg = f"[comfy] done prompt_id={prompt_id}"
-                else:
-                    msg = f"[comfy] executing node={node} prompt_id={prompt_id}"
-
-                print(msg, flush=True)
-                return
-
-            if event_type == "progress" and isinstance(data, dict):
-                prompt_id = data.get("prompt_id")
-                node = data.get("node")
-                value = data.get("value")
-                max_value = data.get("max")
-
-                if prompt_id and isinstance(value, (int, float)) and isinstance(max_value, (int, float)):
-                    bar = _progress_bars.get(prompt_id)
-                    if bar is None or bar.total != max_value:
-                        if bar is not None:
-                            bar.close()
-                        bar = tqdm(total=max_value, desc=f"comfy {node}", leave=False)
-                        _progress_bars[prompt_id] = bar
-
-                    if value < bar.n:
-                        bar.close()
-                        bar = tqdm(total=max_value, desc=f"comfy {node}", leave=False)
-                        _progress_bars[prompt_id] = bar
-
-                    delta = value - bar.n
-                    if delta > 0:
-                        bar.update(delta)
-                return
-    except Exception:
-        pass
 
 
 def generate_for_monitor(
@@ -233,14 +263,9 @@ def generate_for_monitor(
         workflow_path = str(monitor_config.get_workflow_path(Config.get_config_dir()))
         workflow_id = monitor_config.workflow
     
-    # TEAM_006: Use theme-aware PromptGenerator
-    if current_theme_name and config.themes and current_theme_name in config.themes:
-        # Use theme-aware paths for atoms and prompts
-        prompt_gen = PromptGenerator.from_config(config, current_theme_name)
-        logger.info(f"Using theme-aware prompt generator for '{current_theme_name}'")
-    else:
-        # Fallback to default paths
-        prompt_gen = PromptGenerator(config.prompt, Config.get_config_dir())
+    # Create theme-aware PromptGenerator
+    prompt_gen = PromptGenerator.from_config(config, current_theme_name)
+    logger.info(f"Using prompt generator for theme '{current_theme_name}'")
     monitor_seed_offset = hash(monitor_name) % 10000
     base_seed = prompt_gen.get_time_slot_seed(monitor_index=monitor_seed_offset)
     
@@ -288,9 +313,11 @@ def generate_for_monitor(
         monitor_index=monitor_seed_offset,
         template_path=template_path,
     )
-    logger.info(f"Prompt: {prompts.positive[:100]}...")
-    if prompts.negative:
-        logger.info(f"Negative: {prompts.negative[:100]}...")
+    # Log prompt sections
+    for section in prompts.sections():
+        text = prompts.get_prompt(section)
+        if text:
+            logger.info(f"[{section}]: {text[:80]}...")
     
     # Load workflow
     workflow_mgr = WorkflowManager(config.comfyui)
@@ -301,7 +328,7 @@ def generate_for_monitor(
     if not client.health_check():
         raise GenerationError(f"ComfyUI not reachable at {config.comfyui.base_url}")
     
-    result = client.generate(workflow, prompts, on_event=_proxy_ws_event_to_stdout)
+    result = client.generate(workflow, prompts, on_event=_make_ws_event_handler(workflow))
     logger.info(f"Generated: {result.filename}")
     
     # TEAM_006: Use MonitorsConfig directly (no legacy wrapper)
@@ -335,8 +362,8 @@ def generate_for_monitor(
         theme_name=current_theme_name,
         workflow_id=workflow_id,
         template=template_path,
-        prompt=prompts.positive,
-        negative_prompt=prompts.negative,
+        prompts=prompts.prompts,
+        negatives=prompts.negatives,
         seed=base_seed,
         output_path=str(saved_path),
         history_path=str(history_entry.path) if history_entry else None,
@@ -349,7 +376,7 @@ def generate_for_monitor(
         notifier.notify_wallpaper_changed(
             monitor_name=monitor_name,
             image_path=saved_path,
-            prompt=prompts.positive[:100] if prompts.positive else None,
+            prompt=str(prompts)[:100] if prompts.prompts else None,
         )
     
     logger.info("Generation complete")
@@ -473,10 +500,10 @@ def retry_last(
     theme_name = last_gen['theme_name']
     workflow_id = last_gen['workflow_id']
     template = last_gen['template']
-    prompt = last_gen['prompt']
-    negative_prompt = last_gen.get('negative_prompt')
+    stored_prompts = last_gen['prompts']
+    stored_negatives = last_gen.get('negatives', {})
     old_seed = last_gen['seed']
-    output_path = last_gen['output_path']
+    output_path = Path(last_gen['output_path'])
     history_path = last_gen.get('history_path')
     
     # Generate new seed (different from old)
@@ -490,9 +517,9 @@ def retry_last(
         print(f"  Theme: {theme_name}")
         print(f"  Workflow: {workflow_id}")
         print(f"  Template: {template}")
-        print(f"  Prompt: {prompt[:100]}...")
-        if negative_prompt:
-            print(f"  Negative: {negative_prompt[:80]}...")
+        print(f"  Sections: {list(stored_prompts.keys())}")
+        for section, text in stored_prompts.items():
+            print(f"  [{section}]: {text[:80]}...")
         print(f"  Old seed: {old_seed}")
         print(f"  New seed: {new_seed}")
         if delete_failed:
@@ -526,17 +553,17 @@ def retry_last(
     # Build workflow path
     workflow_path = str(Config.get_config_dir() / "workflows" / f"{workflow_id}.json")
     
-    # Create prompt result with the same prompt but new seed
+    # Create prompt result with the stored prompts/negatives and new seed
     from ..prompt_generator import PromptResult
     prompts = PromptResult(
-        positive=prompt,
-        negative=negative_prompt,
+        prompts=stored_prompts,
+        negatives=stored_negatives,
         seed=new_seed,
     )
     
     logger.info(f"Generating with same prompt, new seed {new_seed}")
     logger.info(f"Workflow: {workflow_path}")
-    logger.info(f"Prompt: {prompt[:100]}...")
+    logger.info(f"Sections: {list(stored_prompts.keys())}")
     
     # Load workflow
     workflow_mgr = WorkflowManager(config.comfyui)
@@ -547,7 +574,7 @@ def retry_last(
     if not client.health_check():
         raise GenerationError(f"ComfyUI not reachable at {config.comfyui.base_url}")
     
-    result = client.generate(workflow, prompts, on_event=_proxy_ws_event_to_stdout)
+    result = client.generate(workflow, prompts, on_event=_make_ws_event_handler(workflow))
     logger.info(f"Generated: {result.filename}")
     
     # Save wallpaper
@@ -579,8 +606,8 @@ def retry_last(
         theme_name=theme_name,
         workflow_id=workflow_id,
         template=template,
-        prompt=prompt,
-        negative_prompt=negative_prompt,
+        prompts=stored_prompts,
+        negatives=stored_negatives,
         seed=new_seed,
         output_path=str(saved_path),
         history_path=str(history_entry.path) if history_entry else None,
